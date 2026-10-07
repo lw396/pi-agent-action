@@ -146,11 +146,11 @@ export function parseGitHubContext(): GitHubContext {
     actor: context.actor,
     inputs: {
       prompt: process.env.PROMPT || "",
-      triggerPhrase: process.env.TRIGGER_PHRASE ?? "@claude",
+      triggerPhrase: process.env.TRIGGER_PHRASE ?? "@pi",
       assigneeTrigger: process.env.ASSIGNEE_TRIGGER ?? "",
       labelTrigger: process.env.LABEL_TRIGGER ?? "",
       baseBranch: process.env.BASE_BRANCH,
-      branchPrefix: process.env.BRANCH_PREFIX ?? "claude/",
+      branchPrefix: process.env.BRANCH_PREFIX ?? "pi/",
       branchNameTemplate: process.env.BRANCH_NAME_TEMPLATE,
       useStickyComment: process.env.USE_STICKY_COMMENT === "true",
       classifyInlineComments: process.env.CLASSIFY_INLINE_COMMENTS !== "false",

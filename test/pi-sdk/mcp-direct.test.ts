@@ -16,7 +16,7 @@ const COMMENT_SERVER = join(
   import.meta.dir,
   "../../src/mcp/github-comment-server.ts",
 );
-const TOOL = "mcp__github_comment__update_claude_comment";
+const TOOL = "mcp__github_comment__update_comment";
 
 let current: FauxSession | undefined;
 afterEach(() => {

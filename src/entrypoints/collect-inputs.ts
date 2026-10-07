@@ -1,10 +1,10 @@
 export function collectActionInputsPresence(): string {
   const inputDefaults: Record<string, string> = {
-    trigger_phrase: "@claude",
+    trigger_phrase: "@pi",
     assignee_trigger: "",
-    label_trigger: "claude",
+    label_trigger: "pi",
     base_branch: "",
-    branch_prefix: "claude/",
+    branch_prefix: "pi/",
     allowed_bots: "",
     mode: "tag",
     model: "",

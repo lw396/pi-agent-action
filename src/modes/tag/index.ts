@@ -136,7 +136,7 @@ export async function prepareTagMode({
     "Grep",
     "LS",
     "Read",
-    "mcp__github_comment__update_claude_comment",
+    "mcp__github_comment__update_comment",
     "mcp__github_ci__get_ci_status",
     "mcp__github_ci__get_workflow_run_details",
     "mcp__github_ci__download_job_log",

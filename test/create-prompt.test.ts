@@ -794,7 +794,7 @@ describe("generatePrompt", () => {
     expect(prompt).toContain("scripts/git-push.sh origin");
 
     // Should use the minimal comment tool
-    expect(prompt).toContain("mcp__github_comment__update_claude_comment");
+    expect(prompt).toContain("mcp__github_comment__update_comment");
 
     // Should not have commit signing tool references
     expect(prompt).not.toContain("mcp__github_file_ops__commit_files");
@@ -826,7 +826,7 @@ describe("generatePrompt", () => {
       'mcp__github_file_ops__delete_files: {"files":',
     );
     // Comment tool should always be from comment server, not file ops
-    expect(prompt).toContain("mcp__github_comment__update_claude_comment");
+    expect(prompt).toContain("mcp__github_comment__update_comment");
 
     // Should not have git command instructions
     expect(prompt).not.toContain("Use git commands via the Bash tool");
@@ -1085,7 +1085,7 @@ describe("buildAllowedToolsString", () => {
     expect(result).toContain("Bash(git add:*)");
     expect(result).toContain("Bash(git commit:*)");
     expect(result).toContain("scripts/git-push.sh:*)");
-    expect(result).toContain("mcp__github_comment__update_claude_comment");
+    expect(result).toContain("mcp__github_comment__update_comment");
 
     // Should not have commit signing tools
     expect(result).not.toContain("mcp__github_file_ops__commit_files");
@@ -1106,7 +1106,7 @@ describe("buildAllowedToolsString", () => {
     // Should have specific Bash git commands for non-signing mode
     expect(result).toContain("Bash(git add:*)");
     expect(result).toContain("Bash(git commit:*)");
-    expect(result).toContain("mcp__github_comment__update_claude_comment");
+    expect(result).toContain("mcp__github_comment__update_comment");
 
     // Should not have commit signing tools
     expect(result).not.toContain("mcp__github_file_ops__commit_files");
@@ -1179,7 +1179,7 @@ describe("buildAllowedToolsString", () => {
     expect(result).toContain("mcp__github_file_ops__commit_files");
     expect(result).toContain("mcp__github_file_ops__delete_files");
     // Comment tool should always be from github_comment server
-    expect(result).toContain("mcp__github_comment__update_claude_comment");
+    expect(result).toContain("mcp__github_comment__update_comment");
 
     // Bash should NOT be included when using commit signing (except in comment tool name)
     expect(result).not.toContain("Bash(");
@@ -1203,7 +1203,7 @@ describe("buildAllowedToolsString", () => {
     expect(result).toContain("Bash(git rm:*)");
 
     // Comment tool from minimal server should be included
-    expect(result).toContain("mcp__github_comment__update_claude_comment");
+    expect(result).toContain("mcp__github_comment__update_comment");
 
     // Commit signing tools should NOT be included
     expect(result).not.toContain("mcp__github_file_ops__commit_files");
@@ -1226,7 +1226,7 @@ describe("buildAllowedToolsString", () => {
     expect(result).toContain("mcp__github_ci__get_ci_status");
 
     // Comment tool from minimal server should be included
-    expect(result).toContain("mcp__github_comment__update_claude_comment");
+    expect(result).toContain("mcp__github_comment__update_comment");
 
     // Commit signing tools should NOT be included
     expect(result).not.toContain("mcp__github_file_ops__commit_files");

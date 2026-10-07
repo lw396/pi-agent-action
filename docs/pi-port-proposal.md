@@ -89,7 +89,7 @@ pi 在 2026-10-02 发布了 1.0 版本，内置了 MCP 支持（参见 `packages
 - **必须替换**：`claude_args` → `pi_args`（只放 pi 自己的参数）；所有认证相关输入（见下文"模型与认证"）；`path_to_claude_code_executable`；插件相关输入。
 - **删除**：`settings`。上游常见的 key 都有了新位置（`model` → `model` 输入，`env` → workflow 的 `env:`，`permissions` → `allowed_tools`）；同名但改收 pi 格式会让旧配置静默失效；pi 的部分设置（`defaultProjectTrust`、`packages`、`shellPath`）能绕开安全默认值。以后有需要再加 `pi_settings`。
 - **新增**：`model`（必填）、`api_key`（可选）、`allowed_tools` / `disallowed_tools`（沿用 Claude 语法）、`json_schema`（输出仍叫 `structured_output`），以及 bash env 白名单的放行输入（名称待定）。
-- **更换默认值**：触发词 `@claude` → `@pi`，分支前缀 `claude/` → `pi/`；`bot_name` / `bot_id` 由 GitHub App 决定，待定。
+- **更换默认值**：触发词 `@claude` → `@pi`，触发标签 `claude` → `pi`，分支前缀 `claude/` → `pi/`；`bot_name` / `bot_id` 由 GitHub App 决定，待定。
 
 README 中要提供一张 claude-code-action → pi-agent-action 的迁移对照表，内容从 [`upstream-divergence.md`](upstream-divergence.md) 中挑出用户可见的行。
 

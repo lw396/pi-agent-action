@@ -24,7 +24,7 @@
 
 ## How It Works
 
-1. **Trigger Detection**: Listens for comments containing the trigger phrase (default: `@claude`) or issue assignment to a specific user
+1. **Trigger Detection**: Listens for comments containing the trigger phrase (default: `@pi`) or issue assignment to a specific user
 2. **Context Gathering**: Analyzes the PR/issue, comments, code changes
 3. **Smart Responses**: Either answers questions or implements changes
 4. **Branch Management**: Creates new PRs for human authors, pushes directly for Claude's own PRs

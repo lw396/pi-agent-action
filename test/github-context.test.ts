@@ -34,7 +34,9 @@ import {
   isEntityContext,
   isAutomationContext,
   isWorkflowRunEvent,
+  type ParsedGitHubContext,
 } from "../src/github/context";
+import { checkContainsTrigger } from "../src/github/validation/trigger";
 import { CLAUDE_APP_BOT_ID, CLAUDE_BOT_LOGIN } from "../src/github/constants";
 import { createMockContext, createMockAutomationContext } from "./mockContext";
 
@@ -340,10 +342,10 @@ describe("parseGitHubContext", () => {
       const { inputs } = parseGitHubContext();
 
       expect(inputs.prompt).toBe("");
-      expect(inputs.triggerPhrase).toBe("@claude");
+      expect(inputs.triggerPhrase).toBe("@pi");
       expect(inputs.assigneeTrigger).toBe("");
       expect(inputs.labelTrigger).toBe("");
-      expect(inputs.branchPrefix).toBe("claude/");
+      expect(inputs.branchPrefix).toBe("pi/");
       expect(inputs.branchNameTemplate).toBeUndefined();
       expect(inputs.useStickyComment).toBe(false);
       expect(inputs.classifyInlineComments).toBe(true);
@@ -358,6 +360,26 @@ describe("parseGitHubContext", () => {
       expect(inputs.includeCommentsByActor).toBe("");
       expect(inputs.excludeCommentsByActor).toBe("");
       expect(inputs.baseBranch).toBeUndefined();
+    });
+
+    test("the default trigger phrase activates on @pi, not @claude", () => {
+      const comment = (body: string) =>
+        setEvent("issue_comment", {
+          action: "created",
+          issue: { number: 1 },
+          comment: { id: 1, body },
+          repository: repositoryPayload,
+        } as unknown as IssueCommentEvent);
+
+      comment("@pi please fix this");
+      expect(
+        checkContainsTrigger(parseGitHubContext() as ParsedGitHubContext),
+      ).toBe(true);
+
+      comment("@claude please fix this");
+      expect(
+        checkContainsTrigger(parseGitHubContext() as ParsedGitHubContext),
+      ).toBe(false);
     });
 
     test("inputs reflect the env vars set by action.yml", () => {

@@ -62,7 +62,7 @@ await session.prompt(promptText);
 
 做法：在一个内联扩展中调用 `pi.registerMcpServer(name, config)`，同时加载 `createMcpExtension()`，然后调用 `session.bindExtensions()`。测试用的是 `src/mcp/github-comment-server.ts`，以 `bun run` 启动。
 
-- 以 `exposure: "direct"` 注册后，工具 `mcp__github_comment__update_claude_comment` 出现在第一次请求声明的工具中（M2 把工具改名为 `update_comment` 后，测试和本段要一并更新），模型可以直接调用，调用结果经 stdio 从 server 返回。
+- 以 `exposure: "direct"` 注册后，工具 `mcp__github_comment__update_comment` 出现在第一次请求声明的工具中，模型可以直接调用，调用结果经 stdio 从 server 返回。
 - 第一次 `prompt()` 会等待 `direct` server 连接，默认最多等 10 秒（`createMcpExtension({ startupWaitMs })`）。
 - server 名称中的 `-` 在工具名中会变成 `_`。
 - **stdio server 继承 action 进程的全部 env**，配置中的 `env` 只是在此基础上追加（pi-mcp 的 `StdioTransport` 默认 `inheritEnv`，`registerMcpServer` 的配置无法关闭）。这与上游的 MCP server 拿到的 env 一致，`GITHUB_TOKEN` 不必写进配置；但也意味着 server 进程中有 provider key。

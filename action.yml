@@ -8,21 +8,21 @@ inputs:
   trigger_phrase:
     description: "The trigger phrase to look for in comments or issue body"
     required: false
-    default: "@claude"
+    default: "@pi"
   assignee_trigger:
-    description: "The assignee username that triggers the action (e.g. @claude)"
+    description: "The assignee username that triggers the action (e.g. @pi)"
     required: false
   label_trigger:
-    description: "The label that triggers the action (e.g. claude)"
+    description: "The label that triggers the action (e.g. pi)"
     required: false
-    default: "claude"
+    default: "pi"
   base_branch:
     description: "The branch to use as the base/source when creating new branches (defaults to repository default branch)"
     required: false
   branch_prefix:
-    description: "The prefix to use for Claude branches (defaults to 'claude/', use 'claude-' for dash format)"
+    description: "The prefix to use for branches created by the action (defaults to 'pi/', use 'pi-' for dash format)"
     required: false
-    default: "claude/"
+    default: "pi/"
   branch_name_template:
     description: "Template for branch naming. Available variables: {{prefix}}, {{entityType}}, {{entityNumber}}, {{timestamp}}, {{sha}}, {{label}}, {{description}}. {{label}} will be first label from the issue/PR, or {{entityType}} as a fallback. {{description}} will be the first 5 words of the issue/PR title in kebab-case. Default: '{{prefix}}{{entityType}}-{{entityNumber}}-{{timestamp}}'"
     required: false

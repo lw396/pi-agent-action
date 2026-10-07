@@ -25,8 +25,8 @@ const server = new McpServer({
 });
 
 server.tool(
-  "update_claude_comment",
-  "Update the Claude comment with progress and results (automatically handles both issue and PR comments)",
+  "update_comment",
+  "Update the tracking comment with progress and results (automatically handles both issue and PR comments)",
   {
     body: z.string().describe("The updated comment content"),
   },

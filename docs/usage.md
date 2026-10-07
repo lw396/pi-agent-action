@@ -37,12 +37,12 @@ jobs:
           # Optional: install Claude Code plugins
           # plugins: "code-review@claude-code-plugins\nfeature-dev@claude-code-plugins"
 
-          # Optional: add custom trigger phrase (default: @claude)
+          # Optional: add custom trigger phrase (default: @pi)
           # trigger_phrase: "/claude"
           # Optional: add assignee trigger for issues
           # assignee_trigger: "claude"
           # Optional: add label trigger for issues
-          # label_trigger: "claude"
+          # label_trigger: "pi"
           # Optional: grant additional permissions (requires corresponding GitHub token permissions)
           # additional_permissions: |
           #   actions: read
@@ -72,9 +72,9 @@ jobs:
 | `use_bedrock`                    | Use Amazon Bedrock with OIDC authentication instead of direct Anthropic API                                                                                                                                                            | No       | `false`                     |
 | `use_vertex`                     | Use Google Vertex AI with OIDC authentication instead of direct Anthropic API                                                                                                                                                          | No       | `false`                     |
 | `assignee_trigger`               | The assignee username that triggers the action (e.g. @claude). Only used for issue assignment                                                                                                                                          | No       | -                           |
-| `label_trigger`                  | The label name that triggers the action when applied to an issue (e.g. "claude")                                                                                                                                                       | No       | -                           |
-| `trigger_phrase`                 | The trigger phrase to look for in comments, issue/PR bodies, and issue titles                                                                                                                                                          | No       | `@claude`                   |
-| `branch_prefix`                  | The prefix to use for Claude branches (defaults to 'claude/', use 'claude-' for dash format)                                                                                                                                           | No       | `claude/`                   |
+| `label_trigger`                  | The label name that triggers the action when applied to an issue (e.g. "pi")                                                                                                                                                           | No       | `pi`                        |
+| `trigger_phrase`                 | The trigger phrase to look for in comments, issue/PR bodies, and issue titles                                                                                                                                                          | No       | `@pi`                       |
+| `branch_prefix`                  | The prefix to use for branches created by the action (defaults to 'pi/', use 'pi-' for dash format)                                                                                                                                    | No       | `pi/`                       |
 | `settings`                       | Claude Code settings as JSON string or path to settings JSON file                                                                                                                                                                      | No       | ""                          |
 | `additional_permissions`         | Additional permissions to enable. Currently supports 'actions: read' for viewing workflow results                                                                                                                                      | No       | ""                          |
 | `use_commit_signing`             | Enable commit signing using GitHub's API. Simple but cannot perform complex git operations like rebasing. See [Security](./security.md#commit-signing)                                                                                 | No       | `false`                     |
