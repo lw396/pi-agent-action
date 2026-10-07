@@ -1,5 +1,5 @@
 {
-  "name": "@anthropic-ai/claude-code-action",
+  "name": "pi-agent-action",
   "version": "1.0.0",
   "private": true,
   "scripts": {

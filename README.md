@@ -1,6 +1,10 @@
-![Claude Code Action responding to a comment](https://github.com/user-attachments/assets/1d60c2e9-82ed-4ee5-b749-f9e021c85f4d)
+# pi-agent-action
 
-# Claude Code Action
+> [!WARNING] > **Work in progress.** This project is based on [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action) (MIT) and is being ported to run on the [pi coding agent](https://github.com/earendil-works/pi) instead of Claude Code, as a drop-in replacement for claude-code-action users. It is not an official product of Anthropic or of the pi project, and it is not ready for use yet.
+>
+> See [docs/pi-port-proposal.md](./docs/pi-port-proposal.md) for the plan. The rest of this README and the docs still describe the upstream Claude Code Action and will be rewritten as the port progresses.
+
+## About the Upstream Action
 
 A general-purpose [Claude Code](https://claude.ai/code) action for GitHub PRs and issues that can answer questions and implement code changes. This action intelligently detects when to activate based on your workflow context—whether responding to @claude mentions, issue assignments, or executing automation tasks with explicit prompts. It supports multiple authentication methods including Anthropic direct API (API key or workload identity federation), Amazon Bedrock, Google Vertex AI, and Microsoft Foundry.
 
