@@ -1,0 +1,26 @@
+# Upgrade PRs for pi. The Runner calls the pi SDK in process (ADR-0001), so
+# package.json pins pi to exact versions and each upgrade arrives as a PR that
+# CI tests. The pi packages are bumped together, in one PR, because
+# pi-coding-agent depends on pi-ai and the two must stay on the same version.
+#
+# Dependabot PRs do not receive Actions secrets. For the Runner integration test
+# (test-base-action.yml) to run on them, add OPENCODE_API_KEY as a Dependabot
+# secret too.
+version: 2
+updates:
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    # Wait a few days after a release, so a bad or compromised one can be
+    # pulled before it reaches the action.
+    cooldown:
+      default-days: 3
+    allow:
+      - dependency-name: "@earendil-works/*"
+    groups:
+      pi:
+        patterns:
+          - "@earendil-works/*"
+    commit-message:
+      prefix: "chore(deps)"

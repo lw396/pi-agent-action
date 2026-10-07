@@ -44,6 +44,8 @@ import { installPlugins } from "../../base-action/src/install-plugins";
 import { preparePrompt } from "../runner/prepare-prompt";
 import { runClaude } from "../../base-action/src/run-claude";
 import type { ClaudeRunResult } from "../../base-action/src/run-claude-sdk";
+import { runPi } from "../runner/run-pi";
+import type { RunnerResult } from "../runner/run-pi";
 import { setExecutionFileOutputIfPresent } from "../runner/execution-file";
 
 // Exported for unit testing. `set -o pipefail` makes curl's non-zero exit
@@ -236,20 +238,26 @@ async function run() {
     baseBranch = prepareResult.branchInfo.baseBranch;
     prepareCompleted = true;
 
+    // Agent mode runs on pi through the Runner. Tag mode still runs on Claude
+    // Code until it is ported (docs/pi-port-proposal.md, M2).
+    const usePiRunner = modeName === "agent";
+
     // Phase 2: Install Claude Code CLI
-    const claudeExecutable = await installClaudeCode();
+    const claudeExecutable = usePiRunner ? "" : await installClaudeCode();
 
     // Phase 3: Run Claude (import base-action directly)
     // Set env vars needed by the base-action code
     process.env.INPUT_ACTION_INPUTS_PRESENT = actionInputsPresent;
-    process.env.CLAUDE_CODE_ACTION = "1";
-    process.env.DETAILED_PERMISSION_MESSAGES = "1";
+    if (!usePiRunner) {
+      process.env.CLAUDE_CODE_ACTION = "1";
+      process.env.DETAILED_PERMISSION_MESSAGES = "1";
 
-    // When workload identity federation is configured, fetch the GitHub OIDC
-    // identity token and expose it to the CLI before validating auth env vars.
-    workloadIdentity = await setupWorkloadIdentity();
+      // When workload identity federation is configured, fetch the GitHub OIDC
+      // identity token and expose it to the CLI before validating auth env vars.
+      workloadIdentity = await setupWorkloadIdentity();
 
-    validateEnvironmentVariables();
+      validateEnvironmentVariables();
+    }
 
     // On PRs, .claude/ and .mcp.json in the checkout are attacker-controlled.
     // Restore them from the base branch before the CLI reads them.
@@ -275,13 +283,15 @@ async function run() {
       }
     }
 
-    await setupClaudeCodeSettings(process.env.INPUT_SETTINGS);
+    if (!usePiRunner) {
+      await setupClaudeCodeSettings(process.env.INPUT_SETTINGS);
 
-    await installPlugins(
-      process.env.INPUT_PLUGIN_MARKETPLACES,
-      process.env.INPUT_PLUGINS,
-      claudeExecutable,
-    );
+      await installPlugins(
+        process.env.INPUT_PLUGIN_MARKETPLACES,
+        process.env.INPUT_PLUGINS,
+        claudeExecutable,
+      );
+    }
 
     const promptFile =
       process.env.INPUT_PROMPT_FILE ||
@@ -291,13 +301,19 @@ async function run() {
       promptFile,
     });
 
-    const claudeResult: ClaudeRunResult = await runClaude(promptConfig.path, {
-      claudeArgs: prepareResult.claudeArgs,
-      appendSystemPrompt: process.env.APPEND_SYSTEM_PROMPT,
-      model: process.env.ANTHROPIC_MODEL,
-      pathToClaudeCodeExecutable: claudeExecutable,
-      showFullOutput: process.env.INPUT_SHOW_FULL_OUTPUT,
-    });
+    const claudeResult: ClaudeRunResult | RunnerResult = usePiRunner
+      ? await runPi(promptConfig.path, {
+          model: process.env.MODEL,
+          apiKey: process.env.API_KEY,
+          piArgs: process.env.PI_ARGS,
+        })
+      : await runClaude(promptConfig.path, {
+          claudeArgs: prepareResult.claudeArgs,
+          appendSystemPrompt: process.env.APPEND_SYSTEM_PROMPT,
+          model: process.env.ANTHROPIC_MODEL,
+          pathToClaudeCodeExecutable: claudeExecutable,
+          showFullOutput: process.env.INPUT_SHOW_FULL_OUTPUT,
+        });
 
     claudeSuccess = claudeResult.conclusion === "success";
     executionFile = claudeResult.executionFile;

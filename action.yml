@@ -63,6 +63,18 @@ inputs:
     required: false
     default: ""
 
+  # pi configuration (agent mode runs on pi; tag mode does not use these yet)
+  model:
+    description: "The pi model to run, as provider/id with an optional :<thinking> suffix (e.g. opencode/gpt-6-luna). There is no default model. Pass the provider's API key through the workflow env under pi's variable name (e.g. OPENCODE_API_KEY), or through api_key."
+    required: true
+  api_key:
+    description: "API key for the provider of the model input, used instead of that provider's environment variable. Like pi's --api-key, it is not stored."
+    required: false
+  pi_args:
+    description: "Additional pi command-line flags. Supported: --thinking, --system-prompt, --append-system-prompt, --tools, --exclude-tools, --no-tools, --no-builtin-tools, --no-skills, --no-prompt-templates, --no-context-files. Any other flag fails the run."
+    required: false
+    default: ""
+
   # Auth configuration
   anthropic_api_key:
     description: "Anthropic API key (required for direct API, not needed for Bedrock/Vertex/Foundry)"
@@ -168,10 +180,10 @@ inputs:
 
 outputs:
   conclusion:
-    description: "Execution status of Claude Code ('success' or 'failure')"
+    description: "Execution status ('success' or 'failure')"
     value: ${{ steps.run.outputs.conclusion }}
   execution_file:
-    description: "Path to the Claude Code execution output file"
+    description: "Path to the execution file: a JSON array with the session header and the session's events, including token usage and cost"
     value: ${{ steps.run.outputs.execution_file }}
   branch_name:
     description: "The branch created by Claude Code for this execution"
@@ -183,7 +195,7 @@ outputs:
     description: "JSON string containing all structured output fields when --json-schema is provided in claude_args. Use fromJSON() to parse: fromJSON(steps.id.outputs.structured_output).field_name"
     value: ${{ steps.run.outputs.structured_output }}
   session_id:
-    description: "The Claude Code session ID that can be used with --resume to continue this conversation"
+    description: "The session ID of the run"
     value: ${{ steps.run.outputs.session_id }}
 
 runs:
@@ -315,6 +327,12 @@ runs:
         ADDITIONAL_PERMISSIONS: ${{ inputs.additional_permissions }}
         CLAUDE_ARGS: ${{ inputs.claude_args }}
         ALL_INPUTS: ${{ toJson(inputs) }}
+
+        # Runner (pi) inputs. Provider keys such as OPENCODE_API_KEY are not
+        # listed: variables absent from this block come from the workflow env.
+        MODEL: ${{ inputs.model }}
+        API_KEY: ${{ inputs.api_key }}
+        PI_ARGS: ${{ inputs.pi_args }}
 
         # Base-action inputs
         INPUT_PROMPT_FILE: ${{ runner.temp }}/claude-prompts/claude-prompt.txt

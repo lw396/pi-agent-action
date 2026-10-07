@@ -28,7 +28,14 @@ MODEL_VERSION = re.compile(
 
 # Key: "<workflow file name>:<job id>". Value: why that job is exempt from the table's rule.
 EXEMPT_FROM_FIREWALL_RUNNER: dict[str, str] = {}
-EXEMPT_FROM_AUTO_MODE: dict[str, str] = {}
+_PI_RUNNER_JOB = (
+    "it runs the action in agent mode, which runs on pi, and pi has no auto permission mode; "
+    "this check is to recognise pi jobs instead (docs/pi-port-proposal.md, M4)"
+)
+EXEMPT_FROM_AUTO_MODE: dict[str, str] = {
+    "test-base-action.yml:test-provider-env": _PI_RUNNER_JOB,
+    "test-base-action.yml:test-api-key-input": _PI_RUNNER_JOB,
+}
 
 
 def stop(message: str):

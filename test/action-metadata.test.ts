@@ -20,6 +20,19 @@ describe("action metadata", () => {
     );
   });
 
+  test("passes the model, api_key and pi_args inputs to the run step", () => {
+    expect(metadata).toMatch(
+      /^  model:\n    description: .+\n    required: true$/m,
+    );
+    expect(metadata).toMatch(
+      /^  api_key:\n    description: .+\n    required: false$/m,
+    );
+    expect(inputDefault("pi_args")).toBe("");
+    expect(metadata).toContain("        MODEL: ${{ inputs.model }}\n");
+    expect(metadata).toContain("        API_KEY: ${{ inputs.api_key }}\n");
+    expect(metadata).toContain("        PI_ARGS: ${{ inputs.pi_args }}\n");
+  });
+
   test("defaults the triggers and branch prefix to pi branding", () => {
     expect(inputDefault("trigger_phrase")).toBe("@pi");
     expect(inputDefault("label_trigger")).toBe("pi");
