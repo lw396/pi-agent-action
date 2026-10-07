@@ -64,3 +64,17 @@ Workflow jobs in this repository that call Claude run with three protections. Ke
 `.github/workflows/workflow-hardening.yml` fails when a job that runs the Claude Code action or mentions `ANTHROPIC_FEDERATION_RULE_ID` breaks protection 1 or 3, or when the allow list is missing, empty, not `mode: enforce`, or names a host with `*`. It cannot see a job that calls Claude another way, so check new workflows by hand too. If a job cannot meet protection 1 or 3, add it with the reason to the matching exemption table in `.github/scripts/check_workflow_hardening.py`. A job in `EXEMPT_FROM_AUTO_MODE` must set no permission mode at all. Do not skip or weaken the check.
 
 Keep each workflow's `permissions:` block minimal, and never print tokens or environment variables in workflow logs.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `lw396/pi-agent-action`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root, created lazily. See `docs/agents/domain.md`.

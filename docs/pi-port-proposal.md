@@ -79,10 +79,31 @@ pi 在 2026-10-02 发布了 1.0 版本，内置了 MCP 支持（参见 `packages
 ## `action.yml` 输入兼容策略
 
 - **保持一样**：`trigger_phrase`、`prompt`、`label_trigger`、`assignee_trigger`、`base_branch`、`branch_prefix`、`branch_name_template`、`allowed_bots`、`allowed_non_write_users`、`include_comments_by_actor`、`exclude_comments_by_actor`、`github_token`、`use_sticky_comment`、`track_progress`、`use_commit_signing`、`ssh_signing_key`、`additional_permissions`、`classify_inline_comments` 等与 GitHub 相关的输入。
-- **必须替换**：`claude_args` → `pi_args`；`anthropic_api_key` / `claude_code_oauth_token` → `provider` + `model` + 对应的 API key；`settings`；`path_to_claude_code_executable`；插件相关输入；Anthropic workload identity federation 相关输入。
+- **必须替换**：`claude_args` → `pi_args`；所有认证相关输入（见下文"模型与认证"）；`settings`；`path_to_claude_code_executable`；插件相关输入。
 - **建议更换默认值**：`@claude` 触发词、`claude/` 分支前缀、`bot_name` / `bot_id`。
 
 README 中要提供一张 claude-code-action → pi-agent-action 的迁移对照表。
+
+### 模型与认证：不设默认 provider，直接沿用 pi 的约定
+
+pi 支持 30 多个 provider，每个 provider 从自己的环境变量读取 key，例如 `ANTHROPIC_API_KEY`、`OPENAI_API_KEY`、`GEMINI_API_KEY`、`OPENROUTER_API_KEY`、`OPENCODE_API_KEY`。pi 文档也推荐 CI 用环境变量提供 key。
+
+模型通过 `--model` 选择，格式是 `provider/id`，可以加 `:<thinking>` 后缀；`--provider` 用来把查找限定在某一个 provider 内。凭据的优先级从高到低是：运行时 `--api-key` > `auth.json` > `models.json` 中的 `apiKey` > 环境变量。
+
+据此，action 对 provider 保持中立，不选定任何默认 provider：
+
+```yaml
+- uses: lw396/pi-agent-action@v1
+  with:
+    model: opencode/<model-id> # 必填，格式是 provider/id
+  env:
+    OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }} # 用哪家就传哪家的变量
+```
+
+- **`model` 设为必填**。pi 文档没有说明不指定模型时会选哪个，CI 不能依赖不确定的行为。必填也就不存在"默认用哪家"的问题。
+- **不为每个 provider 单独设输入**。上游的 `anthropic_api_key`、`claude_code_oauth_token`、`use_bedrock`、`use_vertex`、`use_foundry`，以及 Anthropic workload identity federation 的 `anthropic_federation_rule_id` 等输入全部删除。用户按 pi 的变量名通过 `env` 传 key。
+- **可选的通用 `api_key` 输入**：对应 pi 的 `--api-key`，供只想配置一个 secret 的用户使用。它要求同时设置 `model`。
+- Bedrock、Vertex 等云平台凭据，按 pi 的方式从环境中获取（例如 AWS 环境凭据、Google ADC），action 不再处理 OIDC 换取凭据。是否提供示例 workflow，到 M4 再决定。
 
 ## 安全
 
@@ -92,8 +113,9 @@ README 中要提供一张 claude-code-action → pi-agent-action 的迁移对照
 2. 用 `tools` / `excludeTools` 只开放需要的工具。
 3. 通过 `tool_call` 拦截扩展限制 bash 等高风险工具。
 4. 默认不信任仓库自带的 `.pi/` 配置和扩展。
+5. **清理所有 provider 的 key**。上游在 `allowed_non_write_users` 场景下，会从子进程环境里清掉 Anthropic、云厂商和 GitHub Actions 的 secret，避免被 prompt injection 窃取。改成多 provider 之后，要清理的是 pi 支持的**全部** provider key 变量（30 多个，再加上云平台凭据）。清单最好从 pi 的 provider 定义生成，不要手写，否则 pi 新增 provider 时会漏掉。（M3）
 
-这是相对上游的实质性降级，需要在 `docs/security.md` 中如实说明。
+第 1 到 4 项替代的是 `--permission-mode auto` 的安全审查，但做不到同等的防护，这是相对上游的实质性降级，需要在 `docs/security.md` 中如实说明。
 
 ## 仓库与上游同步
 
@@ -140,7 +162,7 @@ README 中要提供一张 claude-code-action → pi-agent-action 的迁移对照
 
 恢复自动运行前，需要满足以下条件：
 
-1. **认证**：在仓库 secret 中配置一个模型 API key，工作流改用 API key 认证，不再用 Anthropic 联邦认证。
+1. **认证**：仓库 secret 中已有 `OPENCODE_API_KEY`（2026-10-07 添加），工作流通过 `env` 传入它，不再用 Anthropic 联邦认证。
 2. **fork PR**：来自 fork 的 PR 拿不到 secret，所以保留"仅同仓库 PR 才运行"的 `if` 条件，fork PR 跳过集成测试。
 3. **runner 与加固检查**：确认 `ubuntu-24.04-firewall` 是否可用。
    - 如果不可用，要么改用其他方式限制出站流量，要么把相关 job 连同原因写进 `check_workflow_hardening.py` 的豁免表。不能直接关闭检查。
@@ -149,7 +171,7 @@ README 中要提供一张 claude-code-action → pi-agent-action 的迁移对照
 
 ## 里程碑
 
-0. **M0 — 准备**：`ci-all.yml` 只调用单元测试、格式检查和类型检查，集成测试暂时改为只能手动触发（见"CI 与集成测试"）；更新 `CLAUDE.md`；做技术验证，确认 pi SDK 能在 Bun 下运行，MCP 的 `direct` 暴露模式可用，并找到 usage/cost 字段；确定默认的 provider、model 和命名。
+0. **M0 — 准备**：`ci-all.yml` 只调用单元测试、格式检查和类型检查，集成测试暂时改为只能手动触发（见"CI 与集成测试"）；更新 `CLAUDE.md`；做技术验证，确认 pi SDK 能在 Bun 下运行，MCP 的 `direct` 暴露模式可用，并找到 usage/cost 字段；确定命名，以及集成测试用的模型。
 1. **M1 — agent mode 跑通**：在 `src/runner/` 中用 pi SDK 执行 `prompt`，并输出 execution file；`test-base-action.yml` 恢复自动运行。（2–3 天）
 2. **M2 — tag mode 跑通**：现有 MCP server 以 `direct` 模式注册，跟踪评论、分支、提交都正常工作；`test-mcp-servers.yml` 恢复自动运行。（2–3 天）
 3. **M3 — 安全与控制**：工具白名单映射、`tool_call` 拦截扩展、structured output、默认不信任项目配置；`test-structured-output.yml` 恢复自动运行。
@@ -158,12 +180,12 @@ README 中要提供一张 claude-code-action → pi-agent-action 的迁移对照
 ## 待决问题
 
 - 是否修改 `update_claude_comment` 等 MCP 工具名？改名的话命名更中立，但会和上游的提示词产生差异。
-- 默认 provider 和 model 用什么？
+- ~~默认 provider 和 model 用什么？~~ 已决定：不设默认 provider，`model` 必填（见"模型与认证"）。开发和集成测试使用仓库 secret `OPENCODE_API_KEY`（OpenCode Zen/Go）；具体用哪个模型，在技术验证时从 OpenCode 的可用模型里挑一个便宜的。
 - 是否支持 Codeberg、Forgejo 等非 GitHub 平台？（竞品已经支持。）
 - `allowed_non_write_users` 场景下，没有 auto 模式的安全审查，是否应该直接禁用 bash？
 
 ## 参考
 
-- pi 文档：[mcp](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/mcp.md) · [sdk](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sdk.md) · [json](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/json.md) · [extensions](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md) · [security](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/security.md) · [providers](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/providers.md)
+- pi 文档：[mcp](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/mcp.md) · [sdk](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sdk.md) · [json](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/json.md) · [extensions](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md) · [security](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/security.md) · [providers](https://pi.dev/docs/latest/providers#use-an-api-key-from-the-environment) · [models](https://pi.dev/docs/latest/models) · [cli](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/cli.md)
 - [The Register: Pi coding agent pulls a 180 and adds MCP support](https://www.theregister.com/ai-and-ml/2026/10/02/pi-coding-agent-pulls-a-180-and-adds-mcp-support/5300678)
 - [GitHub Docs: Detaching a fork](https://docs.github.com/en/pull-requests/how-tos/work-with-forks/detaching-a-fork)
