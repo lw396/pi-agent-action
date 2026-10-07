@@ -20,6 +20,7 @@ import {
   SessionManager,
   SettingsManager,
   type AgentSession,
+  type AgentSessionEvent,
   type CreateAgentSessionOptions,
   type InlineExtension,
 } from "@earendil-works/pi-coding-agent";
@@ -38,12 +39,10 @@ export function lastToolResultText(context: TranscriptContext): string {
     .join("");
 }
 
-export type ToolExecutionEnd = {
-  type: "tool_execution_end";
-  toolName: string;
-  isError: boolean;
-  result: unknown;
-};
+export type ToolExecutionEnd = Extract<
+  AgentSessionEvent,
+  { type: "tool_execution_end" }
+>;
 
 export type FauxSession = {
   session: AgentSession;
@@ -53,14 +52,14 @@ export type FauxSession = {
   /** Agent dir passed to pi; must stay empty, since settings live in memory. */
   agentDir: string;
   /** Every session event, in order. */
-  events: Array<{ type: string } & Record<string, unknown>>;
+  events: AgentSessionEvent[];
   dispose: () => void;
 };
 
 export function toolExecutionEnds(session: FauxSession): ToolExecutionEnd[] {
   return session.events.filter(
-    (event) => event.type === "tool_execution_end",
-  ) as unknown as ToolExecutionEnd[];
+    (event): event is ToolExecutionEnd => event.type === "tool_execution_end",
+  );
 }
 
 export type FauxSessionOptions = {
@@ -74,7 +73,7 @@ export type FauxSessionOptions = {
 export async function createFauxSession(
   options: FauxSessionOptions,
 ): Promise<FauxSession> {
-  const root = mkdtempSync(join(tmpdir(), "pi-sdk-spike-"));
+  const root = mkdtempSync(join(tmpdir(), "pi-sdk-test-"));
   const cwd = join(root, "work");
   const agentDir = join(root, "agent");
   await Bun.write(join(cwd, ".keep"), "");
@@ -121,7 +120,7 @@ export async function createFauxSession(
 
   const events: FauxSession["events"] = [];
   session.subscribe((event) => {
-    events.push(event as FauxSession["events"][number]);
+    events.push(event);
   });
 
   return {

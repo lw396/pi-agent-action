@@ -10,16 +10,16 @@ M0 技术验证（issue #2）的结论。spec（#1）依赖的 pi SDK 能力都�
 
 ## 结论一览
 
-| 验收项                                              | 结论                                    | 测试                                  |
-| --------------------------------------------------- | --------------------------------------- | ------------------------------------- |
-| `createAgentSession()` 在 Bun 下完成一次会话        | 可行                                    | `test/pi-sdk/session.test.ts`         |
-| faux provider 按脚本驱动含工具调用的会话            | 可行，但要用 `fauxProvider()`，见下文   | `test/pi-sdk/session.test.ts`         |
-| 本项目的 MCP server 通过 SDK 注册，以 `direct` 暴露 | 可行                                    | `test/pi-sdk/mcp-direct.test.ts`      |
-| `spawnHook` 改写 env；bwrap 中读 `/proc`、`sudo`    | 可行；但 `read` 工具不经过 `spawnHook`  | `test/pi-sdk/bash-spawn-hook.test.ts` |
-| `SettingsManager.inMemory()` 的签名与任意设置项     | 可行；仓库的 `.pi/settings.json` 不生效 | `test/pi-sdk/settings.test.ts`        |
-| 会话中途切换可用工具集                              | 可行                                    | `test/pi-sdk/active-tools.test.ts`    |
+| 验收项                                              | 结论                                                                                                               | 测试                                  |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| `createAgentSession()` 在 Bun 下完成一次会话        | 可行                                                                                                               | `test/pi-sdk/session.test.ts`         |
+| faux provider 按脚本驱动含工具调用的会话            | 可行，但要用 `fauxProvider()`，见下文                                                                              | `test/pi-sdk/session.test.ts`         |
+| 本项目的 MCP server 通过 SDK 注册，以 `direct` 暴露 | 可行                                                                                                               | `test/pi-sdk/mcp-direct.test.ts`      |
+| `spawnHook` 改写 env；bwrap 中读 `/proc`、`sudo`    | 可行，用 `createBashToolDefinition()`；`/proc/$PPID/environ` 可读但只含过滤后的 env；`read` 工具不经过 `spawnHook` | `test/pi-sdk/bash-spawn-hook.test.ts` |
+| `SettingsManager.inMemory()` 的签名与任意设置项     | 可行；仓库的 `.pi/settings.json` 不生效                                                                            | `test/pi-sdk/settings.test.ts`        |
+| 会话中途切换可用工具集                              | 可行                                                                                                               | `test/pi-sdk/active-tools.test.ts`    |
 
-有三项结论影响 spec，已在 #1 中评论说明：faux provider 的 API 名称、`read` 等文件工具能读到进程 env、内存设置不读仓库的 `.pi/settings.json`。
+影响 spec 的结论已在 #1 中评论说明：faux provider 和 bash 工具的 API 名称、`read` 等文件工具能读到进程 env、内存设置不读仓库的 `.pi/settings.json`、仓库的 `.pi/mcp.json` 能覆盖本项目的 MCP server，以及 GitHub runner 上的 bwrap 尚未验证。
 
 ## 完全在内存中运行的会话
 
@@ -53,7 +53,7 @@ await session.prompt(promptText);
 ### 1. `createAgentSession()` 与 faux provider
 
 - 会话事件包含 spec 计划写入 Execution file 的 `tool_execution_start`、`tool_execution_end`、`agent_settled`。
-- **spec 中写的 `registerFauxProvider()` 不适合 Runner 的测试。** 它在 `@earendil-works/pi-ai/compat` 中，已标为 deprecated，而且注册到全局的 API 注册表，`createAgentSession()` 的 `ModelRuntime` 用不到它。应改用 `fauxProvider()`，再调用 `modelRuntime.registerNativeProvider(faux.provider)`。`fauxToolCall()`、`fauxAssistantMessage()` 不变。
+- **spec 中写的 `registerFauxProvider()` 不能驱动 `createAgentSession()` 的会话。** 它在 `@earendil-works/pi-ai/compat` 中（该模块自称临时的兼容入口，会随 ModelManager 迁移删除），注册到 pi-ai 的全局 API 注册表，而会话的 `ModelRuntime` 不查这个注册表：用它的模型发起 prompt 会报 `No API key found for faux`（`session.test.ts` 中有这一项测试）。应改用 `fauxProvider()`，再调用 `modelRuntime.registerNativeProvider(faux.provider)`。`fauxToolCall()`、`fauxAssistantMessage()` 不变。
 - 脚本中的每一步既可以是固定的 `AssistantMessage`，也可以是函数 `(context, options, state, model) => AssistantMessage`。函数能看到这次请求的完整上下文，测试用它检查模型实际收到了什么：
   - 声明给模型的工具不在 `context.tools` 中，而是由上下文中的 system 消息逐条增减（`toolsAdded`、`toolsRemoved`）。用 `getCurrentTools(context.messages)` 得到当前的工具列表。
   - 工具结果是 `role: "toolResult"` 的消息。它后面可能还跟着一条 system 消息，所以要找最后一条 `toolResult`，不能直接取最后一条消息。
@@ -62,10 +62,10 @@ await session.prompt(promptText);
 
 做法：在一个内联扩展中调用 `pi.registerMcpServer(name, config)`，同时加载 `createMcpExtension()`，然后调用 `session.bindExtensions()`。测试用的是 `src/mcp/github-comment-server.ts`，以 `bun run` 启动。
 
-- 以 `exposure: "direct"` 注册后，工具 `mcp__github_comment__update_claude_comment` 出现在第一次请求声明的工具中，模型可以直接调用，调用结果经 stdio 从 server 返回。
+- 以 `exposure: "direct"` 注册后，工具 `mcp__github_comment__update_claude_comment` 出现在第一次请求声明的工具中（M2 把工具改名为 `update_comment` 后，测试和本段要一并更新），模型可以直接调用，调用结果经 stdio 从 server 返回。
 - 第一次 `prompt()` 会等待 `direct` server 连接，默认最多等 10 秒（`createMcpExtension({ startupWaitMs })`）。
 - server 名称中的 `-` 在工具名中会变成 `_`。
-- **stdio server 继承 action 进程的全部 env**，配置中的 `env` 只是在此基础上追加（pi-mcp 的 `StdioTransport` 默认 `inheritEnv`，`registerMcpServer` 的配置无法关闭）。这与 Upstream 的 MCP server 拿到的 env 一致，`GITHUB_TOKEN` 不必写进配置；但也意味着 server 进程中有 provider key。
+- **stdio server 继承 action 进程的全部 env**，配置中的 `env` 只是在此基础上追加（pi-mcp 的 `StdioTransport` 默认 `inheritEnv`，`registerMcpServer` 的配置无法关闭）。这与上游的 MCP server 拿到的 env 一致，`GITHUB_TOKEN` 不必写进配置；但也意味着 server 进程中有 provider key。
 - `createMcpExtension()` 默认会：
 
   - 读 `~/.pi/agent/mcp.json` 和受信任项目的 `.pi/mcp.json`，而且**文件中同名的 server 优先于 `registerMcpServer()` 注册的 server**。仓库中的 `.pi/mcp.json` 因此可以覆盖本项目的 server，例如换掉 `github_comment`。实现 M2 时，`loadConfig` 至少要去掉与本项目 server 同名的条目。`loadMcpConfig()` 没有从包的入口导出，要自己读文件，或者从 `dist/extensions/mcp/config.js` 引入。
@@ -75,7 +75,7 @@ await session.prompt(promptText);
 
 ### 3. bash 的 `spawnHook` 与 bwrap
 
-做法：`createBashToolDefinition(cwd, { spawnHook })` 放进 `createAgentSession()` 的 `customTools`。名为 `bash` 的自定义工具会替换内置的 bash 工具。用 `defineTool()` 包一层，类型才能放进 `customTools` 数组。
+做法：`createBashToolDefinition(cwd, { spawnHook })` 放进 `createAgentSession()` 的 `customTools`。名为 `bash` 的自定义工具会替换内置的 bash 工具。用 `defineTool()` 包一层，类型才能放进 `customTools` 数组。spec 中写的 `createBashTool()` 接受同样的选项，但返回的是 `AgentTool`，不能直接放进 `customTools`（只接受 `ToolDefinition`）；要用它，只能像 pi 的 `examples/extensions/bash-spawn-hook.ts` 那样在扩展中包一层再 `registerTool()`。
 
 - `spawnHook` 收到 `{ command, cwd, env }`。`env` 是 action 进程的全部 env，加上 pi 注入的 `PI_*` 会话变量（`exposeSessionEnvironment`，默认开启）。返回值中的 `env` 会原样用作子进程的 env，所以白名单过滤可以在这里做。
 - 返回的 `command` 仍由 shell 执行（`bash -c`），所以 bwrap 的调用要拼成一条经过转义的 shell 命令。测试用 `shell-quote` 的 `quote()` 拼接：
@@ -88,9 +88,9 @@ await session.prompt(promptText);
 
 - 只过滤 env、不用 bwrap 时，命令仍能读到 `/proc/<pi 的 pid>/environ`。测试中有这一项对照，用来证明下面 bwrap 的用例确实有意义。
 - 用 bwrap 包装后：
-  - `$PPID` 是 1，即新 PID namespace 中 bwrap 的 init 进程，它的 env 就是过滤后的 env；
+  - `$PPID` 是 1，即新 PID namespace 中 bwrap 的 init 进程，它的 env 就是过滤后的 env。所以 `/proc/$PPID/environ` 仍可读取，验收项字面上的"读取会失败"不成立，但其目的（读不到 pi 进程的 env）已经达到；
   - pi 进程在新的 `/proc` 中不可见，`/proc/[0-9]*/environ` 中只有白名单变量和 bash 自己导出的 `PWD`、`OLDPWD`、`SHLVL`、`_`；
-  - `NoNewPrivs` 为 1，`sudo` 会报错退出（`The "no new privileges" flag is set, which prevents sudo from running as root`）。
+  - `NoNewPrivs` 为 1，`sudo` 会报错退出（`The "no new privileges" flag is set, which prevents sudo from running as root`）。没有安装 `sudo` 的机器上，测试只检查 `NoNewPrivs`。
 - `/proc/<pid>/environ` 记录的是进程启动时的 env。action 运行中写进 `process.env` 的值不会出现在里面，但 `action.yml` 中 step 的 `env:` 会。
 - **`spawnHook` 只覆盖 bash。** `read`、`grep`、`find`、`ls`、`edit`、`write` 都在 pi 进程内执行，测试确认 `read` 能直接读取 `/proc/self/environ`。`allowed_non_write_users` 场景下，env 白名单加 bwrap 只能防住 bash；文件工具要由工具权限扩展拦截对 `/proc` 等路径的访问，或者在这个场景下不提供文件工具。M3 要把这一点纳入设计。
 - 尚未验证：
@@ -107,7 +107,7 @@ await session.prompt(promptText);
 - **内存中的 `SettingsManager` 没有项目层**：cwd 中的 `.pi/settings.json` 不会被读取（`getProjectSettings()` 返回 `{}`）。这与 spec 用户故事 39"默认加载仓库提交的 `.pi/` 配置"在设置这部分上冲突。可选做法：
 
   - 用 `SettingsManager.fromStorage()` 配一个自定义的 `SettingsStorage`：全局层在内存中，项目层在启动时从仓库读入一次，写入只进内存。这样既读到仓库设置，又不写盘。
-  - 或者明确不支持仓库的 `.pi/settings.json`，作为 Divergence 登记。
+  - 或者明确不支持仓库的 `.pi/settings.json`，作为偏离登记。
 
   这一点留给 M1 的 settings 模块决定。
 

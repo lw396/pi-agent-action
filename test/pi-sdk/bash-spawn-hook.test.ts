@@ -1,6 +1,10 @@
-// Issue #2, AC 4: createBashTool()'s spawnHook can rewrite env and command, and
+// Issue #2, AC 4: the bash tool's spawnHook can rewrite env and command, and
 // wrapping the command in bwrap stops it reading the pi process's environment
 // through /proc and from escalating with sudo.
+//
+// The tool is built with createBashToolDefinition(), which takes the same
+// options as createBashTool(): customTools needs a ToolDefinition, and
+// createBashTool() returns an AgentTool.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
@@ -16,8 +20,8 @@ import {
   type FauxSession,
 } from "./harness";
 
-const SECRET_NAME = "PI_SPIKE_SECRET";
-const SECRET_VALUE = "spike-secret-value-0123456789";
+const SECRET_NAME = "PI_TEST_SECRET";
+const SECRET_VALUE = "test-secret-value-0123456789";
 const ENV_ALLOWLIST = ["PATH", "HOME", "LANG", "CI"];
 // Variables bash itself exports to the commands it runs.
 const SHELL_ADDED = ["PWD", "OLDPWD", "SHLVL", "_"];
@@ -78,6 +82,8 @@ function bwrapUsable(): boolean {
   return probe.status === 0;
 }
 
+let current: FauxSession | undefined;
+
 /** Runs one bash command through a session whose bash tool uses `hook`. */
 async function runBash(
   command: string,
@@ -114,7 +120,6 @@ async function runBash(
   return { output, hookSaw };
 }
 
-let current: FauxSession | undefined;
 beforeEach(() => {
   process.env[SECRET_NAME] = SECRET_VALUE;
 });
