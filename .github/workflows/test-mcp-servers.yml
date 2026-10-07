@@ -1,9 +1,9 @@
 name: Test MCP Servers
 
+# Manual dispatch only until this workflow is ported to pi. See
+# docs/pi-port-proposal.md.
 on:
-  pull_request:
   workflow_dispatch:
-  workflow_call:
 
 # The Claude API is authenticated via workload identity federation: id-token
 # lets the action mint the GitHub OIDC token it exchanges for a short-lived

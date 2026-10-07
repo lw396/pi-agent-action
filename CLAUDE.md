@@ -9,6 +9,16 @@ bun run format          # Format with prettier
 bun run format:check    # Check formatting
 ```
 
+## Port in Progress
+
+This repository started as a copy of [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action) and is being turned into **pi-agent-action**: the same action running on the [pi coding agent](https://github.com/earendil-works/pi) instead of Claude Code, as a drop-in replacement for claude-code-action users. Read `docs/pi-port-proposal.md` for the plan, milestones, and open questions before making structural changes.
+
+The rest of this file still describes the Claude-based code as it currently is. While porting:
+
+- Keep `src/github/*` and `src/mcp/*` structurally close to upstream so fixes can be cherry-picked from the `upstream` remote.
+- The pi executor goes in `src/runner/`. `base-action/` will be removed once nothing imports it, so don't add new code there.
+- Don't use "Claude" or Anthropic branding in new names, defaults, or user-facing text.
+
 ## What This Is
 
 A GitHub Action that lets Claude respond to `@claude` mentions on issues/PRs (tag mode) or run tasks via `prompt` input (agent mode). Mode is auto-detected: if `prompt` is provided, it's agent mode; if triggered by a comment/issue event with `@claude`, it's tag mode. See `src/modes/detector.ts`.
@@ -17,7 +27,7 @@ A GitHub Action that lets Claude respond to `@claude` mentions on issues/PRs (ta
 
 Single entrypoint: `src/entrypoints/run.ts` orchestrates everything — prepare (auth, permissions, trigger check, branch/comment creation), install Claude Code CLI, execute Claude via `base-action/` functions (imported directly, not subprocess), then cleanup (update tracking comment, write step summary). SSH signing cleanup and token revocation are separate `always()` steps in `action.yml`.
 
-`base-action/` is also published standalone as `@anthropic-ai/claude-code-base-action`. Don't break its public API. It reads config from `INPUT_`-prefixed env vars (set by `action.yml`), not from action inputs directly.
+`base-action/` is the executor: it sets up auth and Claude Code settings, then runs Claude through the Agent SDK. Upstream also published it standalone as `@anthropic-ai/claude-code-base-action`; this repository does not, so its public API need not be preserved. It reads config from `INPUT_`-prefixed env vars (set by `action.yml`), not from action inputs directly.
 
 ## Key Concepts
 
@@ -34,7 +44,7 @@ Single entrypoint: `src/entrypoints/run.ts` orchestrates everything — prepare 
 - **Token lifecycle matters**: The GitHub App token is obtained early and revoked in a separate `always()` step in `action.yml`. If you move token revocation into `run.ts`, it won't run if the process crashes. Same for SSH signing cleanup.
 - **Error phase attribution**: The catch block in `run.ts` uses `prepareCompleted` to distinguish prepare failures from execution failures. The tracking comment shows different messages for each.
 - **`action.yml` outputs reference step IDs**: Outputs like `execution_file`, `branch_name`, `github_token` reference `steps.run.outputs.*`. If you rename the step ID, update the outputs section too.
-- **Integration testing** happens in a separate repo (`install-test`), not here. The tests in this repo are unit tests.
+- **Integration testing**: the tests in this repo are unit tests. Upstream runs end-to-end tests in a separate repo (`install-test`) that this project has no equivalent of yet, and the `test-*.yml` workflows still exercise the Claude executor.
 
 ## Code Conventions
 

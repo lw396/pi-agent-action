@@ -109,15 +109,51 @@ README 中要提供一张 claude-code-action → pi-agent-action 的迁移对照
   上游 2026-07 以来的 50 个提交中，有 43 个是自动版本升级，跟进成本很低。
 
 - 尽量保持 `src/github/*`、`src/mcp/*` 的结构不变，方便 cherry-pick；Claude 专属部分可以放手重写。
-- `base-action/` 不再作为独立包发布。
+- `base-action/` 不再作为独立包发布，也不再保持独立目录。上游把它放在独立目录，是因为它原本是一个独立仓库（2025-07 通过 `8335bda` 并入），之后又要镜像同步到 `anthropics/claude-code-base-action`，还要作为 npm 包发布。这几个原因对本项目都不成立。pi 执行器放在 `src/runner/`，`base-action/` 中通用的部分（`prepare-prompt.ts`、`retry.ts`、`execution-file.ts`）迁移过去，等没有代码再引用它后，整个目录删除。
 - 命名、图标、Marketplace 描述中不使用 "Claude"。README 中注明 "Based on anthropics/claude-code-action (MIT)"，并声明本项目不是官方产品。
+
+## CI 与集成测试
+
+### 现状（M0 起）
+
+- `ci-all.yml` 在推送到 `main`、提交 PR 和手动触发时**自动运行**，但只调用 `ci.yml`，也就是单元测试、Prettier 格式检查和 typecheck。
+- `workflow-hardening.yml` 照常在 PR 和推送到 `main` 时自动运行。
+- 5 个集成测试 `test-*.yml` **只能手动触发**，也不再被 `ci-all.yml` 调用。原因：
+
+  - 它们测试的仍是 Claude 执行器；
+  - 它们通过 Anthropic workload identity federation 认证，本仓库没有相应配置；
+  - 它们依赖的 `ubuntu-24.04-firewall` runner 在个人账号下很可能不可用。
+
+  在这种状态下自动运行，结果只会是失败。
+
+### 目标：移植完成后恢复自动运行
+
+集成测试是唯一会真正调用模型、端到端验证执行器的测试。单元测试覆盖不到这部分，所以每个 `test-*.yml` 移植到 pi 后，都要**恢复 `pull_request` 和 `workflow_call` 触发，并重新加回 `ci-all.yml`**。各工作流的处理时机如下：
+
+| 工作流                        | 测试内容                                                    | 处理方式                                                 | 恢复自动运行的时机 |
+| ----------------------------- | ----------------------------------------------------------- | -------------------------------------------------------- | ------------------ |
+| `test-base-action.yml`        | 用内联 prompt 或 prompt 文件运行执行器，检查 execution file | 改为测试 `src/runner/` 的 pi 执行器                      | M1                 |
+| `test-mcp-servers.yml`        | MCP server 能否被加载、调用                                 | 改为验证 pi 以 `direct` 模式加载本项目的 MCP server      | M2                 |
+| `test-structured-output.yml`  | `--json-schema` 结构化输出                                  | 改为测试基于自定义 tool 的 structured output             | M3                 |
+| `test-settings.yml`           | Claude Code `settings` 输入                                 | 如果保留 `settings` 输入，就改为测试 pi 的设置；否则删除 | M4                 |
+| `test-custom-executables.yml` | 自定义 Claude Code、Bun 可执行文件路径                      | 随 `path_to_claude_code_executable` 等输入一起删除或改写 | M4                 |
+
+恢复自动运行前，需要满足以下条件：
+
+1. **认证**：在仓库 secret 中配置一个模型 API key，工作流改用 API key 认证，不再用 Anthropic 联邦认证。
+2. **fork PR**：来自 fork 的 PR 拿不到 secret，所以保留"仅同仓库 PR 才运行"的 `if` 条件，fork PR 跳过集成测试。
+3. **runner 与加固检查**：确认 `ubuntu-24.04-firewall` 是否可用。
+   - 如果不可用，要么改用其他方式限制出站流量，要么把相关 job 连同原因写进 `check_workflow_hardening.py` 的豁免表。不能直接关闭检查。
+   - 同时把加固检查的识别规则从 Claude 改为 pi（M3/M4）。
+4. **成本控制**：集成测试使用低价模型，限制最大轮数。必要时用 `paths` 过滤，只在执行器、MCP 或 `action.yml` 发生变化时运行。
 
 ## 里程碑
 
-1. **M1 — agent mode 跑通**：用 pi SDK 执行 `prompt`，并输出 execution file。（2–3 天）
-2. **M2 — tag mode 跑通**：现有 MCP server 以 `direct` 模式注册，跟踪评论、分支、提交都正常工作。（2–3 天）
-3. **M3 — 安全与控制**：工具白名单映射、`tool_call` 拦截扩展、structured output、默认不信任项目配置。
-4. **M4 — 收尾**：重写 `format-turns.ts`，迁移 `action.yml` 输入，更新加固检查脚本，补充迁移对照表和文档。
+0. **M0 — 准备**：`ci-all.yml` 只调用单元测试、格式检查和类型检查，集成测试暂时改为只能手动触发（见"CI 与集成测试"）；更新 `CLAUDE.md`；做技术验证，确认 pi SDK 能在 Bun 下运行，MCP 的 `direct` 暴露模式可用，并找到 usage/cost 字段；确定默认的 provider、model 和命名。
+1. **M1 — agent mode 跑通**：在 `src/runner/` 中用 pi SDK 执行 `prompt`，并输出 execution file；`test-base-action.yml` 恢复自动运行。（2–3 天）
+2. **M2 — tag mode 跑通**：现有 MCP server 以 `direct` 模式注册，跟踪评论、分支、提交都正常工作；`test-mcp-servers.yml` 恢复自动运行。（2–3 天）
+3. **M3 — 安全与控制**：工具白名单映射、`tool_call` 拦截扩展、structured output、默认不信任项目配置；`test-structured-output.yml` 恢复自动运行。
+4. **M4 — 收尾**：重写 `format-turns.ts`，迁移 `action.yml` 输入，更新加固检查脚本，处理 `test-settings.yml` 和 `test-custom-executables.yml`，补充迁移对照表和文档。
 
 ## 待决问题
 
