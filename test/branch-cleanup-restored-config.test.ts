@@ -194,6 +194,36 @@ describe("auto-commit with restored config paths", () => {
     expect(filesInHeadCommit()).toEqual(["src/app.ts", "src/new-file.ts"]);
   });
 
+  test("does not commit the revert of restored pi config", async () => {
+    write(".pi/settings.json", '{"from":"base"}\n');
+    write("AGENTS.md", "base agents\n");
+    git("add", "-A");
+    git("commit", "-qm", "base pi config");
+    write(".pi/settings.json", '{"from":"pr-author"}\n');
+    write("AGENTS.md", "pr author agents\n");
+    write(".pi/extensions/added.ts", "pr author extension\n");
+    git("add", "-A");
+    git("commit", "-qm", "PR author edits pi config");
+    // restoreConfigFromBase reverts both to base, deletes the file base does
+    // not have, and leaves all of it unstaged.
+    write(".pi/settings.json", '{"from":"base"}\n');
+    write("AGENTS.md", "base agents\n");
+    rmSync(join(workDir, ".pi/extensions"), { recursive: true });
+    write("src/app.ts", "real change\n");
+
+    await checkAndCommitOrDeleteBranch(
+      mockOctokit,
+      "owner",
+      "repo",
+      BRANCH,
+      "main",
+      false,
+      [...SENSITIVE_PATHS],
+    );
+
+    expect(filesInHeadCommit()).toEqual(["src/app.ts"]);
+  });
+
   test("pushes the commit to the branch", async () => {
     authorPrConfigEdits();
     simulateRestoredConfig();

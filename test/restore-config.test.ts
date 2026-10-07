@@ -381,6 +381,98 @@ describe("restoreConfigFromBase", () => {
     expectNoLinksInSnapshot();
   });
 
+  describe("pi config paths", () => {
+    // Paths pi reads from cwd at startup: project settings and extensions,
+    // skills, and context files. pi also looks for the upper-case `.MD`
+    // spellings, which are distinct files on a case-sensitive runner.
+    // Each path with a file a PR could place at or under it.
+    const PI_PATHS_WITH_SAMPLE_FILE: Array<[string, string]> = [
+      [".pi", ".pi/extensions/evil.ts"],
+      [".agents", ".agents/skills/evil/SKILL.md"],
+      ["AGENTS.md", "AGENTS.md"],
+      ["AGENTS.MD", "AGENTS.MD"],
+      ["AGENTS.override.md", "AGENTS.override.md"],
+      ["CLAUDE.MD", "CLAUDE.MD"],
+    ];
+
+    function addBaseCommit(files: Record<string, string>): void {
+      git(["checkout", "main"]);
+      for (const [path, contents] of Object.entries(files)) {
+        writeRepoFile(path, contents);
+      }
+      git(["add", "-A"]);
+      git(["commit", "-m", "base pi config"]);
+      git(["push", "origin", "main"]);
+      git(["checkout", "pr"]);
+      git(["merge", "--no-edit", "main"]);
+    }
+
+    function addPrCommit(files: Record<string, string>): void {
+      for (const [path, contents] of Object.entries(files)) {
+        writeRepoFile(path, contents);
+      }
+      git(["add", "-A"]);
+      git(["commit", "-m", "pr pi config"]);
+    }
+
+    test("restores PR-modified pi config from the base branch and snapshots the PR version", () => {
+      addBaseCommit({
+        ".pi/settings.json": "base settings\n",
+        ".agents/skills/review/SKILL.md": "base skill\n",
+        "AGENTS.md": "base agents\n",
+        "AGENTS.override.md": "base override\n",
+      });
+      addPrCommit({
+        ".pi/settings.json": "pr settings\n",
+        ".pi/extensions/evil.ts": "pr extension\n",
+        ".agents/skills/review/SKILL.md": "pr skill\n",
+        "AGENTS.md": "pr agents\n",
+        "AGENTS.override.md": "pr override\n",
+      });
+
+      const restored = restoreConfigFromBase("main");
+
+      // Every sensitive path is reported, so callers exclude all of them from
+      // auto-commits, whether or not it existed on either branch.
+      expect(restored).toEqual(
+        expect.arrayContaining(PI_PATHS_WITH_SAMPLE_FILE.map(([path]) => path)),
+      );
+      expect(readRepoFile(".pi/settings.json")).toBe("base settings\n");
+      expect(existsRepoFile(".pi/extensions/evil.ts")).toBe(false);
+      expect(readRepoFile(".agents/skills/review/SKILL.md")).toBe(
+        "base skill\n",
+      );
+      expect(readRepoFile("AGENTS.md")).toBe("base agents\n");
+      expect(readRepoFile("AGENTS.override.md")).toBe("base override\n");
+
+      expect(readRepoFile(".claude-pr/.pi/settings.json")).toBe(
+        "pr settings\n",
+      );
+      expect(readRepoFile(".claude-pr/.pi/extensions/evil.ts")).toBe(
+        "pr extension\n",
+      );
+      expect(readRepoFile(".claude-pr/.agents/skills/review/SKILL.md")).toBe(
+        "pr skill\n",
+      );
+      expect(readRepoFile(".claude-pr/AGENTS.md")).toBe("pr agents\n");
+      expect(readRepoFile(".claude-pr/AGENTS.override.md")).toBe(
+        "pr override\n",
+      );
+    });
+
+    test.each(PI_PATHS_WITH_SAMPLE_FILE)(
+      "removes %s when the PR adds it and the base branch has none",
+      (sensitivePath, file) => {
+        addPrCommit({ [file]: "pr content\n" });
+
+        restoreConfigFromBase("main");
+
+        expect(existsRepoFile(sensitivePath)).toBe(false);
+        expect(readRepoFile(`.claude-pr/${file}`)).toBe("pr content\n");
+      },
+    );
+  });
+
   test("does not modify an existing .gitignore", () => {
     writeRepoFile(".gitignore", "node_modules\n");
     git(["add", ".gitignore"]);

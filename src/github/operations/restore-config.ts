@@ -32,6 +32,16 @@ export const SENSITIVE_PATHS = [
   "CLAUDE.md",
   "CLAUDE.local.md",
   ".husky",
+  // pi reads project settings, extensions and skills from .pi/, skills from
+  // .agents/, and context files from AGENTS.override.md, AGENTS.md and
+  // CLAUDE.md. It also accepts AGENTS.MD and CLAUDE.MD, which are separate
+  // files on a case-sensitive runner.
+  ".pi",
+  ".agents",
+  "AGENTS.md",
+  "AGENTS.MD",
+  "AGENTS.override.md",
+  "CLAUDE.MD",
 ];
 
 const CLAUDE_PR_EXCLUDE_PATTERN = "/.claude-pr/";
