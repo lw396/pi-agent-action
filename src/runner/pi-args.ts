@@ -31,9 +31,9 @@ const NON_FLAG_FIELDS = new Set<keyof Args>([
 
 // Flags with an action input of their own.
 const REPLACED_BY_INPUT: Partial<Record<keyof Args, string>> = {
-  model: "use the model input instead",
-  provider: "use the model input in provider/id form instead",
-  apiKey: "use the api_key input instead",
+  model: "is not supported: use the model input instead",
+  provider: "is not supported: use the model input in provider/id form instead",
+  apiKey: "is not supported: use the api_key input instead",
 };
 
 // Flags the Runner applies. Session, output-mode, interactive and resource
@@ -96,7 +96,7 @@ export function parsePiArgs(text: string | undefined): PiArgs {
       continue;
     }
     problems.push(
-      `${flagName(field)}: ${REPLACED_BY_INPUT[key] ?? `${flagName(field)} is not supported by the action`}`,
+      `${flagName(field)} ${REPLACED_BY_INPUT[key] ?? "is not supported by the action"}`,
     );
   }
   if (problems.length > 0) {
