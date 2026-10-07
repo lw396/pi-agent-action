@@ -94,6 +94,8 @@ export function redactSecrets(content: string): string {
     "[REDACTED_ANTHROPIC_KEY]",
   );
 
+  content = redactOtherProviderKeys(content);
+
   // AWS access key ids: AKIA/ASIA followed by 16 uppercase alphanumerics. All
   // uppercase alphanumeric, so keep a leading boundary to avoid matching inside
   // larger blobs; also treat a JSON escape or ANSI color code as a boundary.
@@ -160,3 +162,54 @@ export function redactGitHubTokens(content: string): string {
 
 export const stripHtmlComments = (content: string) =>
   content.replace(/<!--[\s\S]*?-->/g, "");
+
+// Model provider keys beyond upstream's Anthropic rule, which stays inline in
+// redactSecrets.
+//
+// Unlike the other vendor-prefixed rules, these keep a leading boundary: prefixes such as
+// `sk-admin-` and `AIza` also turn up inside kebab-case identifiers and base64
+// blobs. As in the AWS rule, a JSON escape or ANSI color code counts as a
+// boundary, and so does a URL-encoded byte (`key%3DAIza...`).
+const KEY_START = String.raw`(?:\b|(?<=\\(?:[nrtbf"\\/]|u[0-9a-fA-F]{4}))|(?<=\[[0-9;]*m)|(?<=%[0-9A-Fa-f]{2}))`;
+
+const OTHER_PROVIDER_KEYS: Array<{ pattern: RegExp; placeholder: string }> = [
+  // OpenRouter: sk-or-v1- followed by 64 hex characters.
+  {
+    pattern: new RegExp(
+      `${KEY_START}sk-or-v1-[0-9a-f]{64}(?![A-Za-z0-9])`,
+      "g",
+    ),
+    placeholder: "[REDACTED_OPENROUTER_KEY]",
+  },
+  // OpenAI project, service-account, admin and early user keys. Real ones
+  // run to 130-170 characters; the 80-character minimum keeps long kebab-case
+  // identifiers that happen to start with a prefix out.
+  {
+    pattern: new RegExp(
+      `${KEY_START}sk-(?:proj|svcacct|admin|None)-[A-Za-z0-9_-]{80,}`,
+      "g",
+    ),
+    placeholder: "[REDACTED_OPENAI_KEY]",
+  },
+  // OpenAI legacy keys: sk- and 48 alphanumerics with the T3BlbkFJ marker
+  // (base64 of "OpenAI") in the middle.
+  {
+    pattern: new RegExp(
+      `${KEY_START}sk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20}(?![A-Za-z0-9])`,
+      "g",
+    ),
+    placeholder: "[REDACTED_OPENAI_KEY]",
+  },
+  // Google API keys, used for Gemini: AIza and 35 more characters.
+  {
+    pattern: new RegExp(`${KEY_START}AIza[0-9A-Za-z_-]{35}`, "g"),
+    placeholder: "[REDACTED_GOOGLE_API_KEY]",
+  },
+];
+
+function redactOtherProviderKeys(content: string): string {
+  for (const { pattern, placeholder } of OTHER_PROVIDER_KEYS) {
+    content = content.replace(pattern, placeholder);
+  }
+  return content;
+}

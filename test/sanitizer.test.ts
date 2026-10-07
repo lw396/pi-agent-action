@@ -466,6 +466,75 @@ describe("redactSecrets", () => {
     expect(redacted).toContain("[REDACTED_AWS_KEY_ID]");
   });
 
+  describe("other model providers", () => {
+    // Synthetic values in each provider's published key format, assembled at
+    // runtime so the source never holds a whole key-shaped literal (secret
+    // scanning push protection would reject the commit). Modern OpenAI keys
+    // are roughly 130-170 characters long.
+    const chunk = "Ab3dEf6hIj";
+    const body = `${chunk.repeat(4)}_-`;
+    const openaiMarker = "T3Blbk" + "FJ";
+    const openaiTail = body + openaiMarker + body;
+    const openaiProject = "sk-proj-" + openaiTail;
+    const openaiServiceAccount = "sk-svcacct-" + openaiTail;
+    const openaiAdmin = "sk-admin-" + openaiTail;
+    const openaiNone = "sk-None-" + openaiTail;
+    const openaiLegacy =
+      "sk-" + chunk.repeat(2) + openaiMarker + chunk.repeat(2);
+    const openrouter = "sk-or-v1-" + "0123456789abcdef".repeat(4);
+    const gemini = "AIza" + "Sy" + chunk.repeat(3) + "AbC";
+
+    it.each([
+      ["OpenAI project", openaiProject, "[REDACTED_OPENAI_KEY]"],
+      ["OpenAI service account", openaiServiceAccount, "[REDACTED_OPENAI_KEY]"],
+      ["OpenAI admin", openaiAdmin, "[REDACTED_OPENAI_KEY]"],
+      ["OpenAI sk-None", openaiNone, "[REDACTED_OPENAI_KEY]"],
+      ["OpenAI legacy", openaiLegacy, "[REDACTED_OPENAI_KEY]"],
+      ["OpenRouter", openrouter, "[REDACTED_OPENROUTER_KEY]"],
+      ["Gemini", gemini, "[REDACTED_GOOGLE_API_KEY]"],
+    ])("should redact %s keys", (_name, key, placeholder) => {
+      expect(redactSecrets(`API_KEY=${key}`)).toBe(`API_KEY=${placeholder}`);
+      expect(redactSecrets(`Authorization: Bearer ${key}\n`)).toBe(
+        `Authorization: Bearer ${placeholder}\n`,
+      );
+      expect(redactSecrets(`\x1b[32m${key}\x1b[0m`)).toBe(
+        `\x1b[32m${placeholder}\x1b[0m`,
+      );
+      expect(redactSecrets(`https://x.test/?q=1&key%3D${key}`)).toBe(
+        `https://x.test/?q=1&key%3D${placeholder}`,
+      );
+      const serialized = redactSecrets(JSON.stringify({ out: `a\n${key}` }));
+      expect(serialized).toContain(placeholder);
+      expect(serialized).not.toContain(key);
+    });
+
+    it("should redact a Gemini key followed by - or _", () => {
+      expect(redactSecrets(`${gemini}-suffix ${gemini}_x`)).toBe(
+        "[REDACTED_GOOGLE_API_KEY]-suffix [REDACTED_GOOGLE_API_KEY]_x",
+      );
+    });
+
+    it("should not redact ordinary text that shares a key prefix", () => {
+      const content = [
+        // kebab-case identifiers ending in a key prefix
+        "task-admin-dashboard-configuration-settings-panel-layout-v2",
+        "disk-proj-abcdefghijklmnopqrstuvwxyz0123456789abcdefghij",
+        // kebab-case identifiers starting with a key prefix
+        "sk-proj-short-but-a-very-long-kebab-case-identifier-name-here",
+        "my-sk-admin-panel-component-with-long-name-abcdefghij",
+        // prefixes followed by too little to be a key
+        "sk-proj-short sk-admin-panel sk-None-x sk-or-v1-abc123 AIzaShort",
+        // legacy-length sk- value without the OpenAI marker
+        "sk-abcdefghijklmnopqrstuvwxyz0123456789abcdefghijkl",
+        // OpenRouter prefix with non-hex body
+        "sk-or-v1-" + "z".repeat(64),
+        // AIza inside a longer base64 blob
+        "iVBORw0KGgo" + gemini + "AAAA",
+      ].join("\n");
+      expect(redactSecrets(content)).toBe(content);
+    });
+  });
+
   it("should not redact base64 blobs that are not JWTs", () => {
     // Long base64 without dots, and two-segment strings, are left alone
     const content =
