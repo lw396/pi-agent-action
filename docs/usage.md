@@ -114,8 +114,6 @@ These inputs are deprecated and will be removed in a future version:
 
 ## Upgrading from v0.x?
 
-For a comprehensive guide on migrating from v0.x to v1.0, including step-by-step instructions and examples, see our **[Migration Guide](./migration-guide.md)**.
-
 ### Quick Migration Examples
 
 #### Interactive Workflows (with @claude mentions)
