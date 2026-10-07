@@ -1,4 +1,1 @@
-export {
-  retryWithBackoff,
-  type RetryOptions,
-} from "../../base-action/src/retry";
+export { retryWithBackoff, type RetryOptions } from "../runner/retry";

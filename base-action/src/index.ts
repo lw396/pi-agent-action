@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 
 import * as core from "@actions/core";
-import { preparePrompt } from "./prepare-prompt";
+import { preparePrompt } from "../../src/runner/prepare-prompt";
 import { runClaude } from "./run-claude";
 import { setupClaudeCodeSettings } from "./setup-claude-code-settings";
 import { validateEnvironmentVariables } from "./validate-env";
 import { installPlugins } from "./install-plugins";
-import { setExecutionFileOutputIfPresent } from "./execution-file";
+import { setExecutionFileOutputIfPresent } from "../../src/runner/execution-file";
 import { setupWorkloadIdentity } from "./workload-identity";
 import type { WorkloadIdentityHandle } from "./workload-identity";
 

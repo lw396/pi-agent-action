@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { retryWithBackoff } from "../src/retry";
+import { retryWithBackoff } from "../../src/runner/retry";
 
 describe("retryWithBackoff", () => {
   let originalConsoleLog: typeof console.log;

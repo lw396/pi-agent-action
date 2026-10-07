@@ -5,7 +5,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { setExecutionFileOutputIfPresent } from "../src/execution-file";
+import { setExecutionFileOutputIfPresent } from "../../src/runner/execution-file";
 
 describe("execution file output", () => {
   const originalRunnerTemp = process.env.RUNNER_TEMP;

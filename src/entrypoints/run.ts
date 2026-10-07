@@ -41,10 +41,10 @@ import type { WorkloadIdentityHandle } from "../../base-action/src/workload-iden
 import { validateEnvironmentVariables } from "../../base-action/src/validate-env";
 import { setupClaudeCodeSettings } from "../../base-action/src/setup-claude-code-settings";
 import { installPlugins } from "../../base-action/src/install-plugins";
-import { preparePrompt } from "../../base-action/src/prepare-prompt";
+import { preparePrompt } from "../runner/prepare-prompt";
 import { runClaude } from "../../base-action/src/run-claude";
 import type { ClaudeRunResult } from "../../base-action/src/run-claude-sdk";
-import { setExecutionFileOutputIfPresent } from "../../base-action/src/execution-file";
+import { setExecutionFileOutputIfPresent } from "../runner/execution-file";
 
 // Exported for unit testing. `set -o pipefail` makes curl's non-zero exit
 // propagate through the pipe so the install retry logic actually triggers

@@ -18,7 +18,7 @@ import * as core from "@actions/core";
 import { createHash } from "crypto";
 import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
-import { retryWithBackoff } from "./retry";
+import { retryWithBackoff } from "../../src/runner/retry";
 
 /** How often the GitHub OIDC identity token file is rewritten. */
 const REFRESH_INTERVAL_MS = 4 * 60 * 1000;

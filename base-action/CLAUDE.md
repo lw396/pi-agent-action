@@ -12,7 +12,7 @@
 
 ### Action Testing
 
-- Test specific file: `bun test test/prepare-prompt.test.ts`
+- Test specific file: `bun test test/validate-env.test.ts`
 
 ## Architecture Overview
 

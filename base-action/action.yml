@@ -140,6 +140,9 @@ runs:
       run: |
         cd ${GITHUB_ACTION_PATH}
         bun install --production
+        # src/runner/ (imported from here) resolves dependencies from the repo root
+        cd ..
+        bun install --production
 
     - name: Install Claude Code
       shell: bash

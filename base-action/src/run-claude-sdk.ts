@@ -8,7 +8,7 @@ import type {
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { ParsedSdkOptions } from "./parse-sdk-options";
-import { writeExecutionFile } from "./execution-file";
+import { writeExecutionFile } from "../../src/runner/execution-file";
 
 export type ClaudeRunResult = {
   executionFile?: string;

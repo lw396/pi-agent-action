@@ -1,7 +1,10 @@
 #!/usr/bin/env bun
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { preparePrompt, type PreparePromptInput } from "../src/prepare-prompt";
+import {
+  preparePrompt,
+  type PreparePromptInput,
+} from "../../src/runner/prepare-prompt";
 import { unlink, writeFile, readFile, stat } from "fs/promises";
 
 describe("preparePrompt integration tests", () => {
