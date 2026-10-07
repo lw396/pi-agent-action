@@ -66,6 +66,68 @@ Each solution includes complete working examples, configuration details, and exp
 
 Having issues or questions? Check out our [Frequently Asked Questions](./docs/faq.md) for solutions to common problems and detailed explanations of Claude's capabilities and limitations.
 
+## Contributing
+
+### Setup
+
+Requires the [Bun](https://bun.sh/) runtime.
+
+```bash
+git clone https://github.com/lw396/pi-agent-action.git
+cd pi-agent-action
+bun install
+```
+
+### Scripts
+
+- `bun test` - Run all tests
+- `bun run typecheck` - Type check the code
+- `bun run format` - Format code with Prettier
+- `bun run format:check` - Check code formatting
+
+### Pull Request Process
+
+1. Create a new branch from `main`, e.g. `git checkout -b feature/your-feature-name`
+2. Make your changes and commit them using [Conventional Commits](https://www.conventionalcommits.org/) (e.g. `feat: add new feature`)
+3. Run `bun test`, `bun run typecheck` and `bun run format:check`
+4. Push your branch, open a Pull Request, and make sure all CI checks pass
+
+### Testing Changes in a Real Workflow
+
+Unit tests don't exercise the action end to end. To try your changes, create a test repository and point a workflow at your branch:
+
+```yaml
+uses: your-username/pi-agent-action@your-branch
+```
+
+Then check the GitHub Actions logs for runtime issues.
+
+### Running Workflows Locally with act
+
+[act](https://github.com/nektos/act) runs the workflows in `.github/workflows/` locally in Docker containers.
+
+Prerequisites:
+
+- [Docker](https://www.docker.com/) is running (check with `docker ps`)
+- act is installed, e.g. `brew install act`, `gh extension install https://github.com/nektos/gh-act`, or the [install script](https://nektosact.com/installation/index.html)
+
+Run the CI workflow (unit tests, Prettier and typecheck jobs):
+
+```bash
+act pull_request -W .github/workflows/ci.yml
+```
+
+Run a single job, with verbose output for debugging:
+
+```bash
+act pull_request -W .github/workflows/ci.yml -j test -v
+```
+
+Limitations of the integration workflows (`test-*.yml`):
+
+- They run on the `ubuntu-24.04-firewall` runner, which act doesn't know. Map it to a regular image with `-P ubuntu-24.04-firewall=catthehacker/ubuntu:act-latest`. The egress firewall is not applied locally.
+- They currently authenticate to the model API by exchanging a GitHub OIDC token, which act can't mint. Running them locally requires passing an API key as a secret instead, e.g. `--secret ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"`, and a workflow input that reads it.
+
 ## License
 
 This project is licensed under the MIT License—see the LICENSE file for details.

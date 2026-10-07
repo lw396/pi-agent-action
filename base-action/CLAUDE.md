@@ -12,7 +12,6 @@
 
 ### Action Testing
 
-- Test action locally: `./test-local.sh`
 - Test specific file: `bun test test/prepare-prompt.test.ts`
 
 ## Architecture Overview
@@ -42,7 +41,6 @@ This is a GitHub Action that allows running Claude Code within GitHub workflows.
 ### Local Testing
 
 - Use `act` tool to run GitHub Actions workflows locally
-- `test-local.sh` script automates local testing setup
 - Requires `ANTHROPIC_API_KEY` environment variable
 
 ### Test Structure
