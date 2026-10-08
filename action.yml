@@ -39,11 +39,27 @@ inputs:
       (e.g., issue labeling).
 
       SECURITY: Processing untrusted content exposes the workflow to prompt injection. When this
-      input is set, Claude does a best-effort scrub of Anthropic, cloud, and GitHub Actions secrets
-      from subprocess environments. This reduces but does not eliminate prompt injection risk -
+      input is set, bash commands get only an allowlist of environment variables (see
+      allowed_bash_env), and on Linux runners with bubblewrap they run in a sandbox that hides
+      the agent's own environment. This reduces but does not eliminate prompt injection risk -
       only use for workflows with very limited permissions and validate all outputs.
     required: false
     default: ""
+  allowed_bash_env:
+    description: >-
+      Environment variables, besides the built-in allowlist, that bash
+      commands keep when allowed_non_write_users is set, separated by commas,
+      spaces or newlines. Every variable not allowed is removed, including
+      provider keys and GH_TOKEN, so git push and gh need GH_TOKEN listed here.
+      Has no effect unless allowed_non_write_users is set.
+    required: false
+    default: ""
+  subprocess_isolation:
+    description: >-
+      Set to 'false' to turn off the environment allowlist and the bubblewrap
+      sandbox for bash commands when allowed_non_write_users is set.
+    required: false
+    default: "true"
   include_comments_by_actor:
     description: "Comma-separated list of actor usernames to INCLUDE in comments. Supports wildcards: '*[bot]' matches all bots, 'dependabot[bot]' matches specific bot. Empty (default) includes all actors."
     required: false
@@ -271,14 +287,10 @@ runs:
     - name: Install subprocess isolation dependencies
       # Install subprocess isolation dependencies when processing content from non-write users.
       # Best-effort: skips on non-Linux or when sudo/apt unavailable (self-hosted runners).
-      if: ${{ inputs.allowed_non_write_users != '' && runner.os == 'Linux' }}
+      if: ${{ inputs.allowed_non_write_users != '' && inputs.subprocess_isolation != 'false' && runner.os == 'Linux' }}
       continue-on-error: true
       shell: bash
       run: |
-        if [ "${CLAUDE_CODE_SUBPROCESS_ENV_SCRUB:-}" = "0" ]; then
-          echo "Subprocess isolation opted out via CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=0"
-          exit 0
-        fi
         if command -v apt-get >/dev/null && command -v sudo >/dev/null; then
           for i in 1 2 3; do
             sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends bubblewrap socat && break
@@ -344,7 +356,6 @@ runs:
         OVERRIDE_GITHUB_TOKEN: ${{ inputs.github_token }}
         ALLOWED_BOTS: ${{ inputs.allowed_bots }}
         ALLOWED_NON_WRITE_USERS: ${{ inputs.allowed_non_write_users }}
-        CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: ${{ env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB || (inputs.allowed_non_write_users != '' && '1') || '' }}
         CLAUDE_CODE_SCRIPT_CAPS: ${{ env.CLAUDE_CODE_SCRIPT_CAPS || '' }}
         INCLUDE_COMMENTS_BY_ACTOR: ${{ inputs.include_comments_by_actor }}
         EXCLUDE_COMMENTS_BY_ACTOR: ${{ inputs.exclude_comments_by_actor }}
@@ -371,6 +382,8 @@ runs:
         INPUT_ALLOWED_TOOLS: ${{ inputs.allowed_tools }}
         INPUT_DISALLOWED_TOOLS: ${{ inputs.disallowed_tools }}
         JSON_SCHEMA: ${{ inputs.json_schema }}
+        SUBPROCESS_ISOLATION: ${{ inputs.subprocess_isolation }}
+        ALLOWED_BASH_ENV: ${{ inputs.allowed_bash_env }}
 
         # Base-action inputs
         INPUT_PROMPT_FILE: ${{ runner.temp }}/claude-prompts/claude-prompt.txt

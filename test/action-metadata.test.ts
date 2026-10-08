@@ -44,6 +44,28 @@ describe("action metadata", () => {
     );
   });
 
+  test("passes the subprocess isolation inputs to the run step", () => {
+    expect(inputDefault("allowed_bash_env")).toBe("");
+    expect(inputDefault("subprocess_isolation")).toBe("true");
+    expect(metadata).toContain(
+      "        SUBPROCESS_ISOLATION: ${{ inputs.subprocess_isolation }}\n",
+    );
+    expect(metadata).toContain(
+      "        ALLOWED_BASH_ENV: ${{ inputs.allowed_bash_env }}\n",
+    );
+    expect(metadata).not.toContain("CLAUDE_CODE_SUBPROCESS_ENV_SCRUB");
+  });
+
+  test("keeps the hardening steps for allowed_non_write_users", () => {
+    expect(metadata).toContain(
+      "apt-get install -y --no-install-recommends bubblewrap",
+    );
+    expect(metadata).toContain("name: Pin bun binary for post-steps");
+    expect(metadata).toMatch(
+      /name: Re-prepend system bin dirs to PATH\n      if: \$\{\{ always\(\) && inputs\.allowed_non_write_users != ''/,
+    );
+  });
+
   test("defaults the triggers and branch prefix to pi branding", () => {
     expect(inputDefault("trigger_phrase")).toBe("@pi");
     expect(inputDefault("label_trigger")).toBe("pi");

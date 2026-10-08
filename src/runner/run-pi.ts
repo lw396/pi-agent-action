@@ -13,6 +13,7 @@ import {
   type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
 import { setupPiSettings } from "./setup-pi-settings";
+import { isolatedBashTool } from "./bash-isolation";
 import { parsePiArgs } from "./pi-args";
 import { writeExecutionFile } from "./execution-file";
 import { mcpServerExtensions, type McpServers } from "./mcp-servers";
@@ -60,6 +61,18 @@ export type RunnerOptions = {
    * does not.
    */
   jsonSchema?: string;
+  /**
+   * Isolate the bash tool, for untrusted input (allowed_non_write_users): its
+   * commands get only allowlisted variables and run in bwrap where it works.
+   */
+  isolateBash?: boolean;
+  /** The allowed_bash_env input: more variables the isolated bash keeps. */
+  allowedBashEnv?: string;
+  /**
+   * bwrap for the isolated bash. Defaults to bwrap on PATH; tests point it at
+   * a missing file to exercise the fallback.
+   */
+  bwrapPath?: string;
   /** The action's MCP servers, registered with `direct` exposure. */
   mcpServers?: McpServers;
   /** Working directory of the session. Defaults to process.cwd(). */
@@ -141,7 +154,22 @@ export async function runPi(
     ...permissions,
     editableWorkspace: options.acceptEdits ? cwd : undefined,
     readOnlyGit: options.readOnlyGit,
+    procHiddenFrom: options.isolateBash ? cwd : undefined,
   };
+
+  const customTools = options.isolateBash
+    ? [
+        isolatedBashTool(cwd, {
+          allowedEnv: options.allowedBashEnv,
+          bwrapPath: options.bwrapPath,
+        }),
+      ]
+    : [];
+  if (!options.isolateBash && options.allowedBashEnv?.trim()) {
+    core.warning(
+      "allowed_bash_env has no effect: bash is only isolated when allowed_non_write_users is set and subprocess_isolation is not false.",
+    );
+  }
 
   for (const name of AGENT_HIDDEN_ENV) {
     delete process.env[name];
@@ -199,6 +227,7 @@ export async function runPi(
     tools: withSubmitResult(piArgs, jsonSchema !== undefined),
     excludeTools: piArgs.excludeTools,
     noTools: piArgs.noTools,
+    customTools,
     modelRuntime,
     resourceLoader,
     settingsManager,

@@ -204,6 +204,11 @@ async function run() {
       acceptEdits: prepareResult.acceptEdits,
       readOnlyGit: prepareResult.readOnlyGit,
       jsonSchema: process.env.JSON_SCHEMA,
+      // Untrusted input: keep secrets out of bash, unless the workflow opts out.
+      isolateBash:
+        !!process.env.ALLOWED_NON_WRITE_USERS &&
+        process.env.SUBPROCESS_ISOLATION !== "false",
+      allowedBashEnv: process.env.ALLOWED_BASH_ENV,
       mcpServers: parseMcpConfig(prepareResult.mcpConfig),
     });
 

@@ -10,7 +10,7 @@ import {
   type ToolRule,
 } from "./tool-rules";
 import { findShellSyntax } from "./shell-syntax";
-import { checkWorkspacePath } from "./workspace-path";
+import { checkWorkspacePath, reachesProc } from "./workspace-path";
 import { isReadOnlyGitCommand } from "./read-only-git";
 
 /**
@@ -21,6 +21,9 @@ const READ_ONLY_TOOLS = new Set(["read", "grep", "find", "ls"]);
 
 /** pi's file editing tools, which take the file in their `path` argument. */
 const EDIT_TOOLS = new Set(["edit", "write"]);
+
+/** Tools that search the directories under their `path` argument. */
+const SEARCH_TOOLS = new Set(["grep"]);
 
 export type ToolPermissions = {
   allowed: ToolRule[];
@@ -35,6 +38,12 @@ export type ToolPermissions = {
    * without a rule, as Claude Code's read-only commands are in Upstream.
    */
   readOnlyGit?: boolean;
+  /**
+   * Keep the file tools out of /proc, relative to this working directory.
+   * Set when bash is isolated: the file tools run in the pi process, outside
+   * the sandbox, and /proc holds its environment.
+   */
+  procHiddenFrom?: string;
 };
 
 /**
@@ -96,6 +105,19 @@ export function checkToolCall(
     if (matches(rule)) {
       return blocked(
         `${toolName} is blocked by the disallowed_tools rule '${rule.text}'.`,
+      );
+    }
+  }
+
+  const procCwd = permissions.procHiddenFrom;
+  if (
+    procCwd !== undefined &&
+    (READ_ONLY_TOOLS.has(toolName) || EDIT_TOOLS.has(toolName))
+  ) {
+    const path = typeof input.path === "string" ? input.path : ".";
+    if (reachesProc(path, procCwd, SEARCH_TOOLS.has(toolName))) {
+      return blocked(
+        `${toolName} cannot access /proc, or a path that leads into it, while bash is isolated (allowed_non_write_users).`,
       );
     }
   }

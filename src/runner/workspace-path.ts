@@ -90,3 +90,30 @@ export function checkWorkspacePath(
   if (parts.includes(".git")) return { inside: false, reason: "git" };
   return { inside: true };
 }
+
+/**
+ * Whether a file tool's path reaches /proc, where any process's environment
+ * can be read, following symlinks. With `orAncestor`, a directory that
+ * contains /proc (the root) counts too, for tools that search recursively.
+ * A path whose target cannot be resolved counts, since it cannot be checked.
+ */
+export function reachesProc(
+  path: string,
+  cwd: string,
+  orAncestor = false,
+): boolean {
+  const target = realTarget(resolveToolPath(path, cwd));
+  if (target === undefined) return true;
+  if (isWithin(target, "/proc")) return true;
+  return orAncestor && isWithin("/proc", target);
+}
+
+/** Whether `path` is `dir` or inside it; both are absolute. */
+function isWithin(path: string, dir: string): boolean {
+  const relativePath = relative(dir, path);
+  return (
+    relativePath !== ".." &&
+    !relativePath.startsWith(`..${sep}`) &&
+    !isAbsolute(relativePath)
+  );
+}
