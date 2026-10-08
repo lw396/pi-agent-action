@@ -15,6 +15,10 @@ import {
 import { setupPiSettings } from "./setup-pi-settings";
 import { parsePiArgs } from "./pi-args";
 import { writeExecutionFile } from "./execution-file";
+import {
+  parseToolPermissions,
+  toolPermissionsExtension,
+} from "./tool-permissions";
 
 export type RunnerOptions = {
   /** Model in pi's `provider/id[:thinking]` form. Required. */
@@ -26,6 +30,13 @@ export type RunnerOptions = {
   apiKey?: string;
   /** The pi_args input: pi's own command-line flags, a supported subset. */
   piArgs?: string;
+  /**
+   * The allowed_tools input: rules in Claude Code's `Tool` / `Tool(pattern)`
+   * syntax. Calls to tools other than the read-only ones must match a rule.
+   */
+  allowedTools?: string;
+  /** The disallowed_tools input: rules that block calls, before allowed_tools. */
+  disallowedTools?: string;
   /** Working directory of the session. Defaults to process.cwd(). */
   cwd?: string;
   /**
@@ -91,6 +102,10 @@ export async function runPi(
   }
 
   const piArgs = parsePiArgs(options.piArgs);
+  const toolPermissions = parseToolPermissions(
+    options.allowedTools,
+    options.disallowedTools,
+  );
 
   for (const name of AGENT_HIDDEN_ENV) {
     delete process.env[name];
@@ -124,6 +139,7 @@ export async function runPi(
     cwd,
     agentDir,
     settingsManager,
+    extensionFactories: [toolPermissionsExtension(toolPermissions)],
     ...piArgs.resources,
   });
   await resourceLoader.reload();

@@ -10,7 +10,7 @@ import {
   formatReviewComments,
   formatChangedFilesWithSHA,
 } from "../github/data/formatter";
-import { sanitizeContent } from "../github/utils/sanitizer";
+import { redactSecrets, sanitizeContent } from "../github/utils/sanitizer";
 import {
   isIssuesEvent,
   isIssueCommentEvent,
@@ -996,7 +996,9 @@ export async function createPrompt(
     core.exportVariable("ALLOWED_TOOLS", allAllowedTools);
     core.exportVariable("DISALLOWED_TOOLS", allDisallowedTools);
   } catch (error) {
-    core.setFailed(`Create prompt failed with error: ${error}`);
+    core.setFailed(
+      `Create prompt failed with error: ${redactSecrets(String(error))}`,
+    );
     process.exit(1);
   }
 }

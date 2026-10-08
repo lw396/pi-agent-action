@@ -74,6 +74,25 @@ inputs:
     description: "Additional pi command-line flags. Supported: --thinking, --system-prompt, --append-system-prompt, --tools, --exclude-tools, --no-tools, --no-builtin-tools, --no-skills, --no-prompt-templates, --no-context-files. Any other flag fails the run."
     required: false
     default: ""
+  allowed_tools:
+    description: >-
+      Tools the agent may use, in Claude Code's rule syntax, separated by
+      commas or newlines: a tool name (Bash, Edit, Write, mcp__server__tool,
+      mcp__server__*) or Bash(command:*) for bash commands with that prefix.
+      Read-only tools (Read, Grep, Glob, LS) are always allowed; any other
+      call that matches no rule is blocked, so with no rules the agent cannot
+      run bash or change files. A command matched by a Bash(...) pattern must
+      be one simple command: &&, ;, |, $(), backticks, subshells and
+      redirections are refused.
+    required: false
+    default: ""
+  disallowed_tools:
+    description: >-
+      Tools the agent may not use, in the same syntax as allowed_tools.
+      Checked first: a matching call is blocked even if allowed_tools
+      permits it.
+    required: false
+    default: ""
 
   # Auth configuration
   anthropic_api_key:
@@ -333,6 +352,8 @@ runs:
         MODEL: ${{ inputs.model }}
         API_KEY: ${{ inputs.api_key }}
         PI_ARGS: ${{ inputs.pi_args }}
+        INPUT_ALLOWED_TOOLS: ${{ inputs.allowed_tools }}
+        INPUT_DISALLOWED_TOOLS: ${{ inputs.disallowed_tools }}
 
         # Base-action inputs
         INPUT_PROMPT_FILE: ${{ runner.temp }}/claude-prompts/claude-prompt.txt

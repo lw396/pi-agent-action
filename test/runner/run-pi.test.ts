@@ -1,98 +1,22 @@
 // Runner seam (issue #7): runPi() driven end to end by pi's faux provider.
 // No real model is called, and nothing outside the scratch directory is
 // touched: RUNNER_TEMP and HOME point into it for the duration of each test.
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
-import {
-  fauxAssistantMessage,
-  fauxProvider,
-  fauxToolCall,
-  envApiKeyAuth,
-  InMemoryCredentialStore,
-  type FauxResponseStep,
-} from "@earendil-works/pi-ai";
-import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { runPi } from "../../src/runner/run-pi";
+import {
+  fauxRuntime,
+  OIDC_AND_INPUT_VARS,
+  readExecutionFile,
+  useScratch,
+} from "./harness";
 
-type Scratch = {
-  root: string;
-  cwd: string;
-  promptPath: string;
-  savedEnv: Record<string, string | undefined>;
-};
-
-const OIDC_AND_INPUT_VARS = [
-  "ACTIONS_ID_TOKEN_REQUEST_URL",
-  "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
-  "ALL_INPUTS",
-];
-const ENV_KEYS = [
-  "RUNNER_TEMP",
-  "HOME",
-  "FAUX_TEST_API_KEY",
-  ...OIDC_AND_INPUT_VARS,
-];
-
-let scratch: Scratch;
-
-beforeEach(async () => {
-  const root = mkdtempSync(join(tmpdir(), "run-pi-test-"));
-  const savedEnv = Object.fromEntries(
-    ENV_KEYS.map((key) => [key, process.env[key]]),
-  );
-  process.env.RUNNER_TEMP = join(root, "runner-temp");
-  process.env.HOME = join(root, "home");
-  process.env.FAUX_TEST_API_KEY = "key-from-the-environment";
-  const cwd = join(root, "work");
-  await Bun.write(join(cwd, ".keep"), "");
-  await Bun.write(join(process.env.RUNNER_TEMP, ".keep"), "");
-  const promptPath = join(root, "prompt.txt");
-  scratch = { root, cwd, promptPath, savedEnv };
-});
-
-afterEach(() => {
-  for (const [key, value] of Object.entries(scratch.savedEnv)) {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
-  rmSync(scratch.root, { recursive: true, force: true });
-});
-
-/** A model runtime that only knows the faux provider, scripted with responses. */
-async function fauxRuntime(responses: FauxResponseStep[]) {
-  const faux = fauxProvider({
-    models: [
-      {
-        id: "faux-model",
-        reasoning: true,
-        cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
-      },
-    ],
-  });
-  faux.setResponses(responses);
-  const modelRuntime = await ModelRuntime.create({
-    credentials: new InMemoryCredentialStore(),
-    modelsPath: null,
-    refreshOnCreate: false,
-  });
-  // The faux provider accepts any request; authenticate it by API key like a
-  // real provider, so a test can see which key reaches the request.
-  modelRuntime.registerNativeProvider({
-    ...faux.provider,
-    auth: { apiKey: envApiKeyAuth("Faux API key", ["FAUX_TEST_API_KEY"]) },
-  });
-  const model = faux.getModel();
-  return { faux, modelRuntime, model: `${model.provider}/${model.id}` };
-}
+const getScratch = useScratch();
 
 async function writePrompt(text: string) {
-  await Bun.write(scratch.promptPath, text);
-}
-
-function readExecutionFile(path: string): Array<Record<string, any>> {
-  return JSON.parse(readFileSync(path, "utf-8"));
+  await Bun.write(getScratch().promptPath, text);
 }
 
 describe("runPi", () => {
@@ -102,9 +26,9 @@ describe("runPi", () => {
     ]);
     await writePrompt("Say you are done.");
 
-    const result = await runPi(scratch.promptPath, {
+    const result = await runPi(getScratch().promptPath, {
       model,
-      cwd: scratch.cwd,
+      cwd: getScratch().cwd,
       modelRuntime,
     });
 
@@ -141,10 +65,11 @@ describe("runPi", () => {
     ]);
     await writePrompt("Say hi with bash.");
 
-    const result = await runPi(scratch.promptPath, {
+    const result = await runPi(getScratch().promptPath, {
       model,
-      cwd: scratch.cwd,
+      cwd: getScratch().cwd,
       modelRuntime,
+      allowedTools: "Bash",
     });
 
     const records = readExecutionFile(result.executionFile!);
@@ -176,7 +101,11 @@ describe("runPi", () => {
     await writePrompt("Say you are done.");
 
     await expect(
-      runPi(scratch.promptPath, { model, cwd: scratch.cwd, modelRuntime }),
+      runPi(getScratch().promptPath, {
+        model,
+        cwd: getScratch().cwd,
+        modelRuntime,
+      }),
     ).rejects.toThrow("400 invalid request: unsupported parameter");
 
     const records = readExecutionFile(
@@ -196,7 +125,11 @@ describe("runPi", () => {
 
     for (const model of [undefined, "", "  "]) {
       await expect(
-        runPi(scratch.promptPath, { model, cwd: scratch.cwd, modelRuntime }),
+        runPi(getScratch().promptPath, {
+          model,
+          cwd: getScratch().cwd,
+          modelRuntime,
+        }),
       ).rejects.toThrow("The model input is required");
     }
     expect(faux.state.callCount).toBe(0);
@@ -215,12 +148,12 @@ describe("runPi", () => {
     ]);
     await writePrompt("Say you are done.");
 
-    await runPi(scratch.promptPath, {
+    await runPi(getScratch().promptPath, {
       model,
       piArgs: `--thinking high
         # a comment line
         --append-system-prompt 'Answer like a pirate.'`,
-      cwd: scratch.cwd,
+      cwd: getScratch().cwd,
       modelRuntime,
     });
 
@@ -238,10 +171,10 @@ describe("runPi", () => {
     ]);
     await writePrompt("Say you are done.");
 
-    await runPi(scratch.promptPath, {
+    await runPi(getScratch().promptPath, {
       model,
       apiKey: "key-from-the-api-key-input",
-      cwd: scratch.cwd,
+      cwd: getScratch().cwd,
       modelRuntime,
     });
 
@@ -258,7 +191,11 @@ describe("runPi", () => {
     ]);
     await writePrompt("Say you are done.");
 
-    await runPi(scratch.promptPath, { model, cwd: scratch.cwd, modelRuntime });
+    await runPi(getScratch().promptPath, {
+      model,
+      cwd: getScratch().cwd,
+      modelRuntime,
+    });
 
     expect(apiKey).toBe("key-from-the-environment");
   });
@@ -278,10 +215,10 @@ describe("runPi", () => {
     ];
     for (const [piArgs, message] of cases) {
       await expect(
-        runPi(scratch.promptPath, {
+        runPi(getScratch().promptPath, {
           model,
           piArgs,
-          cwd: scratch.cwd,
+          cwd: getScratch().cwd,
           modelRuntime,
         }),
       ).rejects.toThrow(message);
@@ -295,9 +232,9 @@ describe("runPi", () => {
     ]);
     await writePrompt("Say you are done.");
 
-    await runPi(scratch.promptPath, {
+    await runPi(getScratch().promptPath, {
       model,
-      cwd: scratch.cwd,
+      cwd: getScratch().cwd,
       modelRuntime,
     });
 
@@ -320,10 +257,11 @@ describe("runPi", () => {
     ]);
     await writePrompt("Print the environment.");
 
-    const result = await runPi(scratch.promptPath, {
+    const result = await runPi(getScratch().promptPath, {
       model,
-      cwd: scratch.cwd,
+      cwd: getScratch().cwd,
       modelRuntime,
+      allowedTools: "Bash",
     });
 
     const bashEnd = readExecutionFile(result.executionFile!).find(

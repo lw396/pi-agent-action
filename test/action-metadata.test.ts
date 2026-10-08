@@ -33,6 +33,17 @@ describe("action metadata", () => {
     expect(metadata).toContain("        PI_ARGS: ${{ inputs.pi_args }}\n");
   });
 
+  test("passes the allowed_tools and disallowed_tools inputs to the run step", () => {
+    expect(inputDefault("allowed_tools")).toBe("");
+    expect(inputDefault("disallowed_tools")).toBe("");
+    expect(metadata).toContain(
+      "        INPUT_ALLOWED_TOOLS: ${{ inputs.allowed_tools }}\n",
+    );
+    expect(metadata).toContain(
+      "        INPUT_DISALLOWED_TOOLS: ${{ inputs.disallowed_tools }}\n",
+    );
+  });
+
   test("defaults the triggers and branch prefix to pi branding", () => {
     expect(inputDefault("trigger_phrase")).toBe("@pi");
     expect(inputDefault("label_trigger")).toBe("pi");

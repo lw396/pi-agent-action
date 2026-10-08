@@ -306,6 +306,8 @@ async function run() {
           model: process.env.MODEL,
           apiKey: process.env.API_KEY,
           piArgs: process.env.PI_ARGS,
+          allowedTools: process.env.INPUT_ALLOWED_TOOLS,
+          disallowedTools: process.env.INPUT_DISALLOWED_TOOLS,
         })
       : await runClaude(promptConfig.path, {
           claudeArgs: prepareResult.claudeArgs,
