@@ -36,11 +36,19 @@ export function parseToolPermissions(
   };
 }
 
-const ONE_COMMAND_AT_A_TIME =
-  "Run one simple command per call, without &&, ||, ;, |, &, newlines, $(), backticks, subshells or redirections.";
-
 function blocked(reason: string): ToolCallEventResult {
   return { block: true, reason: `${reason} Do not retry this call.` };
+}
+
+/** Block a command whose shell syntax keeps a Bash(pattern) rule from applying. */
+function blockedForShellSyntax(
+  toolName: string,
+  syntax: string,
+  detail: string,
+): ToolCallEventResult {
+  return blocked(
+    `This ${toolName} command uses shell syntax (${syntax}), ${detail}. Run one simple command per call, without &&, ||, ;, |, &, newlines, $(), \${}, backticks, subshells or redirections.`,
+  );
 }
 
 /** Decide whether one tool call may run; undefined lets it run. */
@@ -64,8 +72,10 @@ export function checkToolCall(
   for (const rule of permissions.disallowed) {
     if (!ruleNamesTool(rule, toolName)) continue;
     if (rule.pattern !== undefined && shellSyntax) {
-      return blocked(
-        `This ${toolName} command uses shell syntax (${shellSyntax}), so it cannot be checked against the disallowed_tools rule '${rule.text}'. ${ONE_COMMAND_AT_A_TIME}`,
+      return blockedForShellSyntax(
+        toolName,
+        shellSyntax,
+        `so it cannot be checked against the disallowed_tools rule '${rule.text}'`,
       );
     }
     if (matches(rule)) {
@@ -88,8 +98,10 @@ export function checkToolCall(
   }
   const allowed = allowRules.map((rule) => rule.text).join(", ");
   if (shellSyntax) {
-    return blocked(
-      `This ${toolName} command uses shell syntax (${shellSyntax}). allowed_tools only permits these commands: ${allowed}. ${ONE_COMMAND_AT_A_TIME}`,
+    return blockedForShellSyntax(
+      toolName,
+      shellSyntax,
+      `and allowed_tools only permits these commands: ${allowed}`,
     );
   }
   if (allowRules.some(matches)) return undefined;

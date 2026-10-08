@@ -1,6 +1,5 @@
 // Runner seam (issue #7): runPi() driven end to end by pi's faux provider.
-// No real model is called, and nothing outside the scratch directory is
-// touched: RUNNER_TEMP and HOME point into it for the duration of each test.
+// See ./harness.ts for the scratch setup.
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";

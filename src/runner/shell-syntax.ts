@@ -8,9 +8,14 @@
  * Refused outside quotes: command separators and operators (`;`, `&`, `|`,
  * newlines), subshells and process substitution (`(`, `)`), redirections
  * (`<`, `>`), command substitution (`$(…)`, backticks), and ANSI-C quoting
- * (`$'…'`), whose escapes could spell any of the others. Inside double quotes
- * bash still runs `$(…)` and backticks, so those are refused there too.
- * Single-quoted text is literal.
+ * (`$'…'`), whose escapes could spell any of the others.
+ *
+ * Refused outside quotes and inside double quotes, where bash still expands
+ * them: `$(…)`, backticks, `${…}` and `$[…]`. A `${…}` can assign a
+ * variable and expand it again in a form that evaluates its text (`${x@P}`,
+ * or arithmetic on an array subscript as in `${PATH:x}`), which would run a
+ * `$(…)` that was hidden in single quotes. A plain `$NAME` only substitutes
+ * the value and stays allowed. Single-quoted text is literal.
  *
  * Returns a short description of the first construct found, or undefined for
  * a simple command. Unterminated quotes count as shell syntax.
@@ -33,6 +38,8 @@ export function findShellSyntax(command: string): string | undefined {
     }
     if (char === "`") return "backticks";
     if (char === "$" && next === "(") return "$(…)";
+    if (char === "$" && next === "{") return "${…}";
+    if (char === "$" && next === "[") return "$[…]";
 
     if (quote === '"') {
       if (char === '"') quote = undefined;

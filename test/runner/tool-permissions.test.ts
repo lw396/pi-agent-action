@@ -137,6 +137,14 @@ describe("tool permissions", () => {
       "touch first <(touch pwned)",
       "touch first > pwned",
       "touch first $'\\x3b' ; touch pwned",
+      // Expansions that evaluate text stored in a variable, so the $(…) can
+      // hide in single quotes: prompt expansion, and arithmetic on an array
+      // subscript ($[…], ${…:offset}, ${a[…]}).
+      "touch first ${x:='$(touch pwned)'} ${x@P}",
+      "touch first ${x:='a[$(touch pwned)]'} $[x]",
+      "touch first ${x:='a[$(touch pwned)]'} ${PATH:x}",
+      "touch first ${x:='$(touch pwned)'} ${a[x]}",
+      'touch first "${x:=$HOME}"',
     ];
 
     const results = await runCalls(attempts.map(bash), {

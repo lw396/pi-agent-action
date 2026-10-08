@@ -24,8 +24,8 @@ export type ToolRule = {
   pattern?: string;
 };
 
-/** Claude Code tool names, and the pi tool that does the same job. */
-const CLAUDE_TO_PI_TOOL: Record<string, string> = {
+/** Upstream (Claude Code) tool names, and the pi tool that does the same job. */
+const UPSTREAM_TO_PI_TOOL: Record<string, string> = {
   Bash: "bash",
   Read: "read",
   Edit: "edit",
@@ -37,8 +37,8 @@ const CLAUDE_TO_PI_TOOL: Record<string, string> = {
   PowerShell: "powershell",
 };
 
-/** Claude Code tools pi has no counterpart for: a rule on them has no effect. */
-const CLAUDE_ONLY_TOOLS = new Set([
+/** Upstream tools pi has no counterpart for: a rule on them has no effect. */
+const UPSTREAM_ONLY_TOOLS = new Set([
   "WebFetch",
   "WebSearch",
   "NotebookEdit",
@@ -115,13 +115,13 @@ function parseRule(text: string, inputName: string): ToolRule | undefined {
   const name = match[1]!;
   const pattern = match[2];
 
-  if (CLAUDE_ONLY_TOOLS.has(name)) {
+  if (UPSTREAM_ONLY_TOOLS.has(name)) {
     core.warning(
       `${inputName}: ${name} is a Claude Code tool that pi does not have; the rule '${text}' has no effect.`,
     );
     return undefined;
   }
-  const tool = CLAUDE_TO_PI_TOOL[name] ?? name;
+  const tool = UPSTREAM_TO_PI_TOOL[name] ?? name;
 
   if (pattern === undefined) return { text, tool };
   if (tool !== "bash") {
