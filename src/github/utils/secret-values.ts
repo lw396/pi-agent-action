@@ -21,10 +21,17 @@ const MIN_SECRET_LENGTH = 16;
 export const REDACTED = "[REDACTED]";
 
 /**
- * Variables the action's run step (action.yml) sets from inputs that hold no
- * secrets. The ones that can, such as API_KEY, OVERRIDE_GITHUB_TOKEN,
- * SSH_SIGNING_KEY, INPUT_SETTINGS, CLAUDE_ARGS and ALL_INPUTS (every input,
- * api_key included), stay secrets.
+ * Variables the action's run step (action.yml) sets from its own inputs, for
+ * settings that are not credentials. Redacting them by value only garbles
+ * output: a value counts only when it turns up whole, so a prompt quoted in
+ * full became [REDACTED], while a secret written into the prompt was never
+ * caught this way unless it is in the environment under its own name too.
+ *
+ * Left out, so they stay secrets: inputs that carry credentials (API_KEY,
+ * OVERRIDE_GITHUB_TOKEN, SSH_SIGNING_KEY), free-form pass-through arguments
+ * and settings (PI_ARGS, CLAUDE_ARGS, INPUT_SETTINGS), URLs that may embed
+ * credentials (INPUT_PLUGIN_MARKETPLACES), ALL_INPUTS (every input, api_key
+ * included) and anything the run step copies from the workflow env.
  */
 export const ACTION_SETTINGS_ENV: readonly string[] = [
   "MODE",
@@ -37,7 +44,6 @@ export const ACTION_SETTINGS_ENV: readonly string[] = [
   "BRANCH_NAME_TEMPLATE",
   "ALLOWED_BOTS",
   "ALLOWED_NON_WRITE_USERS",
-  "CLAUDE_CODE_SCRIPT_CAPS",
   "INCLUDE_COMMENTS_BY_ACTOR",
   "EXCLUDE_COMMENTS_BY_ACTOR",
   "USE_STICKY_COMMENT",
@@ -49,7 +55,6 @@ export const ACTION_SETTINGS_ENV: readonly string[] = [
   "INCLUDE_FIX_LINKS",
   "ADDITIONAL_PERMISSIONS",
   "MODEL",
-  "PI_ARGS",
   "INPUT_ALLOWED_TOOLS",
   "INPUT_DISALLOWED_TOOLS",
   "JSON_SCHEMA",
@@ -57,9 +62,6 @@ export const ACTION_SETTINGS_ENV: readonly string[] = [
   "ALLOWED_BASH_ENV",
   "INPUT_SHOW_FULL_OUTPUT",
   "DISPLAY_REPORT",
-  "INPUT_PLUGINS",
-  "INPUT_PLUGIN_MARKETPLACES",
-  "NODE_VERSION",
 ];
 
 const NOT_SECRET_NAMES = new Set([
