@@ -202,6 +202,7 @@ async function run() {
       ].join("\n"),
       disallowedTools: process.env.INPUT_DISALLOWED_TOOLS,
       acceptEdits: prepareResult.acceptEdits,
+      jsonSchema: process.env.JSON_SCHEMA,
       mcpServers: parseMcpConfig(prepareResult.mcpConfig),
     });
 

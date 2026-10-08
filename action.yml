@@ -98,6 +98,15 @@ inputs:
       permits it.
     required: false
     default: ""
+  json_schema:
+    description: >-
+      A JSON Schema for an object ("type": "object"). When set, the agent
+      submits its result through a submit_result tool whose arguments must
+      match the schema, and the result is returned in the structured_output
+      output. An agent that stops without submitting is reminded up to 2
+      times; after that the run fails.
+    required: false
+    default: ""
 
   # Auth configuration
   anthropic_api_key:
@@ -216,7 +225,7 @@ outputs:
     description: "The GitHub token used by the action (Claude App token if available)"
     value: ${{ steps.run.outputs.github_token }}
   structured_output:
-    description: "JSON string containing all structured output fields when --json-schema is provided in claude_args. Use fromJSON() to parse: fromJSON(steps.id.outputs.structured_output).field_name"
+    description: "JSON string containing all structured output fields when the json_schema input is set. Use fromJSON() to parse: fromJSON(steps.id.outputs.structured_output).field_name"
     value: ${{ steps.run.outputs.structured_output }}
   session_id:
     description: "The session ID of the run"
@@ -360,6 +369,7 @@ runs:
         # INPUT_ prefix: tag mode's createPrompt exports ALLOWED_TOOLS itself.
         INPUT_ALLOWED_TOOLS: ${{ inputs.allowed_tools }}
         INPUT_DISALLOWED_TOOLS: ${{ inputs.disallowed_tools }}
+        JSON_SCHEMA: ${{ inputs.json_schema }}
 
         # Base-action inputs
         INPUT_PROMPT_FILE: ${{ runner.temp }}/claude-prompts/claude-prompt.txt

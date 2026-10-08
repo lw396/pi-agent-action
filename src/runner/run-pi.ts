@@ -20,6 +20,12 @@ import {
   parseToolPermissions,
   toolPermissionsExtension,
 } from "./tool-permissions";
+import {
+  parseJsonSchema,
+  structuredOutputExtension,
+  SUBMIT_RESULT_TOOL,
+  type StructuredOutputState,
+} from "./structured-output";
 
 export type RunnerOptions = {
   /** Model in pi's `provider/id[:thinking]` form. Required. */
@@ -43,6 +49,12 @@ export type RunnerOptions = {
    * like Claude Code's acceptEdits permission mode in Upstream's tag mode.
    */
   acceptEdits?: boolean;
+  /**
+   * The json_schema input: a JSON Schema for an object. When set, the model
+   * submits its result with the submit_result tool, and the run fails if it
+   * does not.
+   */
+  jsonSchema?: string;
   /** The action's MCP servers, registered with `direct` exposure. */
   mcpServers?: McpServers;
   /** Working directory of the session. Defaults to process.cwd(). */
@@ -111,8 +123,17 @@ export async function runPi(
 
   const piArgs = parsePiArgs(options.piArgs);
   const cwd = options.cwd ?? process.cwd();
+  const jsonSchema = parseJsonSchema(options.jsonSchema);
+  const permissions = parseToolPermissions(
+    options.allowedTools,
+    options.disallowedTools,
+  );
+  if (jsonSchema) {
+    // Submitting the result needs no rule; disallowed_tools can still block it.
+    permissions.allowed.push({ text: "json_schema", tool: SUBMIT_RESULT_TOOL });
+  }
   const toolPermissions = {
-    ...parseToolPermissions(options.allowedTools, options.disallowedTools),
+    ...permissions,
     editableWorkspace: options.acceptEdits ? cwd : undefined,
   };
 
@@ -143,12 +164,16 @@ export async function runPi(
     join(process.env.RUNNER_TEMP || tmpdir(), "pi-agent-"),
   );
   const settingsManager = setupPiSettings();
+  const structuredOutput: StructuredOutputState = { reminders: 0 };
   const resourceLoader = new DefaultResourceLoader({
     cwd,
     agentDir,
     settingsManager,
     extensionFactories: [
       toolPermissionsExtension(toolPermissions),
+      ...(jsonSchema
+        ? [structuredOutputExtension(jsonSchema, structuredOutput)]
+        : []),
       ...mcpServerExtensions(
         options.mcpServers ?? {},
         join(agentDir, "mcp.log"),
@@ -165,7 +190,7 @@ export async function runPi(
     model: resolved.model,
     // --thinking wins over a :<thinking> suffix on the model, as in pi's CLI.
     thinkingLevel: piArgs.thinkingLevel ?? resolved.thinkingLevel,
-    tools: piArgs.tools,
+    tools: withSubmitResult(piArgs, jsonSchema !== undefined),
     excludeTools: piArgs.excludeTools,
     noTools: piArgs.noTools,
     modelRuntime,
@@ -173,6 +198,15 @@ export async function runPi(
     settingsManager,
     sessionManager,
   });
+  if (
+    jsonSchema &&
+    !session.getActiveToolNames().includes(SUBMIT_RESULT_TOOL)
+  ) {
+    session.dispose();
+    throw new Error(
+      `pi_args leaves out the ${SUBMIT_RESULT_TOOL} tool, which json_schema needs. Remove it from --exclude-tools.`,
+    );
+  }
 
   const records: unknown[] = [sessionManager.getHeader()];
   session.subscribe((event) => {
@@ -186,6 +220,13 @@ export async function runPi(
     await session.bindExtensions({});
     await session.prompt(prompt);
     failure = sessionFailure(session.messages);
+    if (
+      failure === undefined &&
+      jsonSchema &&
+      structuredOutput.result === undefined
+    ) {
+      failure = `the model did not call ${SUBMIT_RESULT_TOOL}, which json_schema requires, after ${structuredOutput.reminders} reminders`;
+    }
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error);
   } finally {
@@ -211,7 +252,30 @@ export async function runPi(
   if (failure !== undefined) {
     throw new Error(`pi execution failed: ${failure}`);
   }
-  return { conclusion: "success", executionFile, sessionId };
+  return {
+    conclusion: "success",
+    executionFile,
+    sessionId,
+    structuredOutput:
+      structuredOutput.result !== undefined
+        ? JSON.stringify(structuredOutput.result)
+        : undefined,
+  };
+}
+
+/**
+ * The tools list for the session. A --tools list or --no-tools from pi_args
+ * would leave out submit_result, which json_schema needs: pi activates only
+ * the tools a list names, and `tools` wins over `noTools`.
+ */
+function withSubmitResult(
+  piArgs: ReturnType<typeof parsePiArgs>,
+  needsSubmitResult: boolean,
+): string[] | undefined {
+  if (!needsSubmitResult) return piArgs.tools;
+  if (piArgs.tools) return [...piArgs.tools, SUBMIT_RESULT_TOOL];
+  if (piArgs.noTools === "all") return [SUBMIT_RESULT_TOOL];
+  return undefined;
 }
 
 /**

@@ -1,35 +1,40 @@
 name: Test Structured Outputs
 
-# Manual dispatch only until this workflow is ported to pi. See
-# docs/pi-port-proposal.md.
+# Runs the action in agent mode against a real model, with the json_schema
+# input: the model submits its result through the submit_result tool, and the
+# result comes back in the structured_output output.
+#
+# Manual dispatch only for now, like test-base-action.yml. Restore the
+# pull_request trigger (same-repository PRs only, since fork PRs get no
+# secrets) and call this workflow from ci-all.yml once a manual run has
+# passed. See docs/pi-port-proposal.md, "CI 与集成测试".
 on:
   workflow_dispatch:
+    inputs:
+      model:
+        description: "pi model, as provider/id"
+        required: false
+        default: "opencode/gpt-6-luna"
 
-# The Claude API is authenticated via workload identity federation: id-token
-# lets the action mint the GitHub OIDC token it exchanges for a short-lived
-# access token. See docs/setup.md.
 permissions:
   contents: read
-  id-token: write
 
-# Pin the model so these tests don't depend on the CLI's default model,
-# which can change with each Claude Code release.
 env:
-  ANTHROPIC_MODEL: claude-opus-5
+  # A low-cost OpenCode Zen model, paid for with the OPENCODE_API_KEY secret.
+  TEST_MODEL: ${{ github.event.inputs.model || 'opencode/gpt-6-luna' }}
 
 jobs:
   test-basic-types:
     name: Test Basic Type Conversions
-    # Skip on fork PRs since they can't mint the OIDC token used for Claude API auth
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04-firewall
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Test with explicit values
         id: test
-        uses: ./base-action
+        uses: ./
         with:
           prompt: |
             Run this command: echo "test"
@@ -39,19 +44,17 @@ jobs:
             - number_field: 42
             - boolean_true: true
             - boolean_false: false
-          anthropic_federation_rule_id: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
-          anthropic_organization_id: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
-          anthropic_service_account_id: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
-          claude_args: |
-            --permission-mode auto
-            --allowedTools Bash
-            --json-schema '{"type":"object","properties":{"text_field":{"type":"string"},"number_field":{"type":"number"},"boolean_true":{"type":"boolean"},"boolean_false":{"type":"boolean"}},"required":["text_field","number_field","boolean_true","boolean_false"]}'
+          model: ${{ env.TEST_MODEL }}
+          allowed_tools: Bash
+          json_schema: '{"type":"object","properties":{"text_field":{"type":"string"},"number_field":{"type":"number"},"boolean_true":{"type":"boolean"},"boolean_false":{"type":"boolean"}},"required":["text_field","number_field","boolean_true","boolean_false"]}'
+          github_token: ${{ github.token }}
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
 
       - name: Verify outputs
+        env:
+          OUTPUT: ${{ steps.test.outputs.structured_output }}
         run: |
-          # Parse the structured_output JSON
-          OUTPUT='${{ steps.test.outputs.structured_output }}'
-
           # Test string pass-through
           TEXT_FIELD=$(echo "$OUTPUT" | jq -r '.text_field')
           if [ "$TEXT_FIELD" != "hello" ]; then
@@ -84,16 +87,15 @@ jobs:
 
   test-complex-types:
     name: Test Arrays and Objects
-    # Skip on fork PRs since they can't mint the OIDC token used for Claude API auth
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04-firewall
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Test complex types
         id: test
-        uses: ./base-action
+        uses: ./
         with:
           prompt: |
             Run: echo "ready"
@@ -102,19 +104,17 @@ jobs:
             - items: ["apple", "banana", "cherry"]
             - config: {"key": "value", "count": 3}
             - empty_array: []
-          anthropic_federation_rule_id: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
-          anthropic_organization_id: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
-          anthropic_service_account_id: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
-          claude_args: |
-            --permission-mode auto
-            --allowedTools Bash
-            --json-schema '{"type":"object","properties":{"items":{"type":"array","items":{"type":"string"}},"config":{"type":"object"},"empty_array":{"type":"array"}},"required":["items","config","empty_array"]}'
+          model: ${{ env.TEST_MODEL }}
+          allowed_tools: Bash
+          json_schema: '{"type":"object","properties":{"items":{"type":"array","items":{"type":"string"}},"config":{"type":"object"},"empty_array":{"type":"array"}},"required":["items","config","empty_array"]}'
+          github_token: ${{ github.token }}
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
 
       - name: Verify JSON stringification
+        env:
+          OUTPUT: ${{ steps.test.outputs.structured_output }}
         run: |
-          # Parse the structured_output JSON
-          OUTPUT='${{ steps.test.outputs.structured_output }}'
-
           # Arrays should be JSON stringified
           if ! echo "$OUTPUT" | jq -e '.items | length == 3' > /dev/null; then
             echo "❌ Array not properly formatted"
@@ -140,16 +140,15 @@ jobs:
 
   test-edge-cases:
     name: Test Edge Cases
-    # Skip on fork PRs since they can't mint the OIDC token used for Claude API auth
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04-firewall
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Test edge cases
         id: test
-        uses: ./base-action
+        uses: ./
         with:
           prompt: |
             Run: echo "test"
@@ -159,19 +158,17 @@ jobs:
             - empty_string: ""
             - negative: -5
             - decimal: 3.14
-          anthropic_federation_rule_id: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
-          anthropic_organization_id: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
-          anthropic_service_account_id: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
-          claude_args: |
-            --permission-mode auto
-            --allowedTools Bash
-            --json-schema '{"type":"object","properties":{"zero":{"type":"number"},"empty_string":{"type":"string"},"negative":{"type":"number"},"decimal":{"type":"number"}},"required":["zero","empty_string","negative","decimal"]}'
+          model: ${{ env.TEST_MODEL }}
+          allowed_tools: Bash
+          json_schema: '{"type":"object","properties":{"zero":{"type":"number"},"empty_string":{"type":"string"},"negative":{"type":"number"},"decimal":{"type":"number"}},"required":["zero","empty_string","negative","decimal"]}'
+          github_token: ${{ github.token }}
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
 
       - name: Verify edge cases
+        env:
+          OUTPUT: ${{ steps.test.outputs.structured_output }}
         run: |
-          # Parse the structured_output JSON
-          OUTPUT='${{ steps.test.outputs.structured_output }}'
-
           # Zero should be "0", not empty or falsy
           ZERO=$(echo "$OUTPUT" | jq -r '.zero')
           if [ "$ZERO" != "0" ]; then
@@ -204,33 +201,30 @@ jobs:
 
   test-name-sanitization:
     name: Test Output Name Sanitization
-    # Skip on fork PRs since they can't mint the OIDC token used for Claude API auth
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04-firewall
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Test special characters in field names
         id: test
-        uses: ./base-action
+        uses: ./
         with:
           prompt: |
             Run: echo "test"
             Return EXACTLY: {test-result: "passed", item_count: 10}
-          anthropic_federation_rule_id: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
-          anthropic_organization_id: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
-          anthropic_service_account_id: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
-          claude_args: |
-            --permission-mode auto
-            --allowedTools Bash
-            --json-schema '{"type":"object","properties":{"test-result":{"type":"string"},"item_count":{"type":"number"}},"required":["test-result","item_count"]}'
+          model: ${{ env.TEST_MODEL }}
+          allowed_tools: Bash
+          json_schema: '{"type":"object","properties":{"test-result":{"type":"string"},"item_count":{"type":"number"}},"required":["test-result","item_count"]}'
+          github_token: ${{ github.token }}
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
 
       - name: Verify sanitized names work
+        env:
+          OUTPUT: ${{ steps.test.outputs.structured_output }}
         run: |
-          # Parse the structured_output JSON
-          OUTPUT='${{ steps.test.outputs.structured_output }}'
-
           # Hyphens should be preserved in the JSON
           TEST_RESULT=$(echo "$OUTPUT" | jq -r '.["test-result"]')
           if [ "$TEST_RESULT" != "passed" ]; then
@@ -249,45 +243,44 @@ jobs:
 
   test-execution-file-structure:
     name: Test Execution File Format
-    # Skip on fork PRs since they can't mint the OIDC token used for Claude API auth
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04-firewall
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Run with structured output
         id: test
-        uses: ./base-action
+        uses: ./
         with:
           prompt: "Run: echo 'complete'. Return: {done: true}"
-          anthropic_federation_rule_id: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
-          anthropic_organization_id: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
-          anthropic_service_account_id: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
-          claude_args: |
-            --permission-mode auto
-            --allowedTools Bash
-            --json-schema '{"type":"object","properties":{"done":{"type":"boolean"}},"required":["done"]}'
+          model: ${{ env.TEST_MODEL }}
+          allowed_tools: Bash
+          json_schema: '{"type":"object","properties":{"done":{"type":"boolean"}},"required":["done"]}'
+          github_token: ${{ github.token }}
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
 
-      - name: Verify execution file contains structured_output
+      - name: Verify the outputs and the execution file
+        env:
+          CONCLUSION: ${{ steps.test.outputs.conclusion }}
+          EXECUTION_FILE: ${{ steps.test.outputs.execution_file }}
+          SESSION_ID: ${{ steps.test.outputs.session_id }}
+        run: .github/scripts/verify-runner-outputs.sh
+
+      - name: Verify the execution file records the submitted result
+        env:
+          FILE: ${{ steps.test.outputs.execution_file }}
         run: |
-          FILE="${{ steps.test.outputs.execution_file }}"
-
-          # Check file exists
-          if [ ! -f "$FILE" ]; then
-            echo "❌ Execution file missing"
+          # The submit_result call that succeeded carries the result in its details.
+          RESULT='.[] | select(.type == "tool_execution_end" and .toolName == "submit_result" and .isError == false) | .result.details'
+          if ! jq -e "$RESULT" "$FILE" > /dev/null; then
+            echo "❌ No successful submit_result call in execution file"
+            jq -r '.[] | select(.type == "tool_execution_end") | .toolName' "$FILE"
             exit 1
           fi
 
-          # Check for structured_output field
-          if ! jq -e '.[] | select(.type == "result") | .structured_output' "$FILE" > /dev/null; then
-            echo "❌ No structured_output in execution file"
-            cat "$FILE"
-            exit 1
-          fi
-
-          # Verify the actual value
-          DONE=$(jq -r '.[] | select(.type == "result") | .structured_output.done' "$FILE")
+          DONE=$(jq -r "[$RESULT] | last | .done" "$FILE")
           if [ "$DONE" != "true" ]; then
             echo "❌ Wrong value in execution file"
             exit 1
@@ -304,7 +297,7 @@ jobs:
       - test-edge-cases
       - test-name-sanitization
       - test-execution-file-structure
-    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ always() }}
     steps:
       - name: Generate Summary
         run: |

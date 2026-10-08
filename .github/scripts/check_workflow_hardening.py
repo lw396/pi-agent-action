@@ -36,6 +36,11 @@ EXEMPT_FROM_AUTO_MODE: dict[str, str] = {
     "test-base-action.yml:test-provider-env": _PI_RUNNER_JOB,
     "test-base-action.yml:test-api-key-input": _PI_RUNNER_JOB,
     "test-mcp-servers.yml:test-direct-mcp-server": _PI_RUNNER_JOB,
+    "test-structured-output.yml:test-basic-types": _PI_RUNNER_JOB,
+    "test-structured-output.yml:test-complex-types": _PI_RUNNER_JOB,
+    "test-structured-output.yml:test-edge-cases": _PI_RUNNER_JOB,
+    "test-structured-output.yml:test-name-sanitization": _PI_RUNNER_JOB,
+    "test-structured-output.yml:test-execution-file-structure": _PI_RUNNER_JOB,
 }
 
 
