@@ -35,7 +35,7 @@ async function runCalls(
   calls: ToolCall[],
   options: Pick<
     RunnerOptions,
-    "allowedTools" | "disallowedTools" | "acceptEdits"
+    "allowedTools" | "disallowedTools" | "acceptEdits" | "readOnlyGit"
   > = {},
 ): Promise<CallResult[]> {
   const steps: FauxResponseStep[] = [
@@ -488,6 +488,89 @@ describe("tool permissions", () => {
 
       expect(result!.isError).toBe(true);
       expect(written(join(getScratch().cwd, "notes.txt"))).toBe(false);
+    });
+  });
+  describe("read-only git commands (tag mode)", () => {
+    function initRepo() {
+      const cwd = getScratch().cwd;
+      const git = (...args: string[]) =>
+        Bun.spawnSync(["git", ...args], { cwd }).exitCode;
+      git("init", "-q");
+      git("config", "user.email", "test@example.com");
+      git("config", "user.name", "test");
+      git("add", ".keep");
+      git("commit", "-q", "-m", "init");
+    }
+
+    test("status, diff, log and show run without a rule", async () => {
+      initRepo();
+
+      const results = await runCalls(
+        [
+          bash("git status"),
+          bash("git diff HEAD"),
+          bash("git diff origin/main...HEAD -- src/app.ts"),
+          bash("git log --oneline -5"),
+          bash("git show --stat HEAD"),
+        ],
+        { readOnlyGit: true },
+      );
+
+      // origin/main does not exist here: git itself fails, but the call ran.
+      expect(results[2]!.text).not.toContain("allowed_tools");
+      for (const result of [0, 1, 3, 4].map((i) => results[i]!)) {
+        expect(result.isError).toBe(false);
+      }
+    });
+
+    test("options and commands that write or run programs are blocked", async () => {
+      initRepo();
+      const outside = join(getScratch().root, "written.txt");
+
+      const results = await runCalls(
+        [
+          bash(`git diff --output=${outside}`),
+          bash(`git log --outp=${outside}`),
+          bash(`git show --output ${outside} HEAD`),
+          bash("git diff --ext-diff"),
+          bash("git log --textconv"),
+          bash("git -c core.pager=touch status"),
+          bash("git -C / status"),
+          bash("git status && touch pwned"),
+          bash("git checkout -b other"),
+          bash("git push origin HEAD"),
+          bash("GIT_EXTERNAL_DIFF=touch git diff"),
+          bash(`git diff --$HOME=${outside}`),
+        ],
+        { readOnlyGit: true },
+      );
+
+      for (const result of results) {
+        expect(result.isError).toBe(true);
+        expect(result.text).toContain("allowed_tools");
+      }
+      expect(existsSync(outside)).toBe(false);
+      expect(ran("pwned")).toBe(false);
+    });
+
+    test("without readOnlyGit, git status needs a rule as before", async () => {
+      initRepo();
+
+      const [result] = await runCalls([bash("git status")]);
+
+      expect(result!.isError).toBe(true);
+    });
+
+    test("disallowed_tools still blocks them", async () => {
+      initRepo();
+
+      const [result] = await runCalls([bash("git status")], {
+        readOnlyGit: true,
+        disallowedTools: "Bash(git status)",
+      });
+
+      expect(result!.isError).toBe(true);
+      expect(result!.text).toContain("disallowed_tools");
     });
   });
 });

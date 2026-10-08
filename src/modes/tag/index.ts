@@ -182,5 +182,6 @@ export async function prepareTagMode({
     mcpConfig: ourMcpConfig,
     allowedTools,
     acceptEdits: true,
+    readOnlyGit: true,
   };
 }

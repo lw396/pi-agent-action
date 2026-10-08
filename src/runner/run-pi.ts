@@ -50,6 +50,11 @@ export type RunnerOptions = {
    */
   acceptEdits?: boolean;
   /**
+   * Let bash run `git status`, `git diff`, `git log` and `git show` without a
+   * rule, like Claude Code's read-only commands in Upstream's tag mode.
+   */
+  readOnlyGit?: boolean;
+  /**
    * The json_schema input: a JSON Schema for an object. When set, the model
    * submits its result with the submit_result tool, and the run fails if it
    * does not.
@@ -135,6 +140,7 @@ export async function runPi(
   const toolPermissions = {
     ...permissions,
     editableWorkspace: options.acceptEdits ? cwd : undefined,
+    readOnlyGit: options.readOnlyGit,
   };
 
   for (const name of AGENT_HIDDEN_ENV) {

@@ -132,6 +132,7 @@ describe("Tag Mode", () => {
         expect(result.allowedTools).not.toContain(blanket);
       }
       expect(result.acceptEdits).toBe(true);
+      expect(result.readOnlyGit).toBe(true);
     });
 
     test("commits through the file ops tools, without bash, under API commit signing", async () => {
@@ -177,7 +178,7 @@ describe("Tag Mode", () => {
   describe("default git command allowlist, enforced by the Runner", () => {
     const getScratch = useScratch();
 
-    test("runs git add and commit, and blocks every other command", async () => {
+    test("runs git add, commit and read-only git commands, and blocks every other command", async () => {
       const { cwd, promptPath } = getScratch();
       const git = (...args: string[]) =>
         Bun.spawnSync(["git", ...args], { cwd }).exitCode;
@@ -239,6 +240,7 @@ describe("Tag Mode", () => {
         modelRuntime,
         allowedTools: prepared.allowedTools.join("\n"),
         acceptEdits: prepared.acceptEdits,
+        readOnlyGit: prepared.readOnlyGit,
       });
 
       // Calls run in parallel: match each result to its command.
@@ -258,7 +260,7 @@ describe("Tag Mode", () => {
       expect(ran).toEqual({
         "git add notes.txt": true,
         "git commit -q -m 'Add notes'": true,
-        "git status": false,
+        "git status": true,
         "touch pwned": false,
         "git add . && touch pwned": false,
       });

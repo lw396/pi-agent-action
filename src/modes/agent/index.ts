@@ -128,5 +128,6 @@ export async function prepareAgentMode({
     // Agent mode adds no rules of its own: allowed_tools alone decides.
     allowedTools: [] as string[],
     acceptEdits: false,
+    readOnlyGit: false,
   };
 }

@@ -87,8 +87,9 @@ inputs:
       redirections are refused.
       Tag mode adds the tools it needs: the tracking comment tool, git add,
       commit, rm and the push wrapper (or the file ops tools with
-      use_commit_signing), and file edits inside the working directory
-      except .git.
+      use_commit_signing), file edits inside the working directory except
+      .git, and git status, diff, log and show without options that write
+      files or run programs.
     required: false
     default: ""
   disallowed_tools:

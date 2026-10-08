@@ -11,6 +11,7 @@ import {
 } from "./tool-rules";
 import { findShellSyntax } from "./shell-syntax";
 import { checkWorkspacePath } from "./workspace-path";
+import { isReadOnlyGitCommand } from "./read-only-git";
 
 /**
  * pi's read-only built-in tools. Like Claude Code's read-only tools, they need
@@ -29,6 +30,11 @@ export type ToolPermissions = {
    * edits inside this directory need no rule. Unset in agent mode.
    */
   editableWorkspace?: string;
+  /**
+   * Tag mode: allow `git status`, `git diff`, `git log` and `git show`
+   * without a rule, as Claude Code's read-only commands are in Upstream.
+   */
+  readOnlyGit?: boolean;
 };
 
 /**
@@ -95,6 +101,13 @@ export function checkToolCall(
   }
 
   if (READ_ONLY_TOOLS.has(toolName)) return undefined;
+  if (
+    permissions.readOnlyGit &&
+    command !== undefined &&
+    isReadOnlyGitCommand(command)
+  ) {
+    return undefined;
+  }
 
   const allowRules = permissions.allowed.filter((rule) =>
     ruleNamesTool(rule, toolName),

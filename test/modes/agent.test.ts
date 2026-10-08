@@ -105,6 +105,7 @@ describe("Agent Mode", () => {
         mcpConfig: expect.any(String),
         allowedTools: [],
         acceptEdits: false,
+        readOnlyGit: false,
       });
     } finally {
       delete process.env.INPUT_ALLOWED_TOOLS;
