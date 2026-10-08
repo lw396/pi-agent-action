@@ -18,6 +18,34 @@ import { checkAndCommitOrDeleteBranch } from "../github/operations/branch-cleanu
 import { updateClaudeComment } from "../github/operations/comments/update-claude-comment";
 import { encodeBranchNameForUrl } from "../github/operations/comments/common";
 
+type ExecutionDetails = {
+  total_cost_usd?: number;
+  duration_ms?: number;
+  duration_api_ms?: number;
+};
+
+/**
+ * The run's cost and duration, from the session_stats record that ends the
+ * Runner's Execution file. Upstream read Claude Code's closing result message.
+ */
+export function executionDetailsFrom(
+  outputData: unknown,
+): ExecutionDetails | null {
+  if (!Array.isArray(outputData) || outputData.length === 0) return null;
+  const lastElement = outputData[outputData.length - 1];
+  if (
+    lastElement?.type !== "session_stats" ||
+    typeof lastElement.cost !== "number" ||
+    typeof lastElement.durationMs !== "number"
+  ) {
+    return null;
+  }
+  return {
+    total_cost_usd: lastElement.cost,
+    duration_ms: lastElement.durationMs,
+  };
+}
+
 export type UpdateCommentLinkParams = {
   commentId: number;
   githubToken: string;
@@ -171,11 +199,7 @@ export async function updateCommentLink(
   }
 
   // Check if action failed and read output file for execution details
-  let executionDetails: {
-    total_cost_usd?: number;
-    duration_ms?: number;
-    duration_api_ms?: number;
-  } | null = null;
+  let executionDetails: ExecutionDetails | null = null;
   let actionFailed = false;
   let errorDetails: string | undefined;
 
@@ -187,23 +211,7 @@ export async function updateCommentLink(
     try {
       if (params.outputFile) {
         const fileContent = await fs.readFile(params.outputFile, "utf8");
-        const outputData = JSON.parse(fileContent);
-
-        // Output file is an array, get the last element which contains execution details
-        if (Array.isArray(outputData) && outputData.length > 0) {
-          const lastElement = outputData[outputData.length - 1];
-          if (
-            lastElement.type === "result" &&
-            "total_cost_usd" in lastElement &&
-            "duration_ms" in lastElement
-          ) {
-            executionDetails = {
-              total_cost_usd: lastElement.total_cost_usd,
-              duration_ms: lastElement.duration_ms,
-              duration_api_ms: lastElement.duration_api_ms,
-            };
-          }
-        }
+        executionDetails = executionDetailsFrom(JSON.parse(fileContent));
       }
 
       actionFailed = !params.claudeSuccess;

@@ -1,198 +1,84 @@
 name: Test MCP Servers
 
-# Manual dispatch only until this workflow is ported to pi. See
-# docs/pi-port-proposal.md.
+# Runs the action against a real model to check that pi loads the action's
+# own MCP servers through the SDK with `direct` exposure: the model sees
+# mcp__github_comment__update_comment as a tool of its own and calls it, and
+# the call reaches the server process.
+#
+# Agent mode starts the comment server when allowed_tools names its tool, but
+# has no tracking comment, so the server answers with its own error instead of
+# updating a comment. That proves the round trip without touching GitHub.
+#
+# Manual dispatch only for now, like test-base-action.yml. Restore the
+# pull_request trigger (same-repository PRs only) and call this workflow from
+# ci-all.yml once a manual run has passed. See docs/pi-port-proposal.md,
+# "CI 与集成测试".
 on:
   workflow_dispatch:
+    inputs:
+      model:
+        description: "pi model, as provider/id"
+        required: false
+        default: "opencode/gpt-6-luna"
 
-# The Claude API is authenticated via workload identity federation: id-token
-# lets the action mint the GitHub OIDC token it exchanges for a short-lived
-# access token. See docs/setup.md.
 permissions:
   contents: read
-  id-token: write
 
-# Pin the model so these tests don't depend on the CLI's default model,
-# which can change with each Claude Code release.
 env:
-  ANTHROPIC_MODEL: claude-opus-5
+  # A low-cost OpenCode Zen model, paid for with the OPENCODE_API_KEY secret.
+  TEST_MODEL: ${{ github.event.inputs.model || 'opencode/gpt-6-luna' }}
 
 jobs:
-  test-mcp-integration:
-    # Skip on fork PRs since they can't mint the OIDC token used for Claude API auth
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+  test-direct-mcp-server:
     runs-on: ubuntu-24.04-firewall
+    timeout-minutes: 10
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-
-      - name: Install dependencies
-        run: |
-          bun install
-          cd base-action/test/mcp-test
-          bun install
-
-      - name: Run Claude Code with MCP test
-        uses: ./base-action
-        id: claude-test
+      - name: Run the action with the comment server
+        id: run
+        uses: ./
         with:
-          prompt: "Call the test_tool tool and report its response."
-          anthropic_federation_rule_id: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
-          anthropic_organization_id: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
-          anthropic_service_account_id: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
-          claude_args: --allowedTools mcp__test-server__test_tool --permission-mode auto
+          prompt: >-
+            Call the mcp__github_comment__update_comment tool once, with the
+            body "MCP test", and report the text it returns. Do not call any
+            other tool.
+          model: ${{ env.TEST_MODEL }}
+          allowed_tools: mcp__github_comment__update_comment
+          github_token: ${{ github.token }}
         env:
-          # Change to test directory so it finds .mcp.json
-          CLAUDE_WORKING_DIR: ${{ github.workspace }}/base-action/test/mcp-test
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
 
-      - name: Check MCP server output
-        run: |
-          echo "Checking Claude output for MCP servers..."
-
-          # Parse the JSON output
-          OUTPUT_FILE="${RUNNER_TEMP}/claude-execution-output.json"
-
-          if [ ! -f "$OUTPUT_FILE" ]; then
-            echo "Error: Output file not found!"
-            exit 1
-          fi
-
-          echo "Output file contents:"
-          cat $OUTPUT_FILE
-
-          # Check if mcp_servers field exists in the init event
-          if jq -e '.[] | select(.type == "system" and .subtype == "init") | .mcp_servers' "$OUTPUT_FILE" > /dev/null; then
-            echo "✓ Found mcp_servers in output"
-            
-            # MCP servers can connect asynchronously, so the init event may
-            # report the server as pending — check registration there, then
-            # verify the tool actually ran.
-            if jq -e '.[] | select(.type == "system" and .subtype == "init") | .mcp_servers[] | select(.name == "test-server")' "$OUTPUT_FILE" > /dev/null; then
-              echo "✓ test-server is registered"
-            else
-              echo "✗ test-server not found"
-              jq '.[] | select(.type == "system" and .subtype == "init") | .mcp_servers' "$OUTPUT_FILE"
-              exit 1
-            fi
-
-            if jq -e '.[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use" and .name == "mcp__test-server__test_tool")' "$OUTPUT_FILE" > /dev/null; then
-              echo "✓ MCP test tool was called"
-            else
-              echo "✗ MCP test tool was not called"
-              jq '[.[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | .name]' "$OUTPUT_FILE"
-              exit 1
-            fi
-
-            if jq -e '.[] | select(.type == "user") | .message.content[]? | select(.type == "tool_result") | select(.content | tostring | contains("Test tool response"))' "$OUTPUT_FILE" > /dev/null; then
-              echo "✓ MCP test tool returned its response"
-            else
-              echo "✗ MCP test tool response not found"
-              exit 1
-            fi
-          else
-            echo "✗ No mcp_servers field found in init event"
-            jq '.[] | select(.type == "system" and .subtype == "init")' "$OUTPUT_FILE"
-            exit 1
-          fi
-
-          echo "✓ All MCP server checks passed!"
-
-  test-mcp-config-flag:
-    # Skip on fork PRs since they can't mint the OIDC token used for Claude API auth
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04-firewall
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-
-      - name: Install dependencies
-        run: |
-          bun install
-          cd base-action/test/mcp-test
-          bun install
-
-      - name: Debug environment paths (--mcp-config test)
-        run: |
-          echo "=== Environment Variables (--mcp-config test) ==="
-          echo "HOME: $HOME"
-          echo ""
-          echo "=== Expected Config Paths ==="
-          echo "GitHub action writes to: $HOME/.claude/settings.json"
-          echo "Claude should read from: $HOME/.claude/settings.json"
-          echo ""
-          echo "=== Actual File System ==="
-          ls -la $HOME/.claude/ || echo "No $HOME/.claude directory"
-
-      - name: Run Claude Code with --mcp-config flag
-        uses: ./base-action
-        id: claude-config-test
-        with:
-          prompt: "Call the test_tool tool and report its response."
-          anthropic_federation_rule_id: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
-          anthropic_organization_id: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
-          anthropic_service_account_id: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
-          claude_args: |
-            --permission-mode auto
-            --allowedTools mcp__test-server__test_tool
-            --mcp-config '{"mcpServers":{"test-server":{"type":"stdio","command":"bun","args":["simple-mcp-server.ts"],"env":{}}}}'
+      - name: Verify the outputs and the execution file
         env:
-          # Change to test directory so bun can find the MCP server script
-          CLAUDE_WORKING_DIR: ${{ github.workspace }}/base-action/test/mcp-test
+          CONCLUSION: ${{ steps.run.outputs.conclusion }}
+          EXECUTION_FILE: ${{ steps.run.outputs.execution_file }}
+          SESSION_ID: ${{ steps.run.outputs.session_id }}
+        run: .github/scripts/verify-runner-outputs.sh
 
-      - name: Check MCP server output with --mcp-config
+      - name: Verify the MCP tool was called directly and reached the server
+        env:
+          EXECUTION_FILE: ${{ steps.run.outputs.execution_file }}
         run: |
-          echo "Checking Claude output for MCP servers with --mcp-config flag..."
+          set -euo pipefail
+          TOOL=mcp__github_comment__update_comment
 
-          # Parse the JSON output
-          OUTPUT_FILE="${RUNNER_TEMP}/claude-execution-output.json"
+          echo "Tool calls:"
+          jq -r '.[] | select(.type == "tool_execution_end") | .toolName' "$EXECUTION_FILE"
 
-          if [ ! -f "$OUTPUT_FILE" ]; then
-            echo "Error: Output file not found!"
-            exit 1
-          fi
+          # Declared to the model directly: the model's own response calls the
+          # tool by name, rather than through codemode or tool_search.
+          jq -e --arg tool "$TOOL" '
+            any(.[]; .type == "message_end" and .message.role == "assistant"
+              and any(.message.content[]; .type == "toolCall" and .name == $tool))
+          ' "$EXECUTION_FILE" > /dev/null ||
+            { echo "❌ the model did not call $TOOL directly"; exit 1; }
 
-          echo "Output file contents:"
-          cat $OUTPUT_FILE
+          # The server's own answer: there is no tracking comment in agent mode.
+          jq -e --arg tool "$TOOL" '
+            any(.[]; .type == "tool_execution_end" and .toolName == $tool
+              and (.result | tostring | contains("CLAUDE_COMMENT_ID environment variable is required")))
+          ' "$EXECUTION_FILE" > /dev/null ||
+            { echo "❌ $TOOL did not return the server's response"; exit 1; }
 
-          # Check if mcp_servers field exists in the init event
-          if jq -e '.[] | select(.type == "system" and .subtype == "init") | .mcp_servers' "$OUTPUT_FILE" > /dev/null; then
-            echo "✓ Found mcp_servers in output"
-            
-            # MCP servers can connect asynchronously, so the init event may
-            # report the server as pending — check registration there, then
-            # verify the tool actually ran.
-            if jq -e '.[] | select(.type == "system" and .subtype == "init") | .mcp_servers[] | select(.name == "test-server")' "$OUTPUT_FILE" > /dev/null; then
-              echo "✓ test-server is registered"
-            else
-              echo "✗ test-server not found"
-              jq '.[] | select(.type == "system" and .subtype == "init") | .mcp_servers' "$OUTPUT_FILE"
-              exit 1
-            fi
-
-            if jq -e '.[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use" and .name == "mcp__test-server__test_tool")' "$OUTPUT_FILE" > /dev/null; then
-              echo "✓ MCP test tool was called"
-            else
-              echo "✗ MCP test tool was not called"
-              jq '[.[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | .name]' "$OUTPUT_FILE"
-              exit 1
-            fi
-
-            if jq -e '.[] | select(.type == "user") | .message.content[]? | select(.type == "tool_result") | select(.content | tostring | contains("Test tool response"))' "$OUTPUT_FILE" > /dev/null; then
-              echo "✓ MCP test tool returned its response"
-            else
-              echo "✗ MCP test tool response not found"
-              exit 1
-            fi
-          else
-            echo "✗ No mcp_servers field found in init event"
-            jq '.[] | select(.type == "system" and .subtype == "init")' "$OUTPUT_FILE"
-            exit 1
-          fi
-
-          echo "✓ All MCP server checks passed with --mcp-config flag!"
+          echo "✅ The comment server was loaded with direct exposure"

@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
+import { join } from "node:path";
 import { prepareTagMode } from "../../src/modes/tag";
 import { mockIssueCommentContext } from "../mockContext";
 import * as actor from "../../src/github/validation/actor";
@@ -8,8 +9,17 @@ import * as branch from "../../src/github/operations/branch";
 import * as createPrompt from "../../src/create-prompt";
 import * as mcp from "../../src/mcp/install-mcp-server";
 import * as gitConfig from "../../src/github/operations/git-config";
+import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
+import { runPi } from "../../src/runner/run-pi";
+import { fauxRuntime, readExecutionFile, useScratch } from "../runner/harness";
 
 describe("Tag Mode", () => {
+  const savedActionPath = process.env.GITHUB_ACTION_PATH;
+  afterEach(() => {
+    if (savedActionPath === undefined) delete process.env.GITHUB_ACTION_PATH;
+    else process.env.GITHUB_ACTION_PATH = savedActionPath;
+  });
+
   test("prepareTagMode is exported as a function", () => {
     expect(typeof prepareTagMode).toBe("function");
   });
@@ -18,6 +28,7 @@ describe("Tag Mode", () => {
     let spies: Array<{ mockRestore: () => void }>;
     let configureGitAuthSpy: any;
     let replaceCheckoutCredentialsSpy: any;
+    let prepareMcpConfigSpy: any;
 
     beforeEach(() => {
       configureGitAuthSpy = spyOn(
@@ -47,7 +58,10 @@ describe("Tag Mode", () => {
             }) as any,
         ),
         spyOn(createPrompt, "createPrompt").mockImplementation(async () => {}),
-        spyOn(mcp, "prepareMcpConfig").mockImplementation(async () => "{}"),
+        (prepareMcpConfigSpy = spyOn(
+          mcp,
+          "prepareMcpConfig",
+        ).mockImplementation(async () => "{}")),
       ];
     });
 
@@ -94,6 +108,164 @@ describe("Tag Mode", () => {
         "test-token",
         context,
       );
+    });
+    test("allows the git commands it needs, and file edits in the workspace", async () => {
+      process.env.GITHUB_ACTION_PATH = "/action";
+
+      const result = await prepareTagMode({
+        context: { ...mockIssueCommentContext },
+        octokit: {} as any,
+        githubToken: "test-token",
+      });
+
+      expect(result.allowedTools).toEqual(
+        expect.arrayContaining([
+          "Read",
+          "mcp__github_comment__update_comment",
+          "Bash(git add:*)",
+          "Bash(git commit:*)",
+          "Bash(/action/scripts/git-push.sh:*)",
+          "Bash(git rm:*)",
+        ]),
+      );
+      for (const blanket of ["Bash", "Edit", "Write", "MultiEdit"]) {
+        expect(result.allowedTools).not.toContain(blanket);
+      }
+      expect(result.acceptEdits).toBe(true);
+    });
+
+    test("commits through the file ops tools, without bash, under API commit signing", async () => {
+      const result = await prepareTagMode({
+        context: {
+          ...mockIssueCommentContext,
+          inputs: { ...mockIssueCommentContext.inputs, useCommitSigning: true },
+        },
+        octokit: {} as any,
+        githubToken: "test-token",
+      });
+
+      expect(result.allowedTools).toEqual(
+        expect.arrayContaining([
+          "mcp__github_file_ops__commit_files",
+          "mcp__github_file_ops__delete_files",
+        ]),
+      );
+      expect(result.allowedTools.some((t) => t.startsWith("Bash"))).toBe(false);
+    });
+
+    test("starts the MCP servers for the action's tools that allowed_tools names", async () => {
+      process.env.INPUT_ALLOWED_TOOLS =
+        "Bash(npm test), mcp__github_inline_comment__create_inline_comment";
+      try {
+        await prepareTagMode({
+          context: { ...mockIssueCommentContext },
+          octokit: {} as any,
+          githubToken: "test-token",
+        });
+      } finally {
+        delete process.env.INPUT_ALLOWED_TOOLS;
+      }
+
+      const { allowedTools } = prepareMcpConfigSpy.mock.calls[0][0];
+      expect(allowedTools).toContain(
+        "mcp__github_inline_comment__create_inline_comment",
+      );
+      expect(allowedTools).not.toContain("Bash(npm test)");
+    });
+  });
+
+  describe("default git command allowlist, enforced by the Runner", () => {
+    const getScratch = useScratch();
+
+    test("runs git add and commit, and blocks every other command", async () => {
+      const { cwd, promptPath } = getScratch();
+      const git = (...args: string[]) =>
+        Bun.spawnSync(["git", ...args], { cwd }).exitCode;
+      git("init", "-q");
+      git("config", "user.email", "test@example.com");
+      git("config", "user.name", "test");
+      await Bun.write(join(cwd, "notes.txt"), "notes");
+
+      // One response per step: calls in one response run in parallel.
+      const steps = [
+        ["git add notes.txt"],
+        [
+          "git commit -q -m 'Add notes'",
+          "git status",
+          "touch pwned",
+          "git add . && touch pwned",
+        ],
+      ];
+      const { modelRuntime, model } = await fauxRuntime([
+        ...steps.map((commands) =>
+          fauxAssistantMessage(
+            commands.map((command) => fauxToolCall("bash", { command })),
+            { stopReason: "toolUse" },
+          ),
+        ),
+        fauxAssistantMessage("Done."),
+      ]);
+      await Bun.write(promptPath, "Commit the notes.");
+      process.env.GITHUB_ACTION_PATH = "/action";
+      const spies = [
+        spyOn(actor, "checkHumanActor").mockImplementation(async () => {}),
+        spyOn(createInitial, "createInitialComment").mockImplementation(
+          async () => ({ id: 42 }) as any,
+        ),
+        spyOn(fetcher, "fetchGitHubData").mockImplementation(
+          async () => ({}) as any,
+        ),
+        spyOn(branch, "setupBranch").mockImplementation(
+          async () => ({ baseBranch: "main" }) as any,
+        ),
+        spyOn(createPrompt, "createPrompt").mockImplementation(async () => {}),
+        spyOn(mcp, "prepareMcpConfig").mockImplementation(async () => "{}"),
+        spyOn(gitConfig, "configureGitAuth").mockImplementation(async () => {}),
+      ];
+      let prepared;
+      try {
+        prepared = await prepareTagMode({
+          context: { ...mockIssueCommentContext },
+          octokit: {} as any,
+          githubToken: "test-token",
+        });
+      } finally {
+        for (const spy of spies) spy.mockRestore();
+      }
+
+      const result = await runPi(promptPath, {
+        model,
+        cwd,
+        modelRuntime,
+        allowedTools: prepared.allowedTools.join("\n"),
+        acceptEdits: prepared.acceptEdits,
+      });
+
+      // Calls run in parallel: match each result to its command.
+      const records = readExecutionFile(result.executionFile!);
+      const ran = Object.fromEntries(
+        records
+          .filter((r) => r.type === "tool_execution_end")
+          .map((end) => {
+            const start = records.find(
+              (r) =>
+                r.type === "tool_execution_start" &&
+                r.toolCallId === end.toolCallId,
+            );
+            return [start!.args.command, !end.isError];
+          }),
+      );
+      expect(ran).toEqual({
+        "git add notes.txt": true,
+        "git commit -q -m 'Add notes'": true,
+        "git status": false,
+        "touch pwned": false,
+        "git add . && touch pwned": false,
+      });
+      expect(
+        Bun.spawnSync(["git", "log", "--oneline"], { cwd }).stdout.toString(),
+      ).toContain("Add notes");
+      expect(await Bun.file(join(cwd, "pwned")).exists()).toBe(false);
     });
   });
 });

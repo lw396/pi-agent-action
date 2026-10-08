@@ -51,12 +51,8 @@ describe("Agent Mode", () => {
     expect(typeof prepareAgentMode).toBe("function");
   });
 
-  test("prepare passes through claude_args", async () => {
-    // Clear any previous calls before this test
-    exportVariableSpy.mockClear();
-    setOutputSpy.mockClear();
-
-    const contextWithCustomArgs = createMockAutomationContext({
+  test("prepare starts the MCP servers for the tools allowed_tools names", async () => {
+    const context = createMockAutomationContext({
       eventName: "workflow_dispatch",
     });
 
@@ -66,17 +62,9 @@ describe("Agent Mode", () => {
     delete process.env.GITHUB_HEAD_REF;
     delete process.env.GITHUB_REF_NAME;
 
-    // Set CLAUDE_ARGS environment variable
-    process.env.CLAUDE_ARGS = "--model claude-sonnet-4 --max-turns 10";
-
     const mockOctokit = {
       rest: {
         users: {
-          getAuthenticated: mock(() =>
-            Promise.resolve({
-              data: { login: "test-user", id: 12345, type: "User" },
-            }),
-          ),
           getByUsername: mock(() =>
             Promise.resolve({
               data: { login: "test-user", id: 12345, type: "User" },
@@ -85,34 +73,46 @@ describe("Agent Mode", () => {
         },
       },
     } as any;
-    const result = await prepareAgentMode({
-      context: contextWithCustomArgs,
-      octokit: mockOctokit,
-      githubToken: "test-token",
-    });
 
-    // Verify claude_args includes user args (no MCP config in agent mode without allowed tools)
-    expect(result.claudeArgs).toBe("--model claude-sonnet-4 --max-turns 10");
-    expect(result.claudeArgs).not.toContain("--mcp-config");
+    try {
+      process.env.INPUT_ALLOWED_TOOLS =
+        "Bash(git status), mcp__github_comment__update_comment";
+      const withTools = await prepareAgentMode({
+        context,
+        octokit: mockOctokit,
+        githubToken: "test-token",
+      });
+      delete process.env.INPUT_ALLOWED_TOOLS;
+      const withoutTools = await prepareAgentMode({
+        context,
+        octokit: mockOctokit,
+        githubToken: "test-token",
+      });
 
-    // Verify return structure - should fall back to repository.default_branch when no env vars set
-    expect(result).toEqual({
-      commentId: undefined,
-      branchInfo: {
-        baseBranch: "main",
-        currentBranch: "main",
-        claudeBranch: undefined,
-      },
-      mcpConfig: expect.any(String),
-      claudeArgs: "--model claude-sonnet-4 --max-turns 10",
-    });
+      expect(Object.keys(JSON.parse(withTools.mcpConfig).mcpServers)).toEqual([
+        "github_comment",
+      ]);
+      expect(JSON.parse(withoutTools.mcpConfig).mcpServers).toEqual({});
 
-    // Clean up
-    delete process.env.CLAUDE_ARGS;
-    if (originalHeadRef !== undefined)
-      process.env.GITHUB_HEAD_REF = originalHeadRef;
-    if (originalRefName !== undefined)
-      process.env.GITHUB_REF_NAME = originalRefName;
+      // Verify return structure - should fall back to repository.default_branch when no env vars set
+      expect(withoutTools).toEqual({
+        commentId: undefined,
+        branchInfo: {
+          baseBranch: "main",
+          currentBranch: "main",
+          claudeBranch: undefined,
+        },
+        mcpConfig: expect.any(String),
+        allowedTools: [],
+        acceptEdits: false,
+      });
+    } finally {
+      delete process.env.INPUT_ALLOWED_TOOLS;
+      if (originalHeadRef !== undefined)
+        process.env.GITHUB_HEAD_REF = originalHeadRef;
+      if (originalRefName !== undefined)
+        process.env.GITHUB_REF_NAME = originalRefName;
+    }
   });
 
   test("prepare falls back to repository.default_branch when not 'main'", async () => {
@@ -260,9 +260,8 @@ describe("Agent Mode", () => {
     // Note: We can't easily test file creation in this unit test,
     // but we can verify the method completes without errors
     // With our conditional MCP logic, agent mode with no allowed tools
-    // should not include any MCP config
-    // Should be empty or just whitespace when no MCP servers are included
-    expect(result.claudeArgs).not.toContain("--mcp-config");
+    // should not include any MCP servers
+    expect(JSON.parse(result.mcpConfig).mcpServers).toEqual({});
   });
 
   describe("git credential configuration", () => {

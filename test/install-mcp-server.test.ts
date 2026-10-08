@@ -87,6 +87,33 @@ describe("prepareMcpConfig", () => {
     fetchSpy.mockRestore();
   });
 
+  test("should redact secrets in the failure message", async () => {
+    const token = "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";
+    const allowedTools = {
+      some() {
+        throw new Error(`request with ${token} failed`);
+      },
+    } as unknown as string[];
+
+    await expect(
+      prepareMcpConfig({
+        githubToken: "test-token",
+        owner: "test-owner",
+        repo: "test-repo",
+        branch: "test-branch",
+        baseBranch: "main",
+        allowedTools,
+        mode: "tag",
+        context: mockContext,
+      }),
+    ).rejects.toThrow("Process exit");
+
+    const message: string = setFailedSpy.mock.calls[0][0];
+    expect(message).toContain("Install MCP server failed");
+    expect(message).not.toContain(token);
+    expect(message).toContain("[REDACTED_GITHUB_TOKEN]");
+  });
+
   test("should return comment server when commit signing is disabled", async () => {
     const result = await prepareMcpConfig({
       githubToken: "test-token",

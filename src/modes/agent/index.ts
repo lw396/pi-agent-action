@@ -1,6 +1,6 @@
 import { mkdir, rm, writeFile } from "fs/promises";
 import { prepareMcpConfig } from "../../mcp/install-mcp-server";
-import { parseAllowedTools } from "./parse-tools";
+import { ruleToolNames } from "../../runner/tool-rules";
 import {
   configureGitAuth,
   replaceCheckoutCredentials,
@@ -89,9 +89,8 @@ export async function prepareAgentMode({
 
   await writeFile(`${promptDir}/claude-prompt.txt`, promptContent);
 
-  // Parse allowed tools from user's claude_args
-  const userClaudeArgs = process.env.CLAUDE_ARGS || "";
-  const allowedTools = parseAllowedTools(userClaudeArgs);
+  // The allowed_tools input decides which of the action's MCP servers start
+  const allowedTools = ruleToolNames(process.env.INPUT_ALLOWED_TOOLS);
 
   // Check for branch info from environment variables (useful for auto-fix workflows)
   const claudeBranch = process.env.CLAUDE_BRANCH || undefined;
@@ -118,19 +117,6 @@ export async function prepareAgentMode({
     context,
   });
 
-  // Build final claude_args with multiple --mcp-config flags
-  let claudeArgs = "";
-
-  // Add our GitHub servers config if we have any
-  const ourConfig = JSON.parse(ourMcpConfig);
-  if (ourConfig.mcpServers && Object.keys(ourConfig.mcpServers).length > 0) {
-    const escapedOurConfig = ourMcpConfig.replace(/'/g, "'\\''");
-    claudeArgs = `--mcp-config '${escapedOurConfig}'`;
-  }
-
-  // Append user's claude_args (which may have more --mcp-config flags)
-  claudeArgs = `${claudeArgs} ${userClaudeArgs}`.trim();
-
   return {
     commentId: undefined,
     branchInfo: {
@@ -139,6 +125,8 @@ export async function prepareAgentMode({
       claudeBranch: claudeBranch,
     },
     mcpConfig: ourMcpConfig,
-    claudeArgs,
+    // Agent mode adds no rules of its own: allowed_tools alone decides.
+    allowedTools: [] as string[],
+    acceptEdits: false,
   };
 }

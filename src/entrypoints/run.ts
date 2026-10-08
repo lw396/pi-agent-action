@@ -1,14 +1,12 @@
 #!/usr/bin/env bun
 
 /**
- * Unified entrypoint for the Claude Code Action.
- * Merges all previously separate action.yml steps (prepare, install, run, cleanup)
+ * Unified entrypoint for the action.
+ * Merges all previously separate action.yml steps (prepare, run, cleanup)
  * into a single TypeScript orchestrator.
  */
 
 import * as core from "@actions/core";
-import { dirname } from "path";
-import { spawn } from "child_process";
 import { appendFile } from "fs/promises";
 import { existsSync, readFileSync } from "fs";
 import { setupGitHubToken, WorkflowValidationSkipError } from "../github/token";
@@ -35,89 +33,10 @@ import { updateCommentLink } from "./update-comment-link";
 import { formatTurnsFromData } from "./format-turns";
 import type { Turn } from "./format-turns";
 import { redactSecrets } from "../github/utils/sanitizer";
-// Base-action imports (used directly instead of subprocess)
-import { setupWorkloadIdentity } from "../../base-action/src/workload-identity";
-import type { WorkloadIdentityHandle } from "../../base-action/src/workload-identity";
-import { validateEnvironmentVariables } from "../../base-action/src/validate-env";
-import { setupClaudeCodeSettings } from "../../base-action/src/setup-claude-code-settings";
-import { installPlugins } from "../../base-action/src/install-plugins";
 import { preparePrompt } from "../runner/prepare-prompt";
-import { runClaude } from "../../base-action/src/run-claude";
-import type { ClaudeRunResult } from "../../base-action/src/run-claude-sdk";
 import { runPi } from "../runner/run-pi";
-import type { RunnerResult } from "../runner/run-pi";
+import { parseMcpConfig } from "../runner/mcp-servers";
 import { setExecutionFileOutputIfPresent } from "../runner/execution-file";
-
-// Exported for unit testing. `set -o pipefail` makes curl's non-zero exit
-// propagate through the pipe so the install retry logic actually triggers
-// on 429/403 instead of silently succeeding (see #1136).
-export function buildInstallCommand(version: string): string {
-  return `set -o pipefail; curl -fsSL https://claude.ai/install.sh | bash -s -- ${version}`;
-}
-
-/**
- * Install Claude Code CLI, handling retry logic and custom executable paths.
- * Returns the absolute path to the claude executable.
- */
-async function installClaudeCode(): Promise<string> {
-  const customExecutable = process.env.PATH_TO_CLAUDE_CODE_EXECUTABLE;
-  if (customExecutable) {
-    if (/[\x00-\x1f\x7f]/.test(customExecutable)) {
-      throw new Error(
-        "PATH_TO_CLAUDE_CODE_EXECUTABLE contains control characters (e.g. newlines), which is not allowed",
-      );
-    }
-    console.log(`Using custom Claude Code executable: ${customExecutable}`);
-    const claudeDir = dirname(customExecutable);
-    // Add to PATH by appending to GITHUB_PATH
-    const githubPath = process.env.GITHUB_PATH;
-    if (githubPath) {
-      await appendFile(githubPath, `${claudeDir}\n`);
-    }
-    // Also add to current process PATH
-    process.env.PATH = `${claudeDir}:${process.env.PATH}`;
-    return customExecutable;
-  }
-
-  const claudeCodeVersion = "2.1.291";
-  console.log(`Installing Claude Code v${claudeCodeVersion}...`);
-
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    console.log(`Installation attempt ${attempt}...`);
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const child = spawn(
-          "bash",
-          ["-c", buildInstallCommand(claudeCodeVersion)],
-          { stdio: "inherit" },
-        );
-        child.on("close", (code) => {
-          if (code === 0) resolve();
-          else reject(new Error(`Install failed with exit code ${code}`));
-        });
-        child.on("error", reject);
-      });
-      console.log("Claude Code installed successfully");
-      // Add to PATH
-      const homeBin = `${process.env.HOME}/.local/bin`;
-      const githubPath = process.env.GITHUB_PATH;
-      if (githubPath) {
-        await appendFile(githubPath, `${homeBin}\n`);
-      }
-      process.env.PATH = `${homeBin}:${process.env.PATH}`;
-      return `${homeBin}/claude`;
-    } catch (error) {
-      if (attempt === 3) {
-        throw new Error(
-          `Failed to install Claude Code after 3 attempts: ${error}`,
-        );
-      }
-      console.log("Installation failed, retrying...");
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-    }
-  }
-  throw new Error("unreachable");
-}
 
 /**
  * Write the step summary from Claude's execution output file.
@@ -160,7 +79,6 @@ async function run() {
   let prepareError: string | undefined;
   let context: GitHubContext | undefined;
   let octokit: Octokits | undefined;
-  let workloadIdentity: WorkloadIdentityHandle | undefined;
   // Paths reverted to the PR base branch, which cleanup must not commit back
   // onto the PR author's branch. Empty unless restoreConfigFromBase ran.
   let restoredConfigPaths: string[] = [];
@@ -238,29 +156,11 @@ async function run() {
     baseBranch = prepareResult.branchInfo.baseBranch;
     prepareCompleted = true;
 
-    // Agent mode runs on pi through the Runner. Tag mode still runs on Claude
-    // Code until it is ported (docs/pi-port-proposal.md, M2).
-    const usePiRunner = modeName === "agent";
-
-    // Phase 2: Install Claude Code CLI
-    const claudeExecutable = usePiRunner ? "" : await installClaudeCode();
-
-    // Phase 3: Run Claude (import base-action directly)
-    // Set env vars needed by the base-action code
+    // Phase 2: Run pi through the Runner
     process.env.INPUT_ACTION_INPUTS_PRESENT = actionInputsPresent;
-    if (!usePiRunner) {
-      process.env.CLAUDE_CODE_ACTION = "1";
-      process.env.DETAILED_PERMISSION_MESSAGES = "1";
 
-      // When workload identity federation is configured, fetch the GitHub OIDC
-      // identity token and expose it to the CLI before validating auth env vars.
-      workloadIdentity = await setupWorkloadIdentity();
-
-      validateEnvironmentVariables();
-    }
-
-    // On PRs, .claude/ and .mcp.json in the checkout are attacker-controlled.
-    // Restore them from the base branch before the CLI reads them.
+    // On PRs, .pi/, .claude/, AGENTS.md and the like in the checkout are
+    // attacker-controlled. Restore them from the base branch before pi reads them.
     //
     // We read pull_request.base.ref from the payload directly because agent
     // mode's branchInfo.baseBranch defaults to the repo's default branch rather
@@ -283,16 +183,6 @@ async function run() {
       }
     }
 
-    if (!usePiRunner) {
-      await setupClaudeCodeSettings(process.env.INPUT_SETTINGS);
-
-      await installPlugins(
-        process.env.INPUT_PLUGIN_MARKETPLACES,
-        process.env.INPUT_PLUGINS,
-        claudeExecutable,
-      );
-    }
-
     const promptFile =
       process.env.INPUT_PROMPT_FILE ||
       `${process.env.RUNNER_TEMP}/claude-prompts/claude-prompt.txt`;
@@ -301,21 +191,19 @@ async function run() {
       promptFile,
     });
 
-    const claudeResult: ClaudeRunResult | RunnerResult = usePiRunner
-      ? await runPi(promptConfig.path, {
-          model: process.env.MODEL,
-          apiKey: process.env.API_KEY,
-          piArgs: process.env.PI_ARGS,
-          allowedTools: process.env.INPUT_ALLOWED_TOOLS,
-          disallowedTools: process.env.INPUT_DISALLOWED_TOOLS,
-        })
-      : await runClaude(promptConfig.path, {
-          claudeArgs: prepareResult.claudeArgs,
-          appendSystemPrompt: process.env.APPEND_SYSTEM_PROMPT,
-          model: process.env.ANTHROPIC_MODEL,
-          pathToClaudeCodeExecutable: claudeExecutable,
-          showFullOutput: process.env.INPUT_SHOW_FULL_OUTPUT,
-        });
+    const claudeResult = await runPi(promptConfig.path, {
+      model: process.env.MODEL,
+      apiKey: process.env.API_KEY,
+      piArgs: process.env.PI_ARGS,
+      // The mode's own rules come first, then the workflow's allowed_tools.
+      allowedTools: [
+        ...prepareResult.allowedTools,
+        process.env.INPUT_ALLOWED_TOOLS ?? "",
+      ].join("\n"),
+      disallowedTools: process.env.INPUT_DISALLOWED_TOOLS,
+      acceptEdits: prepareResult.acceptEdits,
+      mcpServers: parseMcpConfig(prepareResult.mcpConfig),
+    });
 
     claudeSuccess = claudeResult.conclusion === "success";
     executionFile = claudeResult.executionFile;
@@ -341,11 +229,7 @@ async function run() {
     }
     core.setFailed(`Action failed with error: ${redactSecrets(errorMessage)}`);
   } finally {
-    // Phase 4: Cleanup (always runs)
-
-    // Stop refreshing the workload identity token file and delete the token
-    // material so it doesn't outlive this step
-    workloadIdentity?.stop();
+    // Phase 3: Cleanup (always runs)
 
     // Update tracking comment
     if (

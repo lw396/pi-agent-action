@@ -186,3 +186,15 @@ export function commandMatchesPattern(
   }
   return false;
 }
+
+/**
+ * The tool names in an allowed_tools value, as written, without checking the
+ * rules. Prepare uses them to decide which of the action's MCP servers to
+ * start; the Runner checks the rules themselves.
+ */
+export function ruleToolNames(text: string | undefined): string[] {
+  if (!text?.trim()) return [];
+  return splitRules(text, "allowed_tools").map(
+    (rule) => rule.match(/^[^(]*/)![0],
+  );
+}

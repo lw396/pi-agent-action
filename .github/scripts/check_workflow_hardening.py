@@ -35,6 +35,7 @@ _PI_RUNNER_JOB = (
 EXEMPT_FROM_AUTO_MODE: dict[str, str] = {
     "test-base-action.yml:test-provider-env": _PI_RUNNER_JOB,
     "test-base-action.yml:test-api-key-input": _PI_RUNNER_JOB,
+    "test-mcp-servers.yml:test-direct-mcp-server": _PI_RUNNER_JOB,
 }
 
 

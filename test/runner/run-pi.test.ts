@@ -88,6 +88,9 @@ describe("runPi", () => {
     expect(stats.cost).toBeCloseTo(
       responses[0].cost.total + responses[1].cost.total,
     );
+    // Wall time of the session, shown in the tracking comment.
+    expect(stats.durationMs).toBeNumber();
+    expect(stats.durationMs).toBeGreaterThanOrEqual(0);
   });
 
   test("fails with the model's error and still writes the execution file", async () => {

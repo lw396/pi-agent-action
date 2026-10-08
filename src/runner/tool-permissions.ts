@@ -10,6 +10,7 @@ import {
   type ToolRule,
 } from "./tool-rules";
 import { findShellSyntax } from "./shell-syntax";
+import { checkWorkspacePath } from "./workspace-path";
 
 /**
  * pi's read-only built-in tools. Like Claude Code's read-only tools, they need
@@ -17,9 +18,17 @@ import { findShellSyntax } from "./shell-syntax";
  */
 const READ_ONLY_TOOLS = new Set(["read", "grep", "find", "ls"]);
 
+/** pi's file editing tools, which take the file in their `path` argument. */
+const EDIT_TOOLS = new Set(["edit", "write"]);
+
 export type ToolPermissions = {
   allowed: ToolRule[];
   disallowed: ToolRule[];
+  /**
+   * Tag mode's counterpart of Claude Code's acceptEdits permission mode:
+   * edits inside this directory need no rule. Unset in agent mode.
+   */
+  editableWorkspace?: string;
 };
 
 /**
@@ -91,6 +100,21 @@ export function checkToolCall(
     ruleNamesTool(rule, toolName),
   );
   if (allowRules.some((rule) => rule.pattern === undefined)) return undefined;
+
+  const workspace = permissions.editableWorkspace;
+  if (workspace !== undefined && EDIT_TOOLS.has(toolName)) {
+    const check =
+      typeof input.path === "string"
+        ? checkWorkspacePath(input.path, workspace)
+        : ({ inside: false, reason: "outside" } as const);
+    if (check.inside) return undefined;
+    return blocked(
+      check.reason === "git"
+        ? `${toolName} cannot change files in .git without an allowed_tools rule.`
+        : `${toolName} cannot change files outside the working directory (${workspace}) without an allowed_tools rule.`,
+    );
+  }
+
   if (allowRules.length === 0) {
     return blocked(
       `${toolName} is not allowed: no allowed_tools rule permits it.`,

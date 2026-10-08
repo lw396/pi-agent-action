@@ -17,7 +17,7 @@ import { createPrompt } from "../../create-prompt";
 import { isEntityContext } from "../../github/context";
 import type { GitHubContext } from "../../github/context";
 import type { Octokits } from "../../github/api/client";
-import { parseAllowedTools } from "../agent/parse-tools";
+import { ruleToolNames } from "../../runner/tool-rules";
 
 /**
  * Prepares the tag mode execution context.
@@ -120,17 +120,19 @@ export async function prepareTagMode({
     context,
   );
 
-  const userClaudeArgs = process.env.CLAUDE_ARGS || "";
-  const userAllowedMCPTools = parseAllowedTools(userClaudeArgs).filter((tool) =>
-    tool.startsWith("mcp__github_"),
-  );
+  // The action's own MCP tools the workflow allows, which decide the extra
+  // MCP servers to start (the inline comment server, for example).
+  const userAllowedMCPTools = ruleToolNames(
+    process.env.INPUT_ALLOWED_TOOLS,
+  ).filter((tool) => tool.startsWith("mcp__github_"));
 
   const gitPushWrapper = `${process.env.GITHUB_ACTION_PATH}/scripts/git-push.sh`;
 
-  // Build claude_args for tag mode with required tools.
-  // Edit/MultiEdit/Write are intentionally omitted: acceptEdits permission mode (set below)
-  // auto-allows file edits inside $GITHUB_WORKSPACE and denies writes outside (e.g. ~/.bashrc).
-  // Listing them here would grant blanket write access to the whole runner (Asana 1213310082312048).
+  // Rules tag mode adds to the allowed_tools input.
+  // Edit/MultiEdit/Write are intentionally omitted: acceptEdits (returned below)
+  // lets the Runner allow file edits inside $GITHUB_WORKSPACE and block writes
+  // outside (e.g. ~/.bashrc). Listing them here would grant blanket write
+  // access to the whole runner (Asana 1213310082312048).
   const tagModeTools = [
     "Glob",
     "Grep",
@@ -159,6 +161,7 @@ export async function prepareTagMode({
       "mcp__github_file_ops__delete_files",
     );
   }
+  const allowedTools = Array.from(new Set(tagModeTools));
 
   // Get our GitHub MCP servers configuration
   const ourMcpConfig = await prepareMcpConfig({
@@ -168,32 +171,16 @@ export async function prepareTagMode({
     branch: branchInfo.claudeBranch || branchInfo.currentBranch,
     baseBranch: branchInfo.baseBranch,
     claudeCommentId: commentId.toString(),
-    allowedTools: Array.from(new Set(tagModeTools)),
+    allowedTools,
     mode: "tag",
     context,
   });
-
-  // Build complete claude_args with multiple --mcp-config flags
-  let claudeArgs = "";
-
-  // Add our GitHub servers config
-  const escapedOurConfig = ourMcpConfig.replace(/'/g, "'\\''");
-  claudeArgs = `--mcp-config '${escapedOurConfig}'`;
-
-  // Add required tools for tag mode.
-  // acceptEdits: file edits auto-allowed inside cwd ($GITHUB_WORKSPACE), denied outside.
-  // Headless SDK has no prompt handler, so anything that falls through to "ask" is denied.
-  claudeArgs += ` --permission-mode acceptEdits --allowedTools "${tagModeTools.join(",")}"`;
-
-  // Append user's claude_args (which may have more --mcp-config flags)
-  if (userClaudeArgs) {
-    claudeArgs += ` ${userClaudeArgs}`;
-  }
 
   return {
     commentId,
     branchInfo,
     mcpConfig: ourMcpConfig,
-    claudeArgs: claudeArgs.trim(),
+    allowedTools,
+    acceptEdits: true,
   };
 }

@@ -795,6 +795,8 @@ describe("generatePrompt", () => {
 
     // Should use the minimal comment tool
     expect(prompt).toContain("mcp__github_comment__update_comment");
+    // pi declares the action's MCP tools directly; it has no ToolSearch.
+    expect(prompt).not.toContain("ToolSearch");
 
     // Should not have commit signing tool references
     expect(prompt).not.toContain("mcp__github_file_ops__commit_files");

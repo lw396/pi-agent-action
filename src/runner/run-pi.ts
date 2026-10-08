@@ -15,6 +15,7 @@ import {
 import { setupPiSettings } from "./setup-pi-settings";
 import { parsePiArgs } from "./pi-args";
 import { writeExecutionFile } from "./execution-file";
+import { mcpServerExtensions, type McpServers } from "./mcp-servers";
 import {
   parseToolPermissions,
   toolPermissionsExtension,
@@ -37,6 +38,13 @@ export type RunnerOptions = {
   allowedTools?: string;
   /** The disallowed_tools input: rules that block calls, before allowed_tools. */
   disallowedTools?: string;
+  /**
+   * Let edit and write change files in the working directory without a rule,
+   * like Claude Code's acceptEdits permission mode in Upstream's tag mode.
+   */
+  acceptEdits?: boolean;
+  /** The action's MCP servers, registered with `direct` exposure. */
+  mcpServers?: McpServers;
   /** Working directory of the session. Defaults to process.cwd(). */
   cwd?: string;
   /**
@@ -102,16 +110,16 @@ export async function runPi(
   }
 
   const piArgs = parsePiArgs(options.piArgs);
-  const toolPermissions = parseToolPermissions(
-    options.allowedTools,
-    options.disallowedTools,
-  );
+  const cwd = options.cwd ?? process.cwd();
+  const toolPermissions = {
+    ...parseToolPermissions(options.allowedTools, options.disallowedTools),
+    editableWorkspace: options.acceptEdits ? cwd : undefined,
+  };
 
   for (const name of AGENT_HIDDEN_ENV) {
     delete process.env[name];
   }
 
-  const cwd = options.cwd ?? process.cwd();
   const prompt = await readFile(promptPath, "utf-8");
   const modelRuntime = options.modelRuntime ?? (await createModelRuntime());
 
@@ -139,7 +147,13 @@ export async function runPi(
     cwd,
     agentDir,
     settingsManager,
-    extensionFactories: [toolPermissionsExtension(toolPermissions)],
+    extensionFactories: [
+      toolPermissionsExtension(toolPermissions),
+      ...mcpServerExtensions(
+        options.mcpServers ?? {},
+        join(agentDir, "mcp.log"),
+      ),
+    ],
     ...piArgs.resources,
   });
   await resourceLoader.reload();
@@ -167,6 +181,7 @@ export async function runPi(
 
   let failure: string | undefined;
   let stats;
+  const startedAt = Date.now();
   try {
     await session.bindExtensions({});
     await session.prompt(prompt);
@@ -183,7 +198,8 @@ export async function runPi(
     stats = totals;
     session.dispose();
   }
-  records.push({ type: "session_stats", ...stats });
+  const durationMs = Date.now() - startedAt;
+  records.push({ type: "session_stats", ...stats, durationMs });
   console.log(
     `pi used ${stats.tokens.total} tokens in ${stats.assistantMessages} responses, cost $${stats.cost.toFixed(4)}`,
   );

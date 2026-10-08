@@ -2,6 +2,7 @@ import * as core from "@actions/core";
 import { GITHUB_API_URL, GITHUB_SERVER_URL } from "../github/api/config";
 import type { GitHubContext } from "../github/context";
 import { isEntityContext } from "../github/context";
+import { redactSecrets } from "../github/utils/sanitizer";
 import { Octokit } from "@octokit/rest";
 import type { AutoDetectedMode } from "../modes/detector";
 
@@ -234,7 +235,9 @@ export async function prepareMcpConfig(
     // User's config will be passed as separate --mcp-config flags
     return JSON.stringify(baseMcpConfig, null, 2);
   } catch (error) {
-    core.setFailed(`Install MCP server failed with error: ${error}`);
+    core.setFailed(
+      `Install MCP server failed with error: ${redactSecrets(String(error))}`,
+    );
     process.exit(1);
   }
 }

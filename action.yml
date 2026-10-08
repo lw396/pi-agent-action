@@ -85,6 +85,10 @@ inputs:
       run bash or change files. A command matched by a Bash(...) pattern must
       be one simple command: &&, ;, |, $(), ${}, backticks, subshells and
       redirections are refused.
+      Tag mode adds the tools it needs: the tracking comment tool, git add,
+      commit, rm and the push wrapper (or the file ops tools with
+      use_commit_signing), and file edits inside the working directory
+      except .git.
     required: false
     default: ""
   disallowed_tools:

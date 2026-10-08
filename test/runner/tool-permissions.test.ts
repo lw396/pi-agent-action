@@ -4,7 +4,7 @@
 // What is observed: whether a tool call ran (its side effect, or its result),
 // and the reason the model is given when a call is blocked.
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import {
   fauxAssistantMessage,
@@ -33,7 +33,10 @@ type CallResult = {
  */
 async function runCalls(
   calls: ToolCall[],
-  options: Pick<RunnerOptions, "allowedTools" | "disallowedTools"> = {},
+  options: Pick<
+    RunnerOptions,
+    "allowedTools" | "disallowedTools" | "acceptEdits"
+  > = {},
 ): Promise<CallResult[]> {
   const steps: FauxResponseStep[] = [
     fauxAssistantMessage(
@@ -373,6 +376,118 @@ describe("tool permissions", () => {
       expect(nested!.text).toContain("inner error");
       expect(nested!.text).toContain("shell syntax");
       expect(ran("pwned")).toBe(false);
+    });
+  });
+  describe("acceptEdits (tag mode)", () => {
+    const write = (path: string): ToolCall => ({
+      name: "write",
+      args: { path, content: "written" },
+    });
+    const written = (path: string) =>
+      existsSync(path) && readFileSync(path, "utf-8") === "written";
+
+    test("edit and write run inside the working directory without a rule", async () => {
+      const cwd = getScratch().cwd;
+      await Bun.write(join(cwd, "src/app.ts"), "const a = 1;\n");
+
+      const [writeResult, editResult] = await runCalls(
+        [
+          write("notes.txt"),
+          {
+            name: "edit",
+            args: {
+              path: join(cwd, "src/app.ts"),
+              edits: [{ oldText: "const a = 1;", newText: "const a = 2;" }],
+            },
+          },
+        ],
+        { acceptEdits: true },
+      );
+
+      expect(writeResult!.isError).toBe(false);
+      expect(written(join(cwd, "notes.txt"))).toBe(true);
+      expect(editResult!.isError).toBe(false);
+      expect(readFileSync(join(cwd, "src/app.ts"), "utf-8")).toBe(
+        "const a = 2;\n",
+      );
+    });
+
+    test("without acceptEdits, write needs a rule as before", async () => {
+      const [result] = await runCalls([write("notes.txt")]);
+
+      expect(result!.isError).toBe(true);
+      expect(written(join(getScratch().cwd, "notes.txt"))).toBe(false);
+    });
+
+    test("writes outside the working directory are blocked", async () => {
+      const { root, cwd } = getScratch();
+      mkdirSync(join(root, "elsewhere"));
+      symlinkSync(join(root, "elsewhere"), join(cwd, "link"));
+      symlinkSync(join(root, "dangling.txt"), join(cwd, "dangling.txt"));
+
+      const results = await runCalls(
+        [
+          write(join(root, "absolute.txt")),
+          write("../relative.txt"),
+          write("link/through-symlink.txt"),
+          write("dangling.txt"),
+          write("~/home.txt"),
+        ],
+        { acceptEdits: true },
+      );
+
+      for (const result of results) {
+        expect(result.isError).toBe(true);
+        expect(result.text).toContain("outside the working directory");
+      }
+      expect(written(join(root, "absolute.txt"))).toBe(false);
+      expect(written(join(root, "relative.txt"))).toBe(false);
+      expect(written(join(root, "elsewhere/through-symlink.txt"))).toBe(false);
+      expect(written(join(root, "dangling.txt"))).toBe(false);
+      expect(written(join(process.env.HOME!, "home.txt"))).toBe(false);
+    });
+
+    test("writes into .git are blocked, so git hooks cannot be planted", async () => {
+      const cwd = getScratch().cwd;
+      mkdirSync(join(cwd, ".git/hooks"), { recursive: true });
+
+      const results = await runCalls(
+        [
+          write(".git/hooks/pre-commit"),
+          write(".GIT/config"),
+          // A nested repository or submodule has hooks of its own.
+          write("vendor/lib/.git/hooks/pre-commit"),
+        ],
+        { acceptEdits: true },
+      );
+
+      for (const result of results) {
+        expect(result.isError).toBe(true);
+        expect(result.text).toContain(".git");
+      }
+      expect(written(join(cwd, ".git/hooks/pre-commit"))).toBe(false);
+    });
+
+    test("an explicit Write rule still allows writes anywhere", async () => {
+      const { root } = getScratch();
+
+      const [result] = await runCalls([write(join(root, "absolute.txt"))], {
+        acceptEdits: true,
+        allowedTools: "Write",
+      });
+
+      expect(result!.isError).toBe(false);
+      expect(written(join(root, "absolute.txt"))).toBe(true);
+    });
+
+    test("disallowed_tools still blocks edits inside the working directory", async () => {
+      const [result] = await runCalls([write("notes.txt")], {
+        acceptEdits: true,
+        disallowedTools: "Write",
+      });
+
+      expect(result!.isError).toBe(true);
+      expect(written(join(getScratch().cwd, "notes.txt"))).toBe(false);
     });
   });
 });

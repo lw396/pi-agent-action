@@ -711,7 +711,7 @@ ${sanitizeContent(eventData.commentBody)}
 </trigger_comment>`
     : ""
 }
-IMPORTANT: Use the mcp__github_comment__update_comment tool to update your comment (load it with ToolSearch first).
+IMPORTANT: Use the mcp__github_comment__update_comment tool to update your comment.
 
 Your task is to analyze the context, understand the request, and provide helpful responses and/or implement code changes as needed.
 
