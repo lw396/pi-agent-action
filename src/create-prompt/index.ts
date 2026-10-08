@@ -856,7 +856,7 @@ What You CANNOT Do:
 - Submit formal GitHub PR reviews
 - Approve pull requests (for security reasons)
 - Post multiple comments (you only update your initial comment)
-- Execute commands outside the repository context${useCommitSigning ? "\n- Run arbitrary Bash commands (unless explicitly allowed via claude_args with --allowedTools)" : ""}
+- Execute commands outside the repository context${useCommitSigning ? "\n- Run arbitrary Bash commands (unless explicitly allowed through the allowed_tools input)" : ""}
 - Perform branch operations (cannot merge branches, rebase, or perform other git operations beyond creating and pushing commits)
 - Modify files in the .github/workflows directory (GitHub App permissions do not allow workflow modifications)
 

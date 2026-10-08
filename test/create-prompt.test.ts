@@ -833,12 +833,12 @@ describe("generatePrompt", () => {
     // Should not have git command instructions
     expect(prompt).not.toContain("Use git commands via the Bash tool");
 
-    // Bash is off unless the user passes --allowedTools through claude_args.
-    // allowed_tools was removed in v1.0 and must not appear as live guidance.
+    // Bash is off unless the workflow allows it through the allowed_tools
+    // input; claude_args was removed and must not appear as live guidance.
     expect(prompt).toContain(
-      "Run arbitrary Bash commands (unless explicitly allowed via claude_args with --allowedTools)",
+      "Run arbitrary Bash commands (unless explicitly allowed through the allowed_tools input)",
     );
-    expect(prompt).not.toContain("allowed_tools configuration");
+    expect(prompt).not.toContain("claude_args");
   });
 
   test("does not mention allowed_tools when commit signing is off", async () => {

@@ -29,6 +29,7 @@ import { checkContainsTrigger } from "../github/validation/trigger";
 import { restoreConfigFromBase } from "../github/operations/restore-config";
 import { validateBranchName } from "../github/operations/branch";
 import { collectActionInputsPresence } from "./collect-inputs";
+import { assertNoRemovedInputs } from "./removed-inputs";
 import { updateCommentLink } from "./update-comment-link";
 import { formatTurnsFromData } from "./format-turns";
 import type { ExecutionRecord } from "./format-turns";
@@ -91,6 +92,7 @@ async function run() {
   let prepareCompleted = false;
   try {
     // Phase 1: Prepare
+    assertNoRemovedInputs(process.env.ALL_INPUTS);
     const actionInputsPresent = collectActionInputsPresence();
     context = parseGitHubContext();
     const modeName = detectMode(context);

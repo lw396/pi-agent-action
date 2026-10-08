@@ -1,16 +1,26 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
+import { REMOVED_INPUTS } from "../src/entrypoints/removed-inputs";
 
 const metadata = readFileSync(
   new URL("../action.yml", import.meta.url),
   "utf8",
 );
 
+function inputBlock(name: string): string | undefined {
+  return metadata.match(new RegExp(`^  ${name}:\\n((?:    .*\\n)+)`, "m"))?.[1];
+}
+
 function inputDefault(name: string): string | undefined {
-  const block = metadata.match(
-    new RegExp(`^  ${name}:\\n((?:    .*\\n)+)`, "m"),
-  )?.[1];
-  return block?.match(/^    default: "(.*)"$/m)?.[1];
+  return inputBlock(name)?.match(/^    default: "(.*)"$/m)?.[1];
+}
+
+// Names of the inputs declared in action.yml whose block matches pattern.
+function inputsMatching(pattern: RegExp): string[] {
+  const inputsSection = metadata.split(/^outputs:$/m)[0] ?? "";
+  return [...inputsSection.matchAll(/^  (\w+):\n((?:    .*\n)+)/gm)]
+    .filter(([, , block]) => pattern.test(block ?? ""))
+    .map(([, name]) => name ?? "");
 }
 
 describe("action metadata", () => {
@@ -70,5 +80,37 @@ describe("action metadata", () => {
     expect(inputDefault("trigger_phrase")).toBe("@pi");
     expect(inputDefault("label_trigger")).toBe("pi");
     expect(inputDefault("branch_prefix")).toBe("pi/");
+  });
+
+  test("declares each removed input only as a deprecated stub", () => {
+    for (const name of Object.keys(REMOVED_INPUTS)) {
+      const block = inputBlock(name);
+      expect(block, name).toBeDefined();
+      expect(block, name).toMatch(/^    deprecationMessage: .+$/m);
+      expect(block, name).not.toMatch(/^    default:/m);
+      expect(metadata, name).not.toContain(`inputs.${name} `);
+    }
+    expect(inputsMatching(/^    deprecationMessage:/m).sort()).toEqual(
+      Object.keys(REMOVED_INPUTS).sort(),
+    );
+    // The removed-input check reads every input from ALL_INPUTS.
+    expect(metadata).toContain("        ALL_INPUTS: ${{ toJson(inputs) }}\n");
+  });
+
+  test("passes no Claude Code configuration to the run step", () => {
+    for (const name of [
+      "CLAUDE_ARGS",
+      "INPUT_SETTINGS",
+      "INPUT_PLUGINS",
+      "INPUT_PLUGIN_MARKETPLACES",
+      "PATH_TO_CLAUDE_CODE_EXECUTABLE",
+      "CLAUDE_CODE_USE_BEDROCK",
+      "CLAUDE_CODE_OAUTH_TOKEN",
+      "ANTHROPIC_FEDERATION_RULE_ID",
+      "ANTHROPIC_BEDROCK_BASE_URL",
+      "CLAUDE_CODE_ENABLE_TELEMETRY",
+    ]) {
+      expect(metadata).not.toContain(name);
+    }
   });
 });

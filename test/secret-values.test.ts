@@ -88,11 +88,8 @@ describe("redactSecretValues", () => {
       API_KEY: SECRET,
       OVERRIDE_GITHUB_TOKEN: "token-from-the-github-token-input",
       SSH_SIGNING_KEY: "-----BEGIN OPENSSH PRIVATE KEY-----abc",
-      // Free-form pass-through arguments and settings.
+      // Free-form pass-through arguments.
       PI_ARGS: "--append-system-prompt 'use key 0123456789abcdef'",
-      CLAUDE_ARGS: '--mcp-config \'{"token":"0123456789abcdef"}\'',
-      INPUT_SETTINGS: '{"env":{"KEY":"0123456789abcdef"}}',
-      INPUT_PLUGIN_MARKETPLACES: "https://user:token@example.com/repo.git",
       // Copied from the workflow env, not an input.
       NODE_VERSION: "secret-in-the-workflow-env",
       // The serialized inputs, api_key and github_token included.

@@ -86,7 +86,8 @@ pi 在 2026-10-02 发布了 1.0 版本，内置了 MCP 支持（参见 `packages
 ## `action.yml` 输入兼容策略
 
 - **保持一样**：`trigger_phrase`、`prompt`、`label_trigger`、`assignee_trigger`、`base_branch`、`branch_prefix`、`branch_name_template`、`allowed_bots`、`allowed_non_write_users`、`include_comments_by_actor`、`exclude_comments_by_actor`、`github_token`、`use_sticky_comment`、`track_progress`、`use_commit_signing`、`ssh_signing_key`、`additional_permissions`、`classify_inline_comments` 等与 GitHub 相关的输入。
-- **必须替换**：`claude_args` → `pi_args`（只放 pi 自己的参数）；所有认证相关输入（见下文"模型与认证"）；`path_to_claude_code_executable`；插件相关输入。
+- **必须替换**：`claude_args` → `pi_args`（只放 pi 自己的参数）；所有认证相关输入（见下文"模型与认证"）。
+- **删除**：`path_to_claude_code_executable`、插件相关输入。设置已删除的输入时运行失败，并指向迁移对照表（`src/entrypoints/removed-inputs.ts`）。
 - **删除**：`settings`。上游常见的 key 都有了新位置（`model` → `model` 输入，`env` → workflow 的 `env:`，`permissions` → `allowed_tools`）；同名但改收 pi 格式会让旧配置静默失效；pi 的部分设置（`defaultProjectTrust`、`packages`、`shellPath`）能绕开安全默认值。以后有需要再加 `pi_settings`。
 - **新增**：`model`（必填）、`api_key`（可选）、`allowed_tools` / `disallowed_tools`（沿用 Claude 语法）、`json_schema`（输出仍叫 `structured_output`），以及 bash env 白名单的放行输入 `allowed_bash_env` 和关闭开关 `subprocess_isolation`。
 - **更换默认值**：触发词 `@claude` → `@pi`，触发标签 `claude` → `pi`，分支前缀 `claude/` → `pi/`；`bot_name` / `bot_id` 由 GitHub App 决定，待定。
@@ -207,7 +208,7 @@ pi 没有内置沙箱，也没有安全审查，但 `createBashTool()` 的 `spaw
 - ~~`allowed_non_write_users` 场景下是否直接禁用 bash？~~ 已决定：不禁用，改用 env 白名单加 bwrap 隔离，见"安全"第 3 项。
 - `bot_name` / `bot_id` 的默认值（取决于 GitHub App 的名称）。
 - ~~bash env 白名单的具体变量清单，以及放行输入的名称。~~ 已决定：清单见 `src/runner/env-allowlist.ts` 的 `BASH_ENV_ALLOWLIST`，放行输入为 `allowed_bash_env`，关闭开关为 `subprocess_isolation: false`。
-- `path_to_claude_code_executable` 删除还是改写（M4）。
+- ~~`path_to_claude_code_executable` 删除还是改写？~~ 已决定：删除，pi 在 action 进程内运行，没有可以替换的可执行文件；使用已删除的输入时运行失败，并指向 README 的迁移对照表。
 
 ## 参考
 

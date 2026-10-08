@@ -29,9 +29,8 @@ export const REDACTED = "[REDACTED]";
  *
  * Left out, so they stay secrets: inputs that carry credentials (API_KEY,
  * OVERRIDE_GITHUB_TOKEN, SSH_SIGNING_KEY), free-form pass-through arguments
- * and settings (PI_ARGS, CLAUDE_ARGS, INPUT_SETTINGS), URLs that may embed
- * credentials (INPUT_PLUGIN_MARKETPLACES), ALL_INPUTS (every input, api_key
- * included) and anything the run step copies from the workflow env.
+ * (PI_ARGS), ALL_INPUTS (every input, api_key included) and anything the run
+ * step copies from the workflow env.
  */
 export const ACTION_SETTINGS_ENV: readonly string[] = [
   "MODE",

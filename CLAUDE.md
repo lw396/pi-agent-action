@@ -16,7 +16,7 @@ This repository started as a copy of [anthropics/claude-code-action](https://git
 The rest of this file still describes the Claude-based code as it currently is. While porting:
 
 - Keep `src/github/*` and `src/mcp/*` structurally close to upstream so fixes can be cherry-picked from the `upstream` remote.
-- The pi executor goes in `src/runner/`. `base-action/` will be removed once nothing imports it, so don't add new code there.
+- The pi executor (the Runner) lives in `src/runner/`. Upstream's `base-action/` has been removed.
 - Don't use "Claude" or Anthropic branding in new names, defaults, or user-facing text.
 - Match upstream behaviour unless one of four reasons applies: `pi-capability`, `multi-provider`, `branding`, or `scope`. Any behaviour that differs from upstream must add or update a row in `docs/upstream-divergence.md` in the same change, with its reason category. Check that table before cherry-picking from upstream.
 - Domain terms are defined in `CONTEXT.md`; architectural decisions are in `docs/adr/`.
@@ -27,9 +27,9 @@ A GitHub Action that lets Claude respond to `@claude` mentions on issues/PRs (ta
 
 ## How It Runs
 
-Single entrypoint: `src/entrypoints/run.ts` orchestrates everything — prepare (auth, permissions, trigger check, branch/comment creation), install Claude Code CLI, execute Claude via `base-action/` functions (imported directly, not subprocess), then cleanup (update tracking comment, write step summary). SSH signing cleanup and token revocation are separate `always()` steps in `action.yml`.
+Single entrypoint: `src/entrypoints/run.ts` orchestrates everything — prepare (removed-input check, auth, permissions, trigger check, branch/comment creation), run pi in-process through the Runner (`src/runner/run-pi.ts`), then cleanup (update tracking comment, write step summary). SSH signing cleanup and token revocation are separate `always()` steps in `action.yml`.
 
-`base-action/` is the executor: it sets up auth and Claude Code settings, then runs Claude through the Agent SDK. Upstream also published it standalone as `@anthropic-ai/claude-code-base-action`; this repository does not, so its public API need not be preserved. It reads config from `INPUT_`-prefixed env vars (set by `action.yml`), not from action inputs directly.
+The Runner reads its config from env vars that `action.yml` sets from the inputs (`MODEL`, `PI_ARGS`, `INPUT_ALLOWED_TOOLS`, ...), not from action inputs directly. Claude-only inputs that were removed stay declared in `action.yml` as deprecated stubs so `src/entrypoints/removed-inputs.ts` can fail the run when a workflow still sets one; keep that list and the stubs in sync.
 
 ## Key Concepts
 

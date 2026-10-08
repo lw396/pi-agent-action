@@ -63,6 +63,25 @@ Each solution includes complete working examples, configuration details, and exp
 
 Having issues or questions? Check out our [Frequently Asked Questions](./docs/faq.md) for solutions to common problems and detailed explanations of Claude's capabilities and limitations.
 
+## Migrating from claude-code-action
+
+Inputs that only applied to Claude Code are removed. A workflow that still sets one fails, naming the input and what to use instead:
+
+| Removed input                                                                                                                                    | Use instead                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `anthropic_api_key`                                                                                                                              | `model: anthropic/<id>`, with the key as `ANTHROPIC_API_KEY` in the workflow `env:` or in `api_key`                                                                     |
+| `claude_code_oauth_token`                                                                                                                        | An API key for the model's provider, in the workflow `env:` or in `api_key`                                                                                             |
+| `anthropic_federation_rule_id`, `anthropic_organization_id`, `anthropic_service_account_id`, `anthropic_workspace_id`, `anthropic_oidc_audience` | Not supported: use an API key for the model's provider                                                                                                                  |
+| `use_bedrock`                                                                                                                                    | `model: amazon-bedrock/<id>`, with AWS credentials (e.g. `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, or `AWS_PROFILE`) in the workflow `env:`                      |
+| `use_vertex`                                                                                                                                     | `model: google-vertex/<id>`, with `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` and Application Default Credentials in the workflow `env:`                            |
+| `use_foundry`                                                                                                                                    | Not supported: pi has no Microsoft Foundry provider                                                                                                                     |
+| `claude_args`                                                                                                                                    | `model` for `--model`, `allowed_tools` / `disallowed_tools` for `--allowedTools` / `--disallowedTools`, `json_schema` for `--json-schema`, `pi_args` for pi's own flags |
+| `settings`                                                                                                                                       | Not supported: pi settings files are not read                                                                                                                           |
+| `plugins`, `plugin_marketplaces`                                                                                                                 | Not supported: pi has no Claude Code plugins                                                                                                                            |
+| `path_to_claude_code_executable`                                                                                                                 | Remove it: pi runs inside the action's own process, at the version the action pins                                                                                      |
+
+[docs/upstream-divergence.md](./docs/upstream-divergence.md) lists every other difference from claude-code-action.
+
 ## Contributing
 
 ### Setup
