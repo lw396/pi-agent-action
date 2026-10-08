@@ -1,7 +1,12 @@
 // Redaction by value (issue #13): environment values outside the bash env
-// allowlist count as secrets wherever they turn up, raw, base64 or URL-encoded.
+// allowlist count as secrets wherever they turn up, raw, base64 or URL-encoded,
+// except the action's own non-secret settings and existing paths.
 import { afterEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { delimiter } from "node:path";
 import {
+  ACTION_SETTINGS_ENV,
   collectSecretValues,
   redactSecretValues,
 } from "../src/github/utils/secret-values";
@@ -68,6 +73,49 @@ describe("redactSecretValues", () => {
       PWD: workspace,
     });
     expect(redactSecretValues(`cd ${workspace}`)).toBe(`cd ${workspace}`);
+  });
+
+  test("leaves the action's own non-secret settings alone", () => {
+    const prompt = "Review this pull request and summarise the changes.";
+    collectSecretValues({ PROMPT: prompt, MODEL: "opencode/gpt-6-luna" });
+    expect(redactSecretValues(`${prompt} (opencode/gpt-6-luna)`)).toBe(
+      `${prompt} (opencode/gpt-6-luna)`,
+    );
+  });
+
+  test("still redacts the action's secret settings", () => {
+    collectSecretValues({
+      API_KEY: SECRET,
+      OVERRIDE_GITHUB_TOKEN: "token-from-the-github-token-input",
+      // The serialized inputs, api_key and github_token included.
+      ALL_INPUTS: `{"api_key":"${SECRET}"}`,
+    });
+    expect(
+      redactSecretValues(`${SECRET} token-from-the-github-token-input`),
+    ).toBe("[REDACTED] [REDACTED]");
+  });
+
+  test("leaves values that are existing absolute paths, or lists of them, alone", () => {
+    const dir = import.meta.dir;
+    const list = [tmpdir(), process.cwd()].join(delimiter);
+    collectSecretValues({ RUNNER_TEMP: dir, SOME_PATH_LIST: list });
+    expect(redactSecretValues(`${dir} and ${list}`)).toBe(`${dir} and ${list}`);
+  });
+
+  test("redacts a path-shaped value that does not exist", () => {
+    const value = "/no/such/directory/a1b2c3d4";
+    collectSecretValues({ STRANGE_SECRET: value });
+    expect(redactSecretValues(value)).toBe("[REDACTED]");
+  });
+
+  test("lists only settings the run step sets", () => {
+    const metadata = readFileSync(
+      new URL("../action.yml", import.meta.url),
+      "utf8",
+    );
+    for (const name of ACTION_SETTINGS_ENV) {
+      expect(metadata).toContain(`        ${name}: \${{`);
+    }
   });
 
   test("redacts nothing until values are collected", () => {
