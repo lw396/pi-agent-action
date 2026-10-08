@@ -14,6 +14,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { setupPiSettings } from "./setup-pi-settings";
 import { isolatedBashTool } from "./bash-isolation";
+import { commentRedactionExtension } from "./comment-redaction";
 import { parsePiArgs } from "./pi-args";
 import { writeExecutionFile } from "./execution-file";
 import { mcpServerExtensions, type McpServers } from "./mcp-servers";
@@ -205,6 +206,7 @@ export async function runPi(
     settingsManager,
     extensionFactories: [
       toolPermissionsExtension(toolPermissions),
+      commentRedactionExtension(),
       ...(jsonSchema
         ? [structuredOutputExtension(jsonSchema, structuredOutput)]
         : []),

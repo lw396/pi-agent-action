@@ -1,3 +1,5 @@
+import { redactSecretValues } from "./secret-values";
+
 export function stripInvisibleCharacters(content: string): string {
   content = content.replace(/[\u200B\u200C\u200D\uFEFF]/g, "");
   content = content.replace(
@@ -86,6 +88,8 @@ export function sanitizeContent(content: string): string {
  * or a serialized JSON escape such as `\n`).
  */
 export function redactSecrets(content: string): string {
+  // Whole values first, so a known format inside one cannot split it.
+  content = redactSecretValues(content);
   content = redactGitHubTokens(content);
 
   // Anthropic API keys: sk-ant-...

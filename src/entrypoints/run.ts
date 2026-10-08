@@ -33,6 +33,7 @@ import { updateCommentLink } from "./update-comment-link";
 import { formatTurnsFromData } from "./format-turns";
 import type { ExecutionRecord } from "./format-turns";
 import { redactSecrets } from "../github/utils/sanitizer";
+import { collectSecretValues } from "../github/utils/secret-values";
 import { preparePrompt } from "../runner/prepare-prompt";
 import { runPi } from "../runner/run-pi";
 import { parseMcpConfig } from "../runner/mcp-servers";
@@ -69,6 +70,10 @@ async function writeStepSummary(executionFile: string): Promise<void> {
 }
 
 async function run() {
+  // Before anything changes the environment: every redactSecrets() call in
+  // this process, the Runner's included, redacts these values.
+  collectSecretValues(process.env);
+
   let githubToken: string | undefined;
   let commentId: number | undefined;
   let claudeBranch: string | undefined;

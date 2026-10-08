@@ -206,7 +206,7 @@ pi 没有内置沙箱，也没有安全审查，但 `createBashTool()` 的 `spaw
 - ~~是否支持 Codeberg、Forgejo 等非 GitHub 平台？~~ 已决定：不支持，见"非目标"。
 - ~~`allowed_non_write_users` 场景下是否直接禁用 bash？~~ 已决定：不禁用，改用 env 白名单加 bwrap 隔离，见"安全"第 3 项。
 - `bot_name` / `bot_id` 的默认值（取决于 GitHub App 的名称）。
-- ~~bash env 白名单的具体变量清单，以及放行输入的名称。~~ 已决定：清单见 `src/runner/bash-isolation.ts` 的 `BASH_ENV_ALLOWLIST`，放行输入为 `allowed_bash_env`，关闭开关为 `subprocess_isolation: false`。
+- ~~bash env 白名单的具体变量清单，以及放行输入的名称。~~ 已决定：清单见 `src/runner/env-allowlist.ts` 的 `BASH_ENV_ALLOWLIST`，放行输入为 `allowed_bash_env`，关闭开关为 `subprocess_isolation: false`。
 - `path_to_claude_code_executable` 删除还是改写（M4）。
 
 ## 参考

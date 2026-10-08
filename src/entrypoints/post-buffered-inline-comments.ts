@@ -12,6 +12,7 @@
 import { readFileSync } from "fs";
 import { createOctokit } from "../github/api/client";
 import { redactSecrets } from "../github/utils/sanitizer";
+import { collectSecretValues } from "../github/utils/secret-values";
 
 const BUFFER_PATH = "/tmp/inline-comments-buffer.jsonl";
 
@@ -145,6 +146,7 @@ async function postComment(
 }
 
 async function main() {
+  collectSecretValues(process.env);
   let raw: string;
   try {
     raw = readFileSync(BUFFER_PATH, "utf8");
