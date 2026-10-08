@@ -31,7 +31,7 @@ import { validateBranchName } from "../github/operations/branch";
 import { collectActionInputsPresence } from "./collect-inputs";
 import { updateCommentLink } from "./update-comment-link";
 import { formatTurnsFromData } from "./format-turns";
-import type { Turn } from "./format-turns";
+import type { ExecutionRecord } from "./format-turns";
 import { redactSecrets } from "../github/utils/sanitizer";
 import { preparePrompt } from "../runner/prepare-prompt";
 import { runPi } from "../runner/run-pi";
@@ -39,7 +39,7 @@ import { parseMcpConfig } from "../runner/mcp-servers";
 import { setExecutionFileOutputIfPresent } from "../runner/execution-file";
 
 /**
- * Write the step summary from Claude's execution output file.
+ * Write the step summary from the Runner's Execution file.
  */
 async function writeStepSummary(executionFile: string): Promise<void> {
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
@@ -47,15 +47,15 @@ async function writeStepSummary(executionFile: string): Promise<void> {
 
   try {
     const fileContent = readFileSync(executionFile, "utf-8");
-    const data: Turn[] = JSON.parse(fileContent);
+    const data: ExecutionRecord[] = JSON.parse(fileContent);
     const markdown = formatTurnsFromData(data);
     await appendFile(summaryFile, markdown);
-    console.log("Successfully formatted Claude Code report");
+    console.log("Successfully formatted pi Agent report");
   } catch (error) {
     console.error(`Failed to format output: ${error}`);
     // Fall back to raw JSON
     try {
-      let fallback = "## Claude Code Report (Raw Output)\n\n";
+      let fallback = "## pi Agent Report (Raw Output)\n\n";
       fallback +=
         "Failed to format output (please report). Here's the raw JSON:\n\n";
       fallback += "```json\n";

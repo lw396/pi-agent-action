@@ -3,12 +3,10 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import {
   formatTurnsFromData,
-  groupTurnsNaturally,
-  formatGroupedContent,
   detectContentType,
+  type ExecutionRecord,
   formatResultContent,
   formatToolWithResult,
-  type Turn,
   type ToolUse,
   type ToolResult,
 } from "../src/entrypoints/format-turns";
@@ -215,265 +213,6 @@ describe("formatToolWithResult", () => {
   });
 });
 
-describe("groupTurnsNaturally", () => {
-  test("groups system initialization", () => {
-    const data: Turn[] = [
-      {
-        type: "system",
-        subtype: "init",
-        tools: [{ name: "tool1" }, { name: "tool2" }],
-      },
-    ];
-
-    const result = groupTurnsNaturally(data);
-
-    expect(result).toHaveLength(1);
-    expect(result[0]?.type).toBe("system_init");
-    expect(result[0]?.tools_count).toBe(2);
-  });
-
-  test("groups assistant actions with tool calls", () => {
-    const data: Turn[] = [
-      {
-        type: "assistant",
-        message: {
-          content: [
-            { type: "text", text: "I'll help you" },
-            {
-              type: "tool_use",
-              id: "tool_123",
-              name: "read_file",
-              input: { file_path: "/test.txt" },
-            },
-          ],
-          usage: { input_tokens: 100, output_tokens: 50 },
-        },
-      },
-      {
-        type: "user",
-        message: {
-          content: [
-            {
-              type: "tool_result",
-              tool_use_id: "tool_123",
-              content: "file content",
-              is_error: false,
-            },
-          ],
-        },
-      },
-    ];
-
-    const result = groupTurnsNaturally(data);
-
-    expect(result).toHaveLength(1);
-    expect(result[0]?.type).toBe("assistant_action");
-    expect(result[0]?.text_parts).toEqual(["I'll help you"]);
-    expect(result[0]?.tool_calls).toHaveLength(1);
-    expect(result[0]?.tool_calls?.[0]?.tool_use.name).toBe("read_file");
-    expect(result[0]?.tool_calls?.[0]?.tool_result?.content).toBe(
-      "file content",
-    );
-    expect(result[0]?.usage).toEqual({ input_tokens: 100, output_tokens: 50 });
-  });
-
-  test("groups user messages", () => {
-    const data: Turn[] = [
-      {
-        type: "user",
-        message: {
-          content: [{ type: "text", text: "Please help me" }],
-        },
-      },
-    ];
-
-    const result = groupTurnsNaturally(data);
-
-    expect(result).toHaveLength(1);
-    expect(result[0]?.type).toBe("user_message");
-    expect(result[0]?.text_parts).toEqual(["Please help me"]);
-  });
-
-  test("groups final results", () => {
-    const data: Turn[] = [
-      {
-        type: "result",
-        cost_usd: 0.1234,
-        duration_ms: 5000,
-        result: "Task completed",
-      },
-    ];
-
-    const result = groupTurnsNaturally(data);
-
-    expect(result).toHaveLength(1);
-    expect(result[0]?.type).toBe("final_result");
-    expect(result[0]?.data).toEqual(data[0]!);
-  });
-});
-
-describe("formatGroupedContent", () => {
-  test("formats system initialization", () => {
-    const groupedContent = [
-      {
-        type: "system_init",
-        tools_count: 3,
-      },
-    ];
-
-    const result = formatGroupedContent(groupedContent);
-
-    expect(result).toContain("## Claude Code Report");
-    expect(result).toContain("## 🚀 System Initialization");
-    expect(result).toContain("**Available Tools:** 3 tools loaded");
-  });
-
-  test("formats assistant actions", () => {
-    const groupedContent = [
-      {
-        type: "assistant_action",
-        text_parts: ["I'll help you with that"],
-        tool_calls: [
-          {
-            tool_use: {
-              type: "tool_use",
-              name: "test_tool",
-              input: { param: "value" },
-            },
-            tool_result: {
-              type: "tool_result",
-              content: "result",
-              is_error: false,
-            },
-          },
-        ],
-        usage: { input_tokens: 100, output_tokens: 50 },
-      },
-    ];
-
-    const result = formatGroupedContent(groupedContent);
-
-    expect(result).toContain("I'll help you with that");
-    expect(result).toContain("### 🔧 `test_tool`");
-    expect(result).toContain("*Token usage: 100 input, 50 output*");
-  });
-
-  test("formats user messages", () => {
-    const groupedContent = [
-      {
-        type: "user_message",
-        text_parts: ["Help me please"],
-      },
-    ];
-
-    const result = formatGroupedContent(groupedContent);
-
-    expect(result).toContain("## 👤 User");
-    expect(result).toContain("Help me please");
-  });
-
-  test("formats final results", () => {
-    const groupedContent = [
-      {
-        type: "final_result",
-        data: {
-          type: "result",
-          cost_usd: 0.1234,
-          duration_ms: 5678,
-          result: "Success!",
-        } as Turn,
-      },
-    ];
-
-    const result = formatGroupedContent(groupedContent);
-
-    expect(result).toContain("## ✅ Final Result");
-    expect(result).toContain("Success!");
-    expect(result).toContain("**Cost:** $0.1234");
-    expect(result).toContain("**Duration:** 5.7s");
-  });
-});
-
-describe("formatTurnsFromData", () => {
-  test("handles empty data", () => {
-    const result = formatTurnsFromData([]);
-    expect(result).toBe("## Claude Code Report\n\n");
-  });
-
-  test("formats complete conversation", () => {
-    const data: Turn[] = [
-      {
-        type: "system",
-        subtype: "init",
-        tools: [{ name: "tool1" }],
-      },
-      {
-        type: "assistant",
-        message: {
-          content: [
-            { type: "text", text: "I'll help you" },
-            {
-              type: "tool_use",
-              id: "tool_123",
-              name: "read_file",
-              input: { file_path: "/test.txt" },
-            },
-          ],
-        },
-      },
-      {
-        type: "user",
-        message: {
-          content: [
-            {
-              type: "tool_result",
-              tool_use_id: "tool_123",
-              content: "file content",
-              is_error: false,
-            },
-          ],
-        },
-      },
-      {
-        type: "result",
-        cost_usd: 0.05,
-        duration_ms: 2000,
-        result: "Done",
-      },
-    ];
-
-    const result = formatTurnsFromData(data);
-
-    expect(result).toContain("## Claude Code Report");
-    expect(result).toContain("## 🚀 System Initialization");
-    expect(result).toContain("I'll help you");
-    expect(result).toContain("### 🔧 `read_file`");
-    expect(result).toContain("## ✅ Final Result");
-    expect(result).toContain("Done");
-  });
-});
-
-describe("integration tests", () => {
-  test("formats real conversation data correctly", () => {
-    // Load the sample JSON data
-    const jsonPath = join(__dirname, "fixtures", "sample-turns.json");
-    const expectedPath = join(
-      __dirname,
-      "fixtures",
-      "sample-turns-expected-output.md",
-    );
-
-    const jsonData = JSON.parse(readFileSync(jsonPath, "utf-8"));
-    const expectedOutput = readFileSync(expectedPath, "utf-8").trim();
-
-    // Format the data using our function
-    const actualOutput = formatTurnsFromData(jsonData).trim();
-
-    // Compare the outputs
-    expect(actualOutput).toBe(expectedOutput);
-  });
-});
-
 describe("detectContentType fallbacks", () => {
   test("falls back to text for malformed JSON objects", () => {
     // Looks like an object (starts with { ends with }) but does not parse.
@@ -514,85 +253,235 @@ describe("formatResultContent non-string input", () => {
   });
 });
 
-describe("system_other handling", () => {
-  test("groups a non-init system turn as system_other", () => {
-    const systemTurn: Turn = { type: "system", subtype: "some_other_subtype" };
-    const grouped = groupTurnsNaturally([systemTurn]);
-    expect(grouped).toHaveLength(1);
-    expect(grouped[0]?.type).toBe("system_other");
-    expect(grouped[0]?.data).toEqual(systemTurn);
+// Execution file records, shaped like the Runner's (src/runner/run-pi.ts).
+function assistantEnd(
+  content: unknown[],
+  extra: Record<string, unknown> = {},
+): ExecutionRecord {
+  return {
+    type: "message_end",
+    message: {
+      role: "assistant",
+      content,
+      usage: {
+        input: 100,
+        output: 20,
+        cacheRead: 300,
+        cacheWrite: 50,
+        totalTokens: 470,
+        cost: { total: 0.0012 },
+      },
+      stopReason: "stop",
+      ...extra,
+    },
+  };
+}
+
+function toolEnd(
+  toolCallId: string,
+  toolName: string,
+  text: string,
+  isError = false,
+): ExecutionRecord {
+  return {
+    type: "tool_execution_end",
+    toolCallId,
+    toolName,
+    result: { content: [{ type: "text", text }] },
+    isError,
+  };
+}
+
+function sessionStats(): ExecutionRecord {
+  return {
+    type: "session_stats",
+    sessionId: "session-1",
+    userMessages: 1,
+    assistantMessages: 3,
+    toolCalls: 2,
+    toolResults: 2,
+    totalMessages: 7,
+    tokens: {
+      input: 1506,
+      output: 21,
+      cacheRead: 2920,
+      cacheWrite: 1506,
+      total: 5953,
+    },
+    cost: 0.03471,
+    durationMs: 18760,
+  };
+}
+
+describe("formatTurnsFromData", () => {
+  test("renders only the heading for an empty session", () => {
+    expect(formatTurnsFromData([])).toBe("## pi Agent Report\n\n");
   });
 
-  test("renders a system_other group as a System Message section", () => {
-    const markdown = formatGroupedContent([
-      { type: "system_other", data: { type: "system" } as Turn },
+  test("renders an assistant response with its tool call, result and token usage", () => {
+    const result = formatTurnsFromData([
+      assistantEnd(
+        [
+          { type: "text", text: "Let me look at the file." },
+          {
+            type: "toolCall",
+            id: "call_1",
+            name: "read",
+            arguments: { path: "src/index.ts" },
+          },
+        ],
+        { stopReason: "toolUse" },
+      ),
+      {
+        type: "tool_execution_start",
+        toolCallId: "call_1",
+        toolName: "read",
+        args: { path: "src/index.ts" },
+      },
+      toolEnd("call_1", "read", "export {};"),
     ]);
-    expect(markdown).toContain("## ⚙️ System Message");
+
+    expect(result).toBe(
+      "## pi Agent Report\n\n" +
+        "Let me look at the file.\n\n" +
+        "### 🔧 `read`\n\n" +
+        '**Parameters:**\n```json\n{\n  "path": "src/index.ts"\n}\n```\n\n' +
+        "**→** export {};\n\n" +
+        "*Token usage: 450 input, 20 output*\n\n" +
+        "---\n\n",
+    );
   });
 
-  test("filters out thinking_tokens system messages", () => {
-    const data: Turn[] = [
-      { type: "system", subtype: "init", tools: [{ name: "tool1" }] },
-      { type: "system", subtype: "thinking_tokens" },
-      { type: "system", subtype: "thinking_tokens" },
-      { type: "system", subtype: "other_subtype" },
-    ];
+  test("renders a failed tool call with its error text", () => {
+    const result = formatTurnsFromData([
+      assistantEnd(
+        [
+          {
+            type: "toolCall",
+            id: "call_1",
+            name: "write",
+            arguments: { path: "x.txt", content: "a" },
+          },
+        ],
+        { stopReason: "toolUse" },
+      ),
+      toolEnd(
+        "call_1",
+        "write",
+        "write is not allowed: no allowed_tools rule permits it.",
+        true,
+      ),
+    ]);
 
-    const grouped = groupTurnsNaturally(data);
-
-    // Should have init and other_subtype, but not thinking_tokens
-    expect(grouped).toHaveLength(2);
-    expect(grouped[0]?.type).toBe("system_init");
-    expect(grouped[1]?.type).toBe("system_other");
-    expect(grouped[1]?.data?.subtype).toBe("other_subtype");
+    expect(result).toContain(
+      "❌ **Error:** `write is not allowed: no allowed_tools rule permits it.`",
+    );
   });
 
-  test("thinking_tokens does not appear in formatted output", () => {
-    const data: Turn[] = [
-      { type: "system", subtype: "init", tools: [] },
-      { type: "system", subtype: "thinking_tokens" },
-      { type: "system", subtype: "thinking_tokens" },
-    ];
+  test("ends with the final answer and the run's totals", () => {
+    const result = formatTurnsFromData([
+      assistantEnd([{ type: "text", text: "Removed the debug print." }]),
+      { type: "agent_settled" },
+      sessionStats(),
+    ]);
 
-    const result = formatTurnsFromData(data);
+    expect(result).toEndWith(
+      "---\n\n" +
+        "## ✅ Final Result\n\n" +
+        "Removed the debug print.\n\n" +
+        "**Turns:** 3 | **Tool calls:** 2 | " +
+        "**Tokens:** 5932 input (2920 cache read, 1506 cache write), 21 output | " +
+        "**Cost:** $0.0347 | **Duration:** 18.8s\n\n",
+    );
+  });
 
-    expect(result).not.toContain("thinking_tokens");
-    expect(result).toContain("## 🚀 System Initialization");
+  test("ends with the model's error when the run failed", () => {
+    const result = formatTurnsFromData([
+      assistantEnd([{ type: "text", text: "Checking the tests." }]),
+      assistantEnd([], {
+        stopReason: "error",
+        errorMessage: "429 rate limit exceeded",
+      }),
+      { type: "agent_settled" },
+      sessionStats(),
+    ]);
+
+    expect(result).toContain(
+      "## ❌ Error\n\n429 rate limit exceeded\n\n**Turns:** 3 |",
+    );
+    expect(result).not.toContain("Final Result");
+  });
+
+  test("starts with the tools the session began with, and leaves out the prompt", () => {
+    const tool = (name: string) => ({ name, description: "", parameters: {} });
+    const result = formatTurnsFromData([
+      { type: "session", version: 3, id: "session-1", cwd: "/work" },
+      { type: "agent_start" },
+      {
+        type: "message_end",
+        message: {
+          role: "system",
+          content: "",
+          toolsAdded: [tool("read"), tool("bash"), tool("edit")],
+        },
+      },
+      {
+        type: "message_end",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "The whole tag mode prompt" }],
+        },
+      },
+      assistantEnd([{ type: "text", text: "Done." }]),
+    ]);
+
+    expect(result).toStartWith(
+      "## pi Agent Report\n\n" +
+        "## 🚀 System Initialization\n\n" +
+        "**Available Tools:** 3 tools loaded\n\n" +
+        "---\n\n" +
+        "Done.\n\n",
+    );
+    expect(result).not.toContain("The whole tag mode prompt");
+  });
+});
+
+describe("integration tests", () => {
+  test("formats a recorded pi session correctly", () => {
+    const jsonPath = join(__dirname, "fixtures", "sample-pi-events.json");
+    const expectedPath = join(
+      __dirname,
+      "fixtures",
+      "sample-pi-events-expected-output.md",
+    );
+
+    const records = JSON.parse(readFileSync(jsonPath, "utf-8"));
+    const expectedOutput = readFileSync(expectedPath, "utf-8").trim();
+
+    expect(formatTurnsFromData(records).trim()).toBe(expectedOutput);
   });
 });
 
 describe("credential redaction", () => {
   test("redacts credentials embedded in tool results", () => {
-    const data: Turn[] = [
-      {
-        type: "assistant",
-        message: {
-          content: [
-            {
-              type: "tool_use",
-              id: "toolu_1",
-              name: "Bash",
-              input: { command: "cat .env" },
-            },
-          ],
-        },
-      },
-      {
-        type: "user",
-        message: {
-          content: [
-            {
-              type: "tool_result",
-              tool_use_id: "toolu_1",
-              content:
-                "GITHUB_TOKEN=ghs_xz7yzju2SZjGPa0dUNMAx0SH4xDOCS31LXQW\nAWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE",
-            },
-          ],
-        },
-      },
-    ];
-
-    const result = formatTurnsFromData(data);
+    const result = formatTurnsFromData([
+      assistantEnd(
+        [
+          {
+            type: "toolCall",
+            id: "call_1",
+            name: "bash",
+            arguments: { command: "cat .env" },
+          },
+        ],
+        { stopReason: "toolUse" },
+      ),
+      toolEnd(
+        "call_1",
+        "bash",
+        "GITHUB_TOKEN=ghs_xz7yzju2SZjGPa0dUNMAx0SH4xDOCS31LXQW\nAWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE",
+      ),
+    ]);
 
     expect(result).toContain("[REDACTED_GITHUB_TOKEN]");
     expect(result).toContain("[REDACTED_AWS_KEY_ID]");
@@ -600,28 +489,24 @@ describe("credential redaction", () => {
     expect(result).not.toContain("AKIAIOSFODNN7EXAMPLE");
   });
 
-  test("redacts credentials embedded in multi-line tool inputs", () => {
-    const data: Turn[] = [
-      {
-        type: "assistant",
-        message: {
-          content: [
-            {
-              type: "tool_use",
-              id: "toolu_2",
-              name: "Write",
-              input: {
-                file_path: ".env",
-                content:
-                  "AWS_ACCESS_KEY_ID=x\nGITHUB_TOKEN=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\n",
-              },
+  test("redacts credentials embedded in multi-line tool arguments", () => {
+    const result = formatTurnsFromData([
+      assistantEnd(
+        [
+          {
+            type: "toolCall",
+            id: "call_2",
+            name: "write",
+            arguments: {
+              path: ".env",
+              content:
+                "AWS_ACCESS_KEY_ID=x\nGITHUB_TOKEN=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\n",
             },
-          ],
-        },
-      },
-    ];
-
-    const result = formatTurnsFromData(data);
+          },
+        ],
+        { stopReason: "toolUse" },
+      ),
+    ]);
 
     expect(result).toContain("[REDACTED_GITHUB_TOKEN]");
     expect(result).not.toContain("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");
@@ -629,37 +514,53 @@ describe("credential redaction", () => {
 
   test("redacts credentials wrapped in ANSI color codes", () => {
     const key = "sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcdefgh";
-    const data: Turn[] = [
-      {
-        type: "assistant",
-        message: {
-          content: [
-            {
-              type: "tool_use",
-              id: "toolu_3",
-              name: "Bash",
-              input: { command: "node print-config.js" },
-            },
-          ],
-        },
-      },
-      {
-        type: "user",
-        message: {
-          content: [
-            {
-              type: "tool_result",
-              tool_use_id: "toolu_3",
-              content: `apiKey: \x1b[32m${key}\x1b[39m\nregion: us-east-1`,
-            },
-          ],
-        },
-      },
-    ];
-
-    const result = formatTurnsFromData(data);
+    const result = formatTurnsFromData([
+      assistantEnd(
+        [
+          {
+            type: "toolCall",
+            id: "call_3",
+            name: "bash",
+            arguments: { command: "node print-config.js" },
+          },
+        ],
+        { stopReason: "toolUse" },
+      ),
+      toolEnd(
+        "call_3",
+        "bash",
+        `apiKey: \x1b[32m${key}\x1b[39m\nregion: us-east-1`,
+      ),
+    ]);
 
     expect(result).toContain("[REDACTED_ANTHROPIC_KEY]");
     expect(result).not.toContain(key);
+  });
+
+  test("redacts credentials in a tool error and in the model's error", () => {
+    const key = `sk-proj-${"AbCdEfGhIjKlMnOpQrStUvWxYz0123456789".repeat(3)}`;
+    const result = formatTurnsFromData([
+      assistantEnd(
+        [
+          {
+            type: "toolCall",
+            id: "call_4",
+            name: "bash",
+            arguments: { command: "./deploy" },
+          },
+        ],
+        { stopReason: "toolUse" },
+      ),
+      toolEnd("call_4", "bash", `bad key ${key}`, true),
+      assistantEnd([], {
+        stopReason: "error",
+        errorMessage: `401 invalid api key ${key}`,
+      }),
+      sessionStats(),
+    ]);
+
+    expect(result).not.toContain(key);
+    expect(result).toContain("❌ **Error:** `bad key [REDACTED");
+    expect(result).toContain("401 invalid api key [REDACTED");
   });
 });

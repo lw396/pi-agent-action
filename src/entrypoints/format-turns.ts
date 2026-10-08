@@ -18,42 +18,23 @@ export type ToolResult = {
   is_error?: boolean;
 };
 
-export type ContentItem = {
+/**
+ * One record of the Runner's Execution file: pi's session header, a session
+ * event (`message_end`, `tool_execution_end`, `agent_settled`, ...), or the
+ * closing `session_stats` totals. See src/runner/run-pi.ts.
+ */
+export type ExecutionRecord = {
   type: string;
-  text?: string;
-  tool_use_id?: string;
-  content?: any;
-  is_error?: boolean;
-  name?: string;
-  input?: Record<string, any>;
-  id?: string;
-};
-
-export type Message = {
-  content: ContentItem[];
-  usage?: {
-    input_tokens?: number;
-    output_tokens?: number;
-  };
-};
-
-export type Turn = {
-  type: string;
-  subtype?: string;
-  message?: Message;
-  tools?: any[];
-  cost_usd?: number;
-  duration_ms?: number;
-  result?: string;
+  [key: string]: any;
 };
 
 export type GroupedContent = {
   type: string;
   tools_count?: number;
-  data?: Turn;
   text_parts?: string[];
   tool_calls?: { tool_use: ToolUse; tool_result?: ToolResult }[];
-  usage?: Record<string, number>;
+  usage?: Record<string, any>;
+  data?: ExecutionRecord;
 };
 
 export function detectContentType(content: any): string {
@@ -216,6 +197,15 @@ export function formatResultContent(content: any): string {
   }
 }
 
+/** A tool error as text. pi reports it as content blocks, like a result. */
+function errorText(content: any): string {
+  if (!Array.isArray(content)) return String(content);
+  return content
+    .filter((block: any) => block?.type === "text")
+    .map((block: any) => String(block?.text || ""))
+    .join("\n");
+}
+
 export function formatToolWithResult(
   toolUse: ToolUse,
   toolResult?: ToolResult,
@@ -238,7 +228,7 @@ export function formatToolWithResult(
     const isError = toolResult.is_error || false;
 
     if (isError) {
-      result += `❌ **Error:** \`${content}\`\n\n`;
+      result += `❌ **Error:** \`${errorText(content)}\`\n\n`;
     } else {
       result += formatResultContent(content);
     }
@@ -247,73 +237,58 @@ export function formatToolWithResult(
   return result;
 }
 
-export function groupTurnsNaturally(data: Turn[]): GroupedContent[] {
+export function groupTurnsNaturally(data: ExecutionRecord[]): GroupedContent[] {
   const groupedContent: GroupedContent[] = [];
   const toolResultsMap = new Map<string, ToolResult>();
 
-  // First pass: collect all tool results by tool_use_id
-  for (const turn of data) {
-    if (turn.type === "user") {
-      const content = turn.message?.content || [];
-      for (const item of content) {
-        if (item.type === "tool_result" && item.tool_use_id) {
-          toolResultsMap.set(item.tool_use_id, {
-            type: item.type,
-            tool_use_id: item.tool_use_id,
-            content: item.content,
-            is_error: item.is_error,
-          });
-        }
-      }
+  // First pass: collect all tool results by tool call id
+  for (const record of data) {
+    if (record.type === "tool_execution_end" && record.toolCallId) {
+      toolResultsMap.set(record.toolCallId, {
+        type: "tool_result",
+        tool_use_id: record.toolCallId,
+        content: record.result?.content,
+        is_error: record.isError,
+      });
     }
   }
 
-  // Second pass: process turns and group naturally
-  for (const turn of data) {
-    const turnType = turn.type || "unknown";
+  let finalText: string[] = [];
+  let failed = false;
+  let sawSystemMessage = false;
 
-    if (turnType === "system") {
-      const subtype = turn.subtype || "";
-      if (subtype === "init") {
-        const tools = turn.tools || [];
+  // Second pass: one group per finished message. message_end carries the
+  // final message; message_start and turn_end repeat it.
+  for (const record of data) {
+    if (record.type !== "message_end") continue;
+    const message = record.message || {};
+
+    if (message.role === "system") {
+      // The leading system message declares the tools the session starts
+      // with; later ones change the set mid-run.
+      if (!sawSystemMessage) {
         groupedContent.push({
           type: "system_init",
-          tools_count: tools.length,
-        });
-      } else if (subtype !== "thinking_tokens") {
-        // Skip thinking_tokens - internal progress events not meant for summary
-        groupedContent.push({
-          type: "system_other",
-          data: turn,
+          tools_count: (message.toolsAdded || []).length,
         });
       }
-    } else if (turnType === "assistant") {
-      const message = turn.message || { content: [] };
-      const content = message.content || [];
-      const usage = message.usage || {};
-
-      // Process content items
+      sawSystemMessage = true;
+    } else if (message.role === "assistant") {
       const textParts: string[] = [];
       const toolCalls: { tool_use: ToolUse; tool_result?: ToolResult }[] = [];
 
-      for (const item of content) {
-        const itemType = item.type || "";
-
-        if (itemType === "text") {
+      for (const item of message.content || []) {
+        if (item.type === "text") {
           textParts.push(item.text || "");
-        } else if (itemType === "tool_use") {
-          const toolUseId = item.id;
-          const toolResult = toolUseId
-            ? toolResultsMap.get(toolUseId)
-            : undefined;
+        } else if (item.type === "toolCall") {
           toolCalls.push({
             tool_use: {
               type: item.type,
               name: item.name,
-              input: item.input,
+              input: item.arguments,
               id: item.id,
             },
-            tool_result: toolResult,
+            tool_result: item.id ? toolResultsMap.get(item.id) : undefined,
           });
         }
       }
@@ -323,48 +298,46 @@ export function groupTurnsNaturally(data: Turn[]): GroupedContent[] {
           type: "assistant_action",
           text_parts: textParts,
           tool_calls: toolCalls,
-          usage: usage,
+          usage: message.usage,
         });
       }
-    } else if (turnType === "user") {
-      // Handle user messages that aren't tool results
-      const message = turn.message || { content: [] };
-      const content = message.content || [];
-      const textParts: string[] = [];
-
-      for (const item of content) {
-        if (item.type === "text") {
-          textParts.push(item.text || "");
-        }
-      }
-
-      if (textParts.length > 0) {
-        groupedContent.push({
-          type: "user_message",
-          text_parts: textParts,
-        });
-      }
-    } else if (turnType === "result") {
-      groupedContent.push({
-        type: "final_result",
-        data: turn,
-      });
+      // pi reports a provider error, after its own retries, as the stop
+      // reason of the last assistant message (see sessionFailure in run-pi).
+      failed =
+        message.stopReason === "error" || message.stopReason === "aborted";
+      finalText = failed
+        ? [
+            message.errorMessage ||
+              `the model stopped with ${message.stopReason}`,
+          ]
+        : textParts;
     }
+    // The prompt is the session's only user message and, as in Upstream's
+    // report, is left out; tool results are taken from tool_execution_end.
+  }
+
+  // The Runner ends the file with the run's totals, as Claude Code ended its
+  // output with a result message.
+  const stats = data.findLast((record) => record.type === "session_stats");
+  if (stats) {
+    groupedContent.push({
+      type: failed ? "final_error" : "final_result",
+      text_parts: finalText,
+      data: stats,
+    });
   }
 
   return groupedContent;
 }
 
 export function formatGroupedContent(groupedContent: GroupedContent[]): string {
-  let markdown = "## Claude Code Report\n\n";
+  let markdown = "## pi Agent Report\n\n";
 
   for (const item of groupedContent) {
     const itemType = item.type;
 
     if (itemType === "system_init") {
       markdown += `## 🚀 System Initialization\n\n**Available Tools:** ${item.tools_count} tools loaded\n\n---\n\n`;
-    } else if (itemType === "system_other") {
-      markdown += `## ⚙️ System Message\n\n${JSON.stringify(item.data, null, 2)}\n\n---\n\n`;
     } else if (itemType === "assistant_action") {
       // Add text content first (if any) - no header needed
       for (const text of item.text_parts || []) {
@@ -382,15 +355,9 @@ export function formatGroupedContent(groupedContent: GroupedContent[]): string {
       }
 
       // Add usage info if available
-      const usage = item.usage || {};
-      if (Object.keys(usage).length > 0) {
-        const inputTokens = usage.input_tokens || 0;
-        const cacheCreationTokens = usage.cache_creation_input_tokens || 0;
-        const cacheReadTokens = usage.cache_read_input_tokens || 0;
-        const totalInputTokens =
-          inputTokens + cacheCreationTokens + cacheReadTokens;
-        const outputTokens = usage.output_tokens || 0;
-        markdown += `*Token usage: ${totalInputTokens} input, ${outputTokens} output*\n\n`;
+      const usage = item.usage;
+      if (usage) {
+        markdown += `*Token usage: ${inputTokens(usage)} input, ${usage.output || 0} output*\n\n`;
       }
 
       // Only add separator if this section had content
@@ -400,32 +367,38 @@ export function formatGroupedContent(groupedContent: GroupedContent[]): string {
       ) {
         markdown += "---\n\n";
       }
-    } else if (itemType === "user_message") {
-      markdown += "## 👤 User\n\n";
+    } else if (itemType === "final_result" || itemType === "final_error") {
+      const stats = item.data || { type: "session_stats" };
+      const tokens = stats.tokens || {};
+      const cost = stats.cost || 0;
+      const duration = stats.durationMs || 0;
+
+      markdown +=
+        itemType === "final_error"
+          ? "## ❌ Error\n\n"
+          : "## ✅ Final Result\n\n";
       for (const text of item.text_parts || []) {
         if (text.trim()) {
           markdown += `${text}\n\n`;
         }
       }
-      markdown += "---\n\n";
-    } else if (itemType === "final_result") {
-      const data = item.data || {};
-      const cost = (data as any).total_cost_usd || (data as any).cost_usd || 0;
-      const duration = (data as any).duration_ms || 0;
-      const resultText = (data as any).result || "";
-
-      markdown += "## ✅ Final Result\n\n";
-      if (resultText) {
-        markdown += `${resultText}\n\n`;
-      }
-      markdown += `**Cost:** $${cost.toFixed(4)} | **Duration:** ${(duration / 1000).toFixed(1)}s\n\n`;
+      markdown +=
+        `**Turns:** ${stats.assistantMessages || 0} | ` +
+        `**Tool calls:** ${stats.toolCalls || 0} | ` +
+        `**Tokens:** ${inputTokens(tokens)} input (${tokens.cacheRead || 0} cache read, ${tokens.cacheWrite || 0} cache write), ${tokens.output || 0} output | ` +
+        `**Cost:** $${cost.toFixed(4)} | **Duration:** ${(duration / 1000).toFixed(1)}s\n\n`;
     }
   }
 
   return markdown;
 }
 
-export function formatTurnsFromData(data: Turn[]): string {
+/** Input tokens of a pi usage record, cached ones included. */
+function inputTokens(usage: Record<string, any>): number {
+  return (usage.input || 0) + (usage.cacheRead || 0) + (usage.cacheWrite || 0);
+}
+
+export function formatTurnsFromData(data: ExecutionRecord[]): string {
   // Group turns naturally
   const groupedContent = groupTurnsNaturally(data);
 
@@ -459,7 +432,7 @@ function main(): void {
   try {
     // Read the JSON file
     const fileContent = readFileSync(jsonFile, "utf-8");
-    const data: Turn[] = JSON.parse(fileContent);
+    const data: ExecutionRecord[] = JSON.parse(fileContent);
 
     // Print to stdout (so it can be captured by shell)
     console.log(formatTurnsFromData(data));

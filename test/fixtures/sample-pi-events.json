@@ -1,0 +1,1081 @@
+[
+  {
+    "type": "session",
+    "version": 3,
+    "id": "sample-session-id",
+    "timestamp": "2026-10-08T09:51:14.000Z",
+    "cwd": "/home/runner/work/example-repo/example-repo"
+  },
+  {
+    "type": "agent_start"
+  },
+  {
+    "type": "turn_start"
+  },
+  {
+    "type": "message_start",
+    "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi."
+      },
+      "timestamp": 1791453074000,
+      "toolsAdded": [
+        {
+          "name": "read",
+          "description": "",
+          "parameters": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        {
+          "name": "bash",
+          "description": "",
+          "parameters": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        {
+          "name": "edit",
+          "description": "",
+          "parameters": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        {
+          "name": "write",
+          "description": "",
+          "parameters": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        {
+          "name": "mcp__github_comment__update_comment",
+          "description": "",
+          "parameters": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        {
+          "name": "mcp__github_inline_comment__create_inline_comment",
+          "description": "",
+          "parameters": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      ]
+    }
+  },
+  {
+    "type": "message_end",
+    "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi."
+      },
+      "timestamp": 1791453074000,
+      "toolsAdded": [
+        {
+          "name": "read",
+          "description": "",
+          "parameters": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        {
+          "name": "bash",
+          "description": "",
+          "parameters": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        {
+          "name": "edit",
+          "description": "",
+          "parameters": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        {
+          "name": "write",
+          "description": "",
+          "parameters": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        {
+          "name": "mcp__github_comment__update_comment",
+          "description": "",
+          "parameters": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        {
+          "name": "mcp__github_inline_comment__create_inline_comment",
+          "description": "",
+          "parameters": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      ]
+    }
+  },
+  {
+    "type": "message_start",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "<formatted_context>... the tag mode prompt ...</formatted_context>"
+        }
+      ],
+      "timestamp": 1791453074000
+    }
+  },
+  {
+    "type": "message_end",
+    "message": {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "<formatted_context>... the tag mode prompt ...</formatted_context>"
+        }
+      ],
+      "timestamp": 1791453074000
+    }
+  },
+  {
+    "type": "message_start",
+    "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-responses",
+      "provider": "openai",
+      "model": "gpt-test-model",
+      "usage": {
+        "input": 100,
+        "output": 75,
+        "cacheRead": 50,
+        "cacheWrite": 0,
+        "totalTokens": 225,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.008675
+        }
+      },
+      "stopReason": "pending",
+      "timestamp": 1791453074000
+    }
+  },
+  {
+    "type": "message_end",
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "I'll help you with this task. Let me start by examining the file to understand what needs to be changed."
+        },
+        {
+          "type": "toolCall",
+          "id": "tool_call_1",
+          "name": "read",
+          "arguments": {
+            "path": "sample/file.py"
+          }
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "openai",
+      "model": "gpt-test-model",
+      "usage": {
+        "input": 100,
+        "output": 75,
+        "cacheRead": 50,
+        "cacheWrite": 0,
+        "totalTokens": 225,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.008675
+        }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1791453074000
+    }
+  },
+  {
+    "type": "tool_execution_start",
+    "toolCallId": "tool_call_1",
+    "toolName": "read",
+    "args": {
+      "path": "sample/file.py"
+    }
+  },
+  {
+    "type": "tool_execution_end",
+    "toolCallId": "tool_call_1",
+    "toolName": "read",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "def example_function():\n    print(\"Debug message\")  # This should be removed\n    return \"Hello World\"\n\nif __name__ == \"__main__\":\n    result = example_function()\n    print(result)"
+        }
+      ]
+    },
+    "isError": false
+  },
+  {
+    "type": "message_start",
+    "message": {
+      "role": "toolResult",
+      "toolCallId": "tool_call_1",
+      "toolName": "read",
+      "content": [
+        {
+          "type": "text",
+          "text": "def example_function():\n    print(\"Debug message\")  # This should be removed\n    return \"Hello World\"\n\nif __name__ == \"__main__\":\n    result = example_function()\n    print(result)"
+        }
+      ],
+      "isError": false,
+      "timestamp": 1791453074000
+    }
+  },
+  {
+    "type": "message_end",
+    "message": {
+      "role": "toolResult",
+      "toolCallId": "tool_call_1",
+      "toolName": "read",
+      "content": [
+        {
+          "type": "text",
+          "text": "def example_function():\n    print(\"Debug message\")  # This should be removed\n    return \"Hello World\"\n\nif __name__ == \"__main__\":\n    result = example_function()\n    print(result)"
+        }
+      ],
+      "isError": false,
+      "timestamp": 1791453074000
+    }
+  },
+  {
+    "type": "turn_end",
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "I'll help you with this task. Let me start by examining the file to understand what needs to be changed."
+        },
+        {
+          "type": "toolCall",
+          "id": "tool_call_1",
+          "name": "read",
+          "arguments": {
+            "path": "sample/file.py"
+          }
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "openai",
+      "model": "gpt-test-model",
+      "usage": {
+        "input": 100,
+        "output": 75,
+        "cacheRead": 50,
+        "cacheWrite": 0,
+        "totalTokens": 225,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.008675
+        }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1791453074000
+    },
+    "toolResults": [
+      {
+        "role": "toolResult",
+        "toolCallId": "tool_call_1",
+        "toolName": "read",
+        "content": [
+          {
+            "type": "text",
+            "text": "def example_function():\n    print(\"Debug message\")  # This should be removed\n    return \"Hello World\"\n\nif __name__ == \"__main__\":\n    result = example_function()\n    print(result)"
+          }
+        ],
+        "isError": false,
+        "timestamp": 1791453074000
+      }
+    ]
+  },
+  {
+    "type": "turn_start"
+  },
+  {
+    "type": "message_start",
+    "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-responses",
+      "provider": "openai",
+      "model": "gpt-test-model",
+      "usage": {
+        "input": 200,
+        "output": 50,
+        "cacheRead": 100,
+        "cacheWrite": 0,
+        "totalTokens": 350,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.008675
+        }
+      },
+      "stopReason": "pending",
+      "timestamp": 1791453074001
+    }
+  },
+  {
+    "type": "message_end",
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "I can see the debug print statement that needs to be removed. Let me fix this by editing the file."
+        },
+        {
+          "type": "toolCall",
+          "id": "tool_call_2",
+          "name": "edit",
+          "arguments": {
+            "path": "sample/file.py",
+            "edits": [
+              {
+                "oldText": "    print(\"Debug message\")  # This should be removed\n",
+                "newText": ""
+              }
+            ]
+          }
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "openai",
+      "model": "gpt-test-model",
+      "usage": {
+        "input": 200,
+        "output": 50,
+        "cacheRead": 100,
+        "cacheWrite": 0,
+        "totalTokens": 350,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.008675
+        }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1791453074001
+    }
+  },
+  {
+    "type": "tool_execution_start",
+    "toolCallId": "tool_call_2",
+    "toolName": "edit",
+    "args": {
+      "path": "sample/file.py",
+      "edits": [
+        {
+          "oldText": "    print(\"Debug message\")  # This should be removed\n",
+          "newText": ""
+        }
+      ]
+    }
+  },
+  {
+    "type": "tool_execution_end",
+    "toolCallId": "tool_call_2",
+    "toolName": "edit",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "File successfully edited. The debug print statement has been removed."
+        }
+      ]
+    },
+    "isError": false
+  },
+  {
+    "type": "message_start",
+    "message": {
+      "role": "toolResult",
+      "toolCallId": "tool_call_2",
+      "toolName": "edit",
+      "content": [
+        {
+          "type": "text",
+          "text": "File successfully edited. The debug print statement has been removed."
+        }
+      ],
+      "isError": false,
+      "timestamp": 1791453074001
+    }
+  },
+  {
+    "type": "message_end",
+    "message": {
+      "role": "toolResult",
+      "toolCallId": "tool_call_2",
+      "toolName": "edit",
+      "content": [
+        {
+          "type": "text",
+          "text": "File successfully edited. The debug print statement has been removed."
+        }
+      ],
+      "isError": false,
+      "timestamp": 1791453074001
+    }
+  },
+  {
+    "type": "turn_end",
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "I can see the debug print statement that needs to be removed. Let me fix this by editing the file."
+        },
+        {
+          "type": "toolCall",
+          "id": "tool_call_2",
+          "name": "edit",
+          "arguments": {
+            "path": "sample/file.py",
+            "edits": [
+              {
+                "oldText": "    print(\"Debug message\")  # This should be removed\n",
+                "newText": ""
+              }
+            ]
+          }
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "openai",
+      "model": "gpt-test-model",
+      "usage": {
+        "input": 200,
+        "output": 50,
+        "cacheRead": 100,
+        "cacheWrite": 0,
+        "totalTokens": 350,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.008675
+        }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1791453074001
+    },
+    "toolResults": [
+      {
+        "role": "toolResult",
+        "toolCallId": "tool_call_2",
+        "toolName": "edit",
+        "content": [
+          {
+            "type": "text",
+            "text": "File successfully edited. The debug print statement has been removed."
+          }
+        ],
+        "isError": false,
+        "timestamp": 1791453074001
+      }
+    ]
+  },
+  {
+    "type": "turn_start"
+  },
+  {
+    "type": "message_start",
+    "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-responses",
+      "provider": "openai",
+      "model": "gpt-test-model",
+      "usage": {
+        "input": 150,
+        "output": 80,
+        "cacheRead": 75,
+        "cacheWrite": 0,
+        "totalTokens": 305,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.008675
+        }
+      },
+      "stopReason": "pending",
+      "timestamp": 1791453074002
+    }
+  },
+  {
+    "type": "message_end",
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Perfect! I've successfully removed the debug print statement from the function. Let me now create a pull request comment to document this change."
+        },
+        {
+          "type": "toolCall",
+          "id": "tool_call_3",
+          "name": "mcp__github_inline_comment__create_inline_comment",
+          "arguments": {
+            "path": "sample/file.py",
+            "line": 2,
+            "body": "Removed debug print statement as requested."
+          }
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "openai",
+      "model": "gpt-test-model",
+      "usage": {
+        "input": 150,
+        "output": 80,
+        "cacheRead": 75,
+        "cacheWrite": 0,
+        "totalTokens": 305,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.008675
+        }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1791453074002
+    }
+  },
+  {
+    "type": "tool_execution_start",
+    "toolCallId": "tool_call_3",
+    "toolName": "mcp__github_inline_comment__create_inline_comment",
+    "args": {
+      "path": "sample/file.py",
+      "line": 2,
+      "body": "Removed debug print statement as requested."
+    }
+  },
+  {
+    "type": "tool_execution_end",
+    "toolCallId": "tool_call_3",
+    "toolName": "mcp__github_inline_comment__create_inline_comment",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Successfully posted review comment to PR #123"
+        }
+      ]
+    },
+    "isError": false
+  },
+  {
+    "type": "message_start",
+    "message": {
+      "role": "toolResult",
+      "toolCallId": "tool_call_3",
+      "toolName": "mcp__github_inline_comment__create_inline_comment",
+      "content": [
+        {
+          "type": "text",
+          "text": "Successfully posted review comment to PR #123"
+        }
+      ],
+      "isError": false,
+      "timestamp": 1791453074002
+    }
+  },
+  {
+    "type": "message_end",
+    "message": {
+      "role": "toolResult",
+      "toolCallId": "tool_call_3",
+      "toolName": "mcp__github_inline_comment__create_inline_comment",
+      "content": [
+        {
+          "type": "text",
+          "text": "Successfully posted review comment to PR #123"
+        }
+      ],
+      "isError": false,
+      "timestamp": 1791453074002
+    }
+  },
+  {
+    "type": "turn_end",
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Perfect! I've successfully removed the debug print statement from the function. Let me now create a pull request comment to document this change."
+        },
+        {
+          "type": "toolCall",
+          "id": "tool_call_3",
+          "name": "mcp__github_inline_comment__create_inline_comment",
+          "arguments": {
+            "path": "sample/file.py",
+            "line": 2,
+            "body": "Removed debug print statement as requested."
+          }
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "openai",
+      "model": "gpt-test-model",
+      "usage": {
+        "input": 150,
+        "output": 80,
+        "cacheRead": 75,
+        "cacheWrite": 0,
+        "totalTokens": 305,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.008675
+        }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1791453074002
+    },
+    "toolResults": [
+      {
+        "role": "toolResult",
+        "toolCallId": "tool_call_3",
+        "toolName": "mcp__github_inline_comment__create_inline_comment",
+        "content": [
+          {
+            "type": "text",
+            "text": "Successfully posted review comment to PR #123"
+          }
+        ],
+        "isError": false,
+        "timestamp": 1791453074002
+      }
+    ]
+  },
+  {
+    "type": "turn_start"
+  },
+  {
+    "type": "message_start",
+    "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-responses",
+      "provider": "openai",
+      "model": "gpt-test-model",
+      "usage": {
+        "input": 180,
+        "output": 60,
+        "cacheRead": 90,
+        "cacheWrite": 0,
+        "totalTokens": 330,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.008675
+        }
+      },
+      "stopReason": "pending",
+      "timestamp": 1791453074003
+    }
+  },
+  {
+    "type": "message_end",
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Great! I've successfully completed the requested task:\n\n1. ✅ Located the debug print statement in the file\n2. ✅ Removed the print statement while preserving the function logic\n3. ✅ Added a review comment documenting the change\n\nThe debug print statement has been removed as requested by the reviewers."
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "openai",
+      "model": "gpt-test-model",
+      "usage": {
+        "input": 180,
+        "output": 60,
+        "cacheRead": 90,
+        "cacheWrite": 0,
+        "totalTokens": 330,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.008675
+        }
+      },
+      "stopReason": "stop",
+      "timestamp": 1791453074003
+    }
+  },
+  {
+    "type": "turn_end",
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Great! I've successfully completed the requested task:\n\n1. ✅ Located the debug print statement in the file\n2. ✅ Removed the print statement while preserving the function logic\n3. ✅ Added a review comment documenting the change\n\nThe debug print statement has been removed as requested by the reviewers."
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "openai",
+      "model": "gpt-test-model",
+      "usage": {
+        "input": 180,
+        "output": 60,
+        "cacheRead": 90,
+        "cacheWrite": 0,
+        "totalTokens": 330,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.008675
+        }
+      },
+      "stopReason": "stop",
+      "timestamp": 1791453074003
+    },
+    "toolResults": []
+  },
+  {
+    "type": "agent_end",
+    "messages": [
+      {
+        "role": "system",
+        "content": "",
+        "sections": {
+          "preamble": "You are an expert coding assistant operating inside pi."
+        },
+        "timestamp": 1791453074000,
+        "toolsAdded": [
+          {
+            "name": "read",
+            "description": "",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          {
+            "name": "bash",
+            "description": "",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          {
+            "name": "edit",
+            "description": "",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          {
+            "name": "write",
+            "description": "",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          {
+            "name": "mcp__github_comment__update_comment",
+            "description": "",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          {
+            "name": "mcp__github_inline_comment__create_inline_comment",
+            "description": "",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "<formatted_context>... the tag mode prompt ...</formatted_context>"
+          }
+        ],
+        "timestamp": 1791453074000
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "I'll help you with this task. Let me start by examining the file to understand what needs to be changed."
+          },
+          {
+            "type": "toolCall",
+            "id": "tool_call_1",
+            "name": "read",
+            "arguments": {
+              "path": "sample/file.py"
+            }
+          }
+        ],
+        "api": "openai-responses",
+        "provider": "openai",
+        "model": "gpt-test-model",
+        "usage": {
+          "input": 100,
+          "output": 75,
+          "cacheRead": 50,
+          "cacheWrite": 0,
+          "totalTokens": 225,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0.008675
+          }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1791453074000
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "tool_call_1",
+        "toolName": "read",
+        "content": [
+          {
+            "type": "text",
+            "text": "def example_function():\n    print(\"Debug message\")  # This should be removed\n    return \"Hello World\"\n\nif __name__ == \"__main__\":\n    result = example_function()\n    print(result)"
+          }
+        ],
+        "isError": false,
+        "timestamp": 1791453074000
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "I can see the debug print statement that needs to be removed. Let me fix this by editing the file."
+          },
+          {
+            "type": "toolCall",
+            "id": "tool_call_2",
+            "name": "edit",
+            "arguments": {
+              "path": "sample/file.py",
+              "edits": [
+                {
+                  "oldText": "    print(\"Debug message\")  # This should be removed\n",
+                  "newText": ""
+                }
+              ]
+            }
+          }
+        ],
+        "api": "openai-responses",
+        "provider": "openai",
+        "model": "gpt-test-model",
+        "usage": {
+          "input": 200,
+          "output": 50,
+          "cacheRead": 100,
+          "cacheWrite": 0,
+          "totalTokens": 350,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0.008675
+          }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1791453074001
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "tool_call_2",
+        "toolName": "edit",
+        "content": [
+          {
+            "type": "text",
+            "text": "File successfully edited. The debug print statement has been removed."
+          }
+        ],
+        "isError": false,
+        "timestamp": 1791453074001
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Perfect! I've successfully removed the debug print statement from the function. Let me now create a pull request comment to document this change."
+          },
+          {
+            "type": "toolCall",
+            "id": "tool_call_3",
+            "name": "mcp__github_inline_comment__create_inline_comment",
+            "arguments": {
+              "path": "sample/file.py",
+              "line": 2,
+              "body": "Removed debug print statement as requested."
+            }
+          }
+        ],
+        "api": "openai-responses",
+        "provider": "openai",
+        "model": "gpt-test-model",
+        "usage": {
+          "input": 150,
+          "output": 80,
+          "cacheRead": 75,
+          "cacheWrite": 0,
+          "totalTokens": 305,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0.008675
+          }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1791453074002
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "tool_call_3",
+        "toolName": "mcp__github_inline_comment__create_inline_comment",
+        "content": [
+          {
+            "type": "text",
+            "text": "Successfully posted review comment to PR #123"
+          }
+        ],
+        "isError": false,
+        "timestamp": 1791453074002
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Great! I've successfully completed the requested task:\n\n1. ✅ Located the debug print statement in the file\n2. ✅ Removed the print statement while preserving the function logic\n3. ✅ Added a review comment documenting the change\n\nThe debug print statement has been removed as requested by the reviewers."
+          }
+        ],
+        "api": "openai-responses",
+        "provider": "openai",
+        "model": "gpt-test-model",
+        "usage": {
+          "input": 180,
+          "output": 60,
+          "cacheRead": 90,
+          "cacheWrite": 0,
+          "totalTokens": 330,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0.008675
+          }
+        },
+        "stopReason": "stop",
+        "timestamp": 1791453074003
+      }
+    ]
+  },
+  {
+    "type": "agent_settled"
+  },
+  {
+    "type": "session_stats",
+    "sessionId": "sample-session-id",
+    "userMessages": 1,
+    "assistantMessages": 4,
+    "toolCalls": 3,
+    "toolResults": 3,
+    "totalMessages": 9,
+    "tokens": {
+      "input": 630,
+      "output": 265,
+      "cacheRead": 315,
+      "cacheWrite": 0,
+      "total": 1210
+    },
+    "cost": 0.0347,
+    "durationMs": 18750
+  }
+]
