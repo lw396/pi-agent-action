@@ -57,13 +57,13 @@ The Runner reads its config from env vars that `action.yml` sets from the inputs
 
 ## Security hardening for GitHub Actions
 
-Workflow jobs in this repository that call Claude run with three protections. Keep them when you add or edit a workflow.
+Workflow jobs in this repository that run the agent (this action, published or as a local action with a `pi_args` input, or anything that mentions `@earendil-works/pi-coding-agent`) run with three protections. Keep them when you add or edit a workflow.
 
-1. **Egress-firewall runner.** The job has `runs-on: ubuntu-24.04-firewall`, a GitHub-hosted runner that filters the job's outbound network traffic. Do not move a job that calls Claude to another runner.
+1. **Egress-firewall runner.** The job has `runs-on: ubuntu-24.04-firewall`, a GitHub-hosted runner that filters the job's outbound network traffic. Do not move a job that runs the agent to another runner.
 2. **Network allow list.** `.github/egress-firewall.yaml` lists the hosts those jobs may reach, besides any that GitHub's firewall allows by default. Keep `mode: enforce`, which is what makes the firewall block the rest. Follow that file's header when you add a host.
-3. **Auto permission mode.** Every step that runs the Claude Code action (`uses: anthropics/claude-code-action`, or this repository's own `./` and `./base-action`) passes `--permission-mode auto` in `claude_args`. A tool call that needs permission and that the allowed tools do not cover then runs only if Claude Code's safety review passes it. Allow only the tools the job needs, and keep any `--disallowedTools` list a step has. Use `claude-opus-4-6` or a newer model: on an older one Claude Code falls back to its default permission mode.
+3. **Tool allowlist.** pi has no permission mode and no safety review: a tool call runs only if `allowed_tools` permits it (read-only tools always run). Allow only the tools the job needs, keep any `disallowed_tools` list a step has, and use `*` in a tool name only for MCP tools (`mcp__server__*`). A `*` anywhere else can name bash, edit and write at once.
 
-`.github/workflows/workflow-hardening.yml` fails when a job that runs the Claude Code action or mentions `ANTHROPIC_FEDERATION_RULE_ID` breaks protection 1 or 3, or when the allow list is missing, empty, not `mode: enforce`, or names a host with `*`. It cannot see a job that calls Claude another way, so check new workflows by hand too. If a job cannot meet protection 1 or 3, add it with the reason to the matching exemption table in `.github/scripts/check_workflow_hardening.py`. A job in `EXEMPT_FROM_AUTO_MODE` must set no permission mode at all. Do not skip or weaken the check.
+`.github/workflows/workflow-hardening.yml` fails when a job that runs the agent breaks protection 1 or 3, or when the allow list is missing, empty, not `mode: enforce`, or names a host with `*`. It cannot see a job that runs the agent another way, so check new workflows by hand too. If a job cannot meet protection 1 or 3, add it with the reason to the matching exemption table (`EXEMPT_FROM_FIREWALL_RUNNER`, `EXEMPT_FROM_TOOL_ALLOWLIST`) in `.github/scripts/check_workflow_hardening.py`. Do not skip or weaken the check. Its tests are in `.github/scripts/test_check_workflow_hardening.py`: `python3 -m unittest discover -s .github/scripts -p 'test_*.py'`.
 
 Keep each workflow's `permissions:` block minimal, and never print tokens or environment variables in workflow logs.
 

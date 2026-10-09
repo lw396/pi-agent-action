@@ -48,21 +48,21 @@ pi 在 2026-10-02 发布了 1.0 版本，内置了 MCP 支持（参见 `packages
 
 全仓库约 1.1 万行 TypeScript，大部分和模型无关。
 
-| 模块                                                                          | 处理方式                                                                                                                                                   | 工作量 |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| `src/github/*`、`src/modes/detector.ts`、触发检测、分支和评论创建             | 保留，默认值改为 `@pi`、`pi/`；`restore-config.ts` 的 `SENSITIVE_PATHS` 补上 `.pi`、`.agents`、`AGENTS.md`、`AGENTS.MD`、`AGENTS.override.md`、`CLAUDE.MD` | 小     |
-| `src/mcp/*`（5 个 MCP server）                                                | **原样复用**，`install-mcp-server.ts` 改为通过 SDK 注册（`direct` 暴露模式，不写配置文件）                                                                 | 小     |
-| `src/create-prompt/index.ts`                                                  | 基本保留；`update_claude_comment` 改名为 `update_comment`，批量替换                                                                                        | 小     |
-| `base-action/src/run-claude-sdk.ts`、`parse-sdk-options.ts`                   | 改为使用 pi SDK：`createAgentSession()` 加 `session.subscribe()`，通过 `extensionFactories` 加载 `createMcpExtension()`（见 ADR-0001）                     | 中     |
-| `src/entrypoints/format-turns.ts`                                             | 改为解析 pi 的事件（`message_end`、`tool_execution_*`、`agent_settled`）                                                                                   | 中     |
-| `src/modes/agent/parse-tools.ts`                                              | 改为解析新的 `allowed_tools` / `disallowed_tools` 输入（沿用 Claude 的 `Tool(pattern)` 语法），映射到 pi 工具名                                            | 小     |
-| 权限模型                                                                      | 新增 `tool_call` 拦截扩展，按 `allowed_tools` 规则检查 bash 命令；解析 shell 语法，拒绝 `&&`、`;`、`\|`、`$()` 等组合；替代 `--permission-mode`            | 中     |
-| structured output（`--json-schema`）                                          | pi 没有原生支持；新增 `json_schema` 输入，用 `submit_result` tool 接收结果，`agent_before_settle` 中最多提醒 2 次，仍未提交则失败                          | 中     |
-| `install-plugins.ts`、`setup-claude-code-settings.ts`、`workload-identity.ts` | 删除；`setup-claude-code-settings.ts` 改为 `src/runner/setup-pi-settings.ts` 空骨架（返回内存配置，暂不设置任何项）                                        | 小     |
-| `action.yml`                                                                  | 重新设计 Claude 专属输入（见下文）                                                                                                                         | 中     |
-| `.github/scripts/check_workflow_hardening.py`                                 | 去掉 `--permission-mode auto` 检查，改为检查工具白名单和 project trust                                                                                     | 小     |
-| bash 子进程隔离（`allowed_non_write_users`）                                  | `createBashTool()` 的 `spawnHook`：env 白名单加 bwrap（PID namespace、`no_new_privs`）；bwrap 不可用时只做 env 白名单（见 ADR-0002）                       | 中     |
-| 输出脱敏（`src/github/utils/sanitizer.ts`）                                   | 补上主流 provider 的格式正则；新增按值匹配（独立文件），评论类工具在 `tool_call` 扩展中改写参数                                                            | 小     |
+| 模块                                                                          | 处理方式                                                                                                                                                                                 | 工作量 |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| `src/github/*`、`src/modes/detector.ts`、触发检测、分支和评论创建             | 保留，默认值改为 `@pi`、`pi/`；`restore-config.ts` 的 `SENSITIVE_PATHS` 补上 `.pi`、`.agents`、`AGENTS.md`、`AGENTS.MD`、`AGENTS.override.md`、`CLAUDE.MD`                               | 小     |
+| `src/mcp/*`（5 个 MCP server）                                                | **原样复用**，`install-mcp-server.ts` 改为通过 SDK 注册（`direct` 暴露模式，不写配置文件）                                                                                               | 小     |
+| `src/create-prompt/index.ts`                                                  | 基本保留；`update_claude_comment` 改名为 `update_comment`，批量替换                                                                                                                      | 小     |
+| `base-action/src/run-claude-sdk.ts`、`parse-sdk-options.ts`                   | 改为使用 pi SDK：`createAgentSession()` 加 `session.subscribe()`，通过 `extensionFactories` 加载 `createMcpExtension()`（见 ADR-0001）                                                   | 中     |
+| `src/entrypoints/format-turns.ts`                                             | 改为解析 pi 的事件（`message_end`、`tool_execution_*`、`agent_settled`）                                                                                                                 | 中     |
+| `src/modes/agent/parse-tools.ts`                                              | 改为解析新的 `allowed_tools` / `disallowed_tools` 输入（沿用 Claude 的 `Tool(pattern)` 语法），映射到 pi 工具名                                                                          | 小     |
+| 权限模型                                                                      | 新增 `tool_call` 拦截扩展，按 `allowed_tools` 规则检查 bash 命令；解析 shell 语法，拒绝 `&&`、`;`、`\|`、`$()` 等组合；替代 `--permission-mode`                                          | 中     |
+| structured output（`--json-schema`）                                          | pi 没有原生支持；新增 `json_schema` 输入，用 `submit_result` tool 接收结果，`agent_before_settle` 中最多提醒 2 次，仍未提交则失败                                                        | 中     |
+| `install-plugins.ts`、`setup-claude-code-settings.ts`、`workload-identity.ts` | 删除；`setup-claude-code-settings.ts` 改为 `src/runner/setup-pi-settings.ts` 空骨架（返回内存配置，暂不设置任何项）                                                                      | 小     |
+| `action.yml`                                                                  | 重新设计 Claude 专属输入（见下文）                                                                                                                                                       | 中     |
+| `.github/scripts/check_workflow_hardening.py`                                 | 去掉 `--permission-mode auto` 检查，改为检查工具白名单（已完成，#15）。project trust 不用检查：`settings` 输入已删除，Runner 也不读取仓库的 `.pi/settings.json`，workflow 没有办法设置它 | 小     |
+| bash 子进程隔离（`allowed_non_write_users`）                                  | `createBashTool()` 的 `spawnHook`：env 白名单加 bwrap（PID namespace、`no_new_privs`）；bwrap 不可用时只做 env 白名单（见 ADR-0002）                                                     | 中     |
+| 输出脱敏（`src/github/utils/sanitizer.ts`）                                   | 补上主流 provider 的格式正则；新增按值匹配（独立文件），评论类工具在 `tool_call` 扩展中改写参数                                                                                          | 小     |
 
 **估算**：可用版本约 1 周，功能基本对等约 2 周。
 
@@ -189,7 +189,7 @@ pi 没有内置沙箱，也没有安全审查，但 `createBashTool()` 的 `spaw
 2. **fork PR**：来自 fork 的 PR 拿不到 secret，所以保留"仅同仓库 PR 才运行"的 `if` 条件，fork PR 跳过集成测试。
 3. **runner 与加固检查**：确认 `ubuntu-24.04-firewall` 是否可用。
    - 如果不可用，要么改用其他方式限制出站流量，要么把相关 job 连同原因写进 `check_workflow_hardening.py` 的豁免表。不能直接关闭检查。
-   - 同时把加固检查的识别规则从 Claude 改为 pi（M3/M4）。
+   - 加固检查的识别规则已从 Claude 改为 pi（#15）。
 4. **成本控制**：集成测试使用低价模型，限制最大轮数。必要时用 `paths` 过滤，只在执行器、MCP 或 `action.yml` 发生变化时运行。
 
 ## 里程碑

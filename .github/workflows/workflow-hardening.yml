@@ -1,6 +1,6 @@
-# Fails when a workflow job that calls Claude lacks its security settings.
+# Fails when a workflow job that runs the agent lacks its security settings.
 # The rules are in CLAUDE.md, "Security hardening for GitHub Actions".
-name: Security check for workflows that call Claude
+name: Security check for workflows that run the agent
 
 on:
   pull_request:
@@ -19,5 +19,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Check security settings of workflows that call Claude
+      - name: Test the security check
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+
+      - name: Check security settings of workflows that run the agent
         run: python3 .github/scripts/check_workflow_hardening.py
