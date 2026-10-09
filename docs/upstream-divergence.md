@@ -297,6 +297,14 @@
 - **本仓库**：删除，没有 `lw396/pi-agent-action/agent-approval-check`
 - **说明**：它不调用 agent，与执行引擎无关。需要它的 workflow 继续引用上游的子 action 即可；把 pi 的提交身份加进它的 `agent_emails` / `agent_logins`
 
+#### 自建 GitHub App 的创建工具
+
+`scope` · 用户可见：否
+
+- **上游**：提供 `github-app-manifest.json` 和 `docs/create-app.html`，用 GitHub 的 manifest flow 一键创建配置好权限的自建 App
+- **本仓库**：两个文件都删除；`docs/setup.md` 用文字列出建 App 时每一项怎么填，并附上同样设置的 manifest JSON。manifest 不订阅事件（上游订阅 5 个），因为 webhook 未启用，订阅不生效
+- **说明**：上游的 manifest 在 JSON 文件和页面中各有一份，页面本身满是 Claude 品牌；手动创建只需勾选几个权限。不影响 workflow：自建 App 的 token 照常通过 `github_token` 传入
+
 #### workflow 加固检查
 
 `pi-capability` · 用户可见：否

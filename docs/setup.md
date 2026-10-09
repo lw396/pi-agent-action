@@ -1,126 +1,96 @@
 # Setup Guide
 
-## Manual Setup (Direct API)
+## Manual Setup
 
 **Requirements**: You must be a repository admin to complete these steps.
 
-1. Install the Claude GitHub app to your repository: https://github.com/apps/claude
-2. Add authentication to your repository secrets ([Learn how to use secrets in GitHub Actions](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions)):
-   - Either `ANTHROPIC_API_KEY` for API key authentication
-   - Or `CLAUDE_CODE_OAUTH_TOKEN` for OAuth token authentication (Pro and Max users can generate this by running `claude setup-token` locally)
-3. Copy the workflow file from [`examples/claude.yml`](../examples/claude.yml) into your repository's `.github/workflows/`
+1. Install the pi-agent-action GitHub app to your repository: https://github.com/apps/pi-agent-action
+2. Pick a model and add its provider's credentials to your repository secrets ([Learn how to use secrets in GitHub Actions](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions)); see [Model Providers](#model-providers) below
+3. Add a workflow file to your repository's `.github/workflows/`, starting from the [Quickstart](../README.md#quickstart). To authenticate as the app, grant the job `id-token: write` and leave `github_token` unset: the action exchanges the workflow's GitHub OIDC token for a token of the app
 
-> Don't want to store a static API key at all? See [Workload Identity Federation](#workload-identity-federation) below.
+## Model Providers
 
-## Workload Identity Federation
+The action runs any model pi supports, so you are not tied to one API. Set the `model` input to `<provider>/<model-id>` and pass the provider's credentials in the workflow `env:`, under the variable name pi reads for that provider. For providers that use a single API key, the `api_key` input works too.
 
-Workload Identity Federation (WIF) lets the action authenticate to the Claude API by exchanging the workflow's GitHub Actions OIDC token for a short-lived Anthropic access token — no `ANTHROPIC_API_KEY` secret to create, store, or rotate.
+| Provider           | `model`                     | Credentials in `env:`                                                                                                  |
+| ------------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Anthropic (Claude) | `anthropic/<model-id>`      | `ANTHROPIC_API_KEY`                                                                                                    |
+| OpenAI             | `openai/<model-id>`         | `OPENAI_API_KEY`                                                                                                       |
+| Google Gemini      | `google/<model-id>`         | `GEMINI_API_KEY`                                                                                                       |
+| OpenRouter         | `openrouter/<model-id>`     | `OPENROUTER_API_KEY`                                                                                                   |
+| OpenCode           | `opencode/<model-id>`       | `OPENCODE_API_KEY`                                                                                                     |
+| Amazon Bedrock     | `amazon-bedrock/<model-id>` | AWS credentials (`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, or `AWS_PROFILE`) and `AWS_REGION`                   |
+| Google Vertex AI   | `google-vertex/<model-id>`  | `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` and Application Default Credentials (`GOOGLE_APPLICATION_CREDENTIALS`) |
 
-### One-time setup in the Claude Console
+Other providers (DeepSeek, Mistral, xAI, Groq, Azure OpenAI, ...) follow the same pattern; see the [pi documentation](https://github.com/earendil-works/pi) for the full list and their variable names.
 
-You need admin access to your Anthropic organization (Console → **Settings → Workload identity**):
-
-1. **Register an issuer** for GitHub Actions with issuer URL `https://token.actions.githubusercontent.com` (JWKS source: `discovery`).
-2. **Create a service account** (Settings → Service accounts) and add it to the workspace it should act in. Note the `svac_...` ID.
-3. **Create a federation rule** targeting that service account, matched to your repository's OIDC claims (for example a subject prefix of `repo:your-org/your-repo:`). Note the `fdrl_...` rule ID.
-
-See the [Workload Identity Federation documentation](https://platform.claude.com/docs/en/manage-claude/workload-identity-federation) for full details.
-
-### Workflow configuration
+For example, with Claude:
 
 ```yaml
-jobs:
-  claude-response:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      id-token: write # required: used to fetch the GitHub OIDC token
-    steps:
-      - uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_federation_rule_id: fdrl_xxxxxxxxxxxx
-          anthropic_organization_id: 00000000-0000-0000-0000-000000000000
-          anthropic_service_account_id: svac_xxxxxxxxxxxx
-          # Optional when the federation rule targets a single workspace:
-          anthropic_workspace_id: wrkspc_xxxxxxxxxxxx
+- uses: lw396/pi-agent-action@main
+  with:
+    model: anthropic/<model-id>
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-These values are identifiers, not credentials, so they can live directly in the workflow file (or in repository variables).
-
-Notes:
-
-- The workflow must grant `id-token: write` permission so the action can fetch a GitHub OIDC token. The default GitHub App authentication path already requires this permission.
-- Do not set `anthropic_api_key` or `claude_code_oauth_token` alongside the federation inputs — a static credential takes precedence and federation will not be used.
-- The GitHub OIDC token is requested with audience `https://api.anthropic.com` by default, so set the federation rule's expected audience to that value (or leave the rule's audience unmatched). Use `anthropic_oidc_audience` only if your rule expects a different audience.
-- Inline comment classification (`classify_inline_comments`) currently requires `anthropic_api_key`; with federation it is skipped and unconfirmed inline comments are posted directly.
+Switching providers only changes `model` and the variable in `env:`; the rest of the workflow stays the same.
 
 ## Using a Custom GitHub App
 
-If you prefer not to install the official Claude app, you can create your own GitHub App to use with this action. This gives you complete control over permissions and access.
+If you prefer not to install the [pi-agent-action app](https://github.com/apps/pi-agent-action), you can create your own GitHub App and pass its token to the action. This gives you complete control over permissions and access.
 
 **When you may want to use a custom GitHub App:**
 
-- You need more restrictive permissions than the official app
+- You need more restrictive permissions than the pi-agent-action app
 - Organization policies prevent installing third-party apps
-- You're using AWS Bedrock or Google Vertex AI
 
-### Option 1: Quick Setup with App Manifest (Recommended)
-
-The fastest way to create a custom GitHub App is using our pre-configured manifest. This ensures all permissions are correctly set up with a single click.
-
-**Steps:**
-
-1. **Create the app:**
-
-   **🚀 [Download the Quick Setup Tool](./create-app.html)** (Right-click → "Save Link As" or "Download Linked File")
-
-   After downloading, open `create-app.html` in your web browser:
-
-   - **For Personal Accounts:** Click the "Create App for Personal Account" button
-   - **For Organizations:** Enter your organization name and click "Create App for Organization"
-
-   The tool will automatically configure all required permissions and submit the manifest.
-
-   Alternatively, you can use the manifest file directly:
-
-   - Use the [`github-app-manifest.json`](../github-app-manifest.json) file from this repository
-   - Visit https://github.com/settings/apps/new (for personal) or your organization's app settings
-   - Look for the "Create from manifest" option and paste the JSON content
-
-2. **Complete the creation flow:**
-
-   - GitHub will show you a preview of the app configuration
-   - Confirm the app name (you can customize it)
-   - Click "Create GitHub App"
-   - The app will be created with all required permissions automatically configured
-
-3. **Generate and download a private key:**
-
-   - After creating the app, you'll be redirected to the app settings
-   - Scroll down to "Private keys"
-   - Click "Generate a private key"
-   - Download the `.pem` file (keep this secure!)
-
-4. **Continue with installation** - Skip to step 3 in the manual setup below to install the app and configure your workflow.
-
-### Option 2: Manual Setup
-
-If you prefer to configure the app manually or need custom permissions:
+### Setup
 
 1. **Create a new GitHub App:**
 
-   - Go to https://github.com/settings/apps (for personal apps) or your organization's settings
-   - Click "New GitHub App"
-   - Configure the app with these minimum permissions:
-     - **Repository permissions:**
-       - Contents: Read & Write
-       - Issues: Read & Write
-       - Pull requests: Read & Write
-     - **Account permissions:** None required
-   - Set "Where can this GitHub App be installed?" to your preference
-   - Create the app
+   - Go to https://github.com/settings/apps/new (for a personal account) or your organization's Settings → Developer settings → GitHub Apps → New GitHub App
+   - **GitHub App name:** any name; it becomes the app's bot name (`<name>[bot]`) on comments and commits
+   - **Homepage URL:** any URL, e.g. your repository
+   - **Webhook:** uncheck "Active". The action does not receive events; your workflow triggers it
+   - **Callback URL** and **Request user authorization (OAuth) during installation:** leave empty and unchecked
+   - **Repository permissions:**
+     - Contents: Read and write
+     - Issues: Read and write
+     - Pull requests: Read and write
+     - Actions: Read-only (only needed for the CI tools, `additional_permissions: actions: read`)
+     - Metadata: Read-only (selected automatically)
+   - Leave every other permission at "No access", including Workflows: the agent cannot change files under `.github/workflows/`
+   - **Organization and account permissions:** none
+   - **Subscribe to events:** none
+   - **Where can this GitHub App be installed?** "Only on this account" is enough for your own repositories
+   - Click "Create GitHub App"
+
+   The same settings as a [GitHub App manifest](https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest), for tools that register apps from one:
+
+   ```json
+   {
+     "name": "pi-agent-action custom app",
+     "description": "Custom GitHub App for pi-agent-action",
+     "url": "https://github.com/lw396/pi-agent-action",
+     "hook_attributes": {
+       "url": "https://example.com/github/webhook",
+       "active": false
+     },
+     "redirect_url": "https://github.com/settings/apps/new",
+     "callback_urls": [],
+     "setup_url": "https://github.com/lw396/pi-agent-action/blob/main/docs/setup.md",
+     "public": false,
+     "default_permissions": {
+       "contents": "write",
+       "issues": "write",
+       "pull_requests": "write",
+       "actions": "read",
+       "metadata": "read"
+     },
+     "default_events": []
+   }
+   ```
 
 2. **Generate and download a private key:**
 
@@ -132,7 +102,7 @@ If you prefer to configure the app manually or need custom permissions:
 
    - Go to the app's settings page
    - Click "Install App"
-   - Select the repositories where you want to use Claude
+   - Select the repositories where you want to use the action
 
 4. **Add the app credentials to your repository secrets:**
 
@@ -144,30 +114,34 @@ If you prefer to configure the app manually or need custom permissions:
 5. **Update your workflow to use the custom app:**
 
    ```yaml
-   name: Claude with Custom App
+   name: pi with Custom App
    on:
      issue_comment:
        types: [created]
      # ... other triggers
 
    jobs:
-     claude-response:
+     pi:
        runs-on: ubuntu-latest
        steps:
          # Generate a token from your custom app
          - name: Generate GitHub App token
            id: app-token
-           uses: actions/create-github-app-token@v1
+           uses: actions/create-github-app-token@v2
            with:
              app-id: ${{ secrets.APP_ID }}
              private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
-         # Use Claude with your custom app's token
-         - uses: anthropics/claude-code-action@v1
+         - uses: actions/checkout@v6
+
+         # Use the action with your custom app's token
+         - uses: lw396/pi-agent-action@main
            with:
-             anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+             model: openai/<model-id>
              github_token: ${{ steps.app-token.outputs.token }}
              # ... other configuration
+           env:
+             OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
    ```
 
 **Important notes:**
@@ -181,33 +155,36 @@ For more information on creating GitHub Apps, see the [GitHub documentation](htt
 
 **⚠️ IMPORTANT: Never commit API keys directly to your repository! Always use GitHub Actions secrets.**
 
-To securely use your Anthropic API key:
+To securely use your provider's API key (Anthropic in this example):
 
 1. Add your API key as a repository secret:
 
    - Go to your repository's Settings
    - Navigate to "Secrets and variables" → "Actions"
    - Click "New repository secret"
-   - Name it `ANTHROPIC_API_KEY`
+   - Name it after the variable pi reads for your provider, e.g. `ANTHROPIC_API_KEY`
    - Paste your API key as the value
 
 2. Reference the secret in your workflow:
    ```yaml
-   anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+   env:
+     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
    ```
 
 **Never do this:**
 
 ```yaml
 # ❌ WRONG - Exposes your API key
-anthropic_api_key: "sk-ant-..."
+env:
+  ANTHROPIC_API_KEY: "sk-ant-..."
 ```
 
 **Always do this:**
 
 ```yaml
 # ✅ CORRECT - Uses GitHub secrets
-anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+env:
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
 This applies to all sensitive values including API keys, access tokens, and credentials.
@@ -218,14 +195,12 @@ We also recommend that you always use short-lived tokens when possible
 1. Go to your repository's Settings
 2. Click on "Secrets and variables" → "Actions"
 3. Click "New repository secret"
-4. For authentication, choose one:
-   - API Key: Name: `ANTHROPIC_API_KEY`, Value: Your Anthropic API key (starting with `sk-ant-`)
-   - OAuth Token: Name: `CLAUDE_CODE_OAUTH_TOKEN`, Value: Your Claude Code OAuth token (Pro and Max users can generate this by running `claude setup-token` locally)
+4. Name: the variable pi reads for your provider (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, ...; see [Model Providers](#model-providers)); Value: your API key
 5. Click "Add secret"
 
 ### Best Practices for Authentication
 
-1. ✅ Always use `${{ secrets.ANTHROPIC_API_KEY }}` or `${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}` in workflows
+1. ✅ Always pass keys as `${{ secrets.<NAME> }}` in workflows, through `env:` or the `api_key` input
 2. ✅ Never commit API keys or tokens to version control
 3. ✅ Regularly rotate your API keys and tokens
 4. ✅ Use environment secrets for organization-wide access
