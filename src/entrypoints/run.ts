@@ -28,7 +28,6 @@ import { prepareAgentMode } from "../modes/agent";
 import { checkContainsTrigger } from "../github/validation/trigger";
 import { restoreConfigFromBase } from "../github/operations/restore-config";
 import { validateBranchName } from "../github/operations/branch";
-import { collectActionInputsPresence } from "./collect-inputs";
 import { assertNoRemovedInputs } from "./removed-inputs";
 import { updateCommentLink } from "./update-comment-link";
 import { formatTurnsFromData } from "./format-turns";
@@ -94,7 +93,6 @@ async function run() {
     assertNoRemovedInputs(process.env.ALL_INPUTS);
     // Fails on a tool rule the Runner cannot enforce, before anything is set up.
     const runnerInputs = readRunnerInputs(process.env);
-    const actionInputsPresent = collectActionInputsPresence();
     context = parseGitHubContext();
     const modeName = detectMode(context);
     console.log(
@@ -172,7 +170,6 @@ async function run() {
     prepareCompleted = true;
 
     // Phase 2: Run pi through the Runner
-    process.env.INPUT_ACTION_INPUTS_PRESENT = actionInputsPresent;
 
     // On PRs, .pi/, .claude/, AGENTS.md and the like in the checkout are
     // attacker-controlled. Restore them from the base branch before pi reads them.
