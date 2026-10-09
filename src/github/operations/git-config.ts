@@ -61,7 +61,8 @@ export async function configureGitAuth(
  * actions/checkout < v6 stored the header directly in the repo-local config,
  * where `git config --unset-all` removes it. Since v6.0.0 (backported to
  * v5.0.1 and v4.3.1) the header is written to a separate file under
- * RUNNER_TEMP that the repo config pulls in via `include.path`; `--unset-all`
+ * RUNNER_TEMP that the repo config pulls in via `include.path` (v6.0.2 uses
+ * `includeIf.gitdir:<path>.path` entries instead); `--unset-all`
  * on the local config cannot touch an include-provided value, so the removal
  * was a silent no-op and the checkout credential (typically the workflow
  * GITHUB_TOKEN) stayed usable by git for the rest of the job. Clear the
@@ -86,11 +87,12 @@ export async function replaceCheckoutCredentials(
     // No extraheader in the local config (expected on the v6+ include layout).
   }
   try {
-    const includePaths =
-      await $`git config --local --get-all include.path`.text();
-    for (const includePath of includePaths.split("\n")) {
-      const path = includePath.trim();
-      if (!path) continue;
+    // Each line is "<key> <path>", for include.path and includeIf.<cond>.path.
+    const includeEntries =
+      await $`git config --local --get-regexp ${"^include(if\\..+)?\\.path$"}`.text();
+    for (const entry of includeEntries.split("\n")) {
+      const path = entry.slice(entry.indexOf(" ") + 1).trim();
+      if (!entry.includes(" ") || !path) continue;
       try {
         await $`git config --file ${path} --unset-all ${extraheaderKey}`;
         removedHeader = true;

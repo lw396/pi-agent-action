@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { execFileSync } from "child_process";
-import { mkdtempSync, rmSync, statSync } from "fs";
+import { mkdtempSync, realpathSync, rmSync, statSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import {
@@ -45,6 +45,15 @@ function runGit(args: string[], cwd?: string): string {
 function gitConfigGetAll(key: string): string {
   try {
     return runGit(["config", "--local", "--get-all", key]);
+  } catch {
+    return "";
+  }
+}
+
+// The value git uses, following include and includeIf entries.
+function effectiveConfigGetAll(key: string): string {
+  try {
+    return runGit(["config", "--includes", "--get-all", key]);
   } catch {
     return "";
   }
@@ -144,6 +153,36 @@ describe("git-config", () => {
       expect(gitConfigGetAll("credential.helper")).toBe(helperPath);
       expect(statSync(helperPath).mode & 0o777).toBe(0o700);
       expect(process.env.GH_TOKEN).toBe("helper-token");
+    });
+
+    test("removes the extraheader from a credentials file pulled in by includeIf", async () => {
+      // actions/checkout v6.0.2 writes the header to a file under RUNNER_TEMP
+      // and pulls it in with an includeIf.gitdir entry.
+      git(["config", "--local", "--unset-all", EXTRAHEADER_KEY]);
+      const credentialsPath = join(tempDir, "git-credentials.config");
+      runGit([
+        "config",
+        "--file",
+        credentialsPath,
+        EXTRAHEADER_KEY,
+        "AUTHORIZATION: basic checkout",
+      ]);
+      const gitDir = realpathSync(join(repoDir, ".git"));
+      git([
+        "config",
+        "--local",
+        `includeIf.gitdir:${gitDir}.path`,
+        credentialsPath,
+      ]);
+      expect(effectiveConfigGetAll(EXTRAHEADER_KEY)).toContain("AUTHORIZATION");
+
+      await replaceCheckoutCredentials(
+        "test-token",
+        createMockAutomationContext(),
+        false,
+      );
+
+      expect(effectiveConfigGetAll(EXTRAHEADER_KEY)).toBe("");
     });
 
     test("succeeds when there is no checkout extraheader to remove", async () => {
