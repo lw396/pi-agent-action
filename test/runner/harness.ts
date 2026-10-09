@@ -13,6 +13,7 @@ import {
   type FauxResponseStep,
 } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { parseToolRules, type ToolRule } from "../../src/runner/tool-rules";
 
 export type Scratch = {
   root: string;
@@ -94,4 +95,9 @@ export async function fauxRuntime(responses: FauxResponseStep[]) {
 
 export function readExecutionFile(path: string): Array<Record<string, any>> {
   return JSON.parse(readFileSync(path, "utf-8"));
+}
+
+/** Rules written as in the allowed_tools input, parsed as readRunnerInputs() does. */
+export function rules(text: string): ToolRule[] {
+  return parseToolRules(text, "allowed_tools");
 }

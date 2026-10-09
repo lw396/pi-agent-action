@@ -15,7 +15,6 @@ import {
 } from "../../github/data/fetcher";
 import { createPrompt } from "../../create-prompt";
 import { isEntityContext } from "../../github/context";
-import { ruleToolNames } from "../../runner/tool-rules";
 import type { PrepareOptions, PrepareResult } from "../types";
 
 /**
@@ -28,7 +27,7 @@ export async function prepareTagMode({
   context,
   octokit,
   githubToken,
-  allowedToolsInput,
+  allowedTools: workflowAllowedTools,
 }: PrepareOptions): Promise<PrepareResult> {
   // Tag mode only handles entity-based events
   if (!isEntityContext(context)) {
@@ -116,12 +115,6 @@ export async function prepareTagMode({
     context,
   );
 
-  // The action's own MCP tools the workflow allows, which decide the extra
-  // MCP servers to start (the inline comment server, for example).
-  const userAllowedMCPTools = ruleToolNames(allowedToolsInput).filter((tool) =>
-    tool.startsWith("mcp__github_"),
-  );
-
   const gitPushWrapper = `${process.env.GITHUB_ACTION_PATH}/scripts/git-push.sh`;
 
   // Rules tag mode adds to the allowed_tools input.
@@ -138,7 +131,6 @@ export async function prepareTagMode({
     "mcp__github_ci__get_ci_status",
     "mcp__github_ci__get_workflow_run_details",
     "mcp__github_ci__download_job_log",
-    ...userAllowedMCPTools,
   ];
 
   // Add git commands when using git CLI (no API commit signing, or SSH signing)
@@ -159,15 +151,19 @@ export async function prepareTagMode({
   }
   const allowedTools = Array.from(new Set(tagModeTools));
 
-  // Get our GitHub MCP servers configuration
-  const ourMcpConfig = await prepareMcpConfig({
+  // The action's MCP servers the run needs: tag mode's tools, and the
+  // workflow's (the inline comment server, for example).
+  const mcpServers = await prepareMcpConfig({
     githubToken,
     owner: context.repository.owner,
     repo: context.repository.repo,
     branch: branchInfo.agentBranch || branchInfo.currentBranch,
     baseBranch: branchInfo.baseBranch,
     trackingCommentId: commentId.toString(),
-    allowedTools,
+    allowedTools: [
+      ...allowedTools,
+      ...workflowAllowedTools.map((rule) => rule.tool),
+    ],
     mode: "tag",
     context,
   });
@@ -175,7 +171,7 @@ export async function prepareTagMode({
   return {
     commentId,
     branchInfo,
-    mcpConfig: ourMcpConfig,
+    mcpServers,
     allowedTools,
     acceptEdits: true,
     readOnlyGit: true,

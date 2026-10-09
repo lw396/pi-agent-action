@@ -22,10 +22,10 @@ import { expandSlashCommand, USER_REQUEST_FILENAME } from "./slash-command";
 import { writeExecutionFile } from "./execution-file";
 import { mcpServerExtensions, type McpServers } from "./mcp-servers";
 import {
-  parseToolPermissions,
   toolPermissionsExtension,
   type ToolPermissions,
 } from "./tool-permissions";
+import type { ToolRule } from "./tool-rules";
 import {
   createStructuredOutput,
   type StructuredOutput,
@@ -42,12 +42,12 @@ export type RunnerOptions = {
   /** The pi_args input: pi's own command-line flags, a supported subset. */
   piArgs?: string;
   /**
-   * The allowed_tools input: rules in Claude Code's `Tool` / `Tool(pattern)`
-   * syntax. Calls to tools other than the read-only ones must match a rule.
+   * The allowed_tools input, plus the mode's own rules. Calls to tools other
+   * than the read-only ones must match a rule.
    */
-  allowedTools?: string;
+  allowedTools?: ToolRule[];
   /** The disallowed_tools input: rules that block calls, before allowed_tools. */
-  disallowedTools?: string;
+  disallowedTools?: ToolRule[];
   /**
    * Let edit and write change files in the working directory without a rule,
    * like Claude Code's acceptEdits permission mode in Upstream's tag mode.
@@ -268,15 +268,12 @@ function buildToolPermissions(
   cwd: string,
   structuredOutput: StructuredOutput | undefined,
 ): ToolPermissions {
-  const { allowed, disallowed } = parseToolPermissions(
-    options.allowedTools,
-    options.disallowedTools,
-  );
+  const allowed = options.allowedTools ?? [];
   return {
     allowed: structuredOutput
       ? [...allowed, structuredOutput.allowRule]
       : allowed,
-    disallowed,
+    disallowed: options.disallowedTools ?? [],
     editableWorkspace: options.acceptEdits ? cwd : undefined,
     readOnlyGit: options.readOnlyGit,
     procHiddenFrom: options.isolateBash ? cwd : undefined,

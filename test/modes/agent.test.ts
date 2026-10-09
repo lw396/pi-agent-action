@@ -8,6 +8,7 @@ import {
   mock,
 } from "bun:test";
 import { prepareAgentMode } from "../../src/modes/agent";
+import { parseToolRules } from "../../src/runner/tool-rules";
 import { createMockAutomationContext } from "../mockContext";
 import * as core from "@actions/core";
 import * as gitConfig from "../../src/github/operations/git-config";
@@ -79,20 +80,20 @@ describe("Agent Mode", () => {
         context,
         octokit: mockOctokit,
         githubToken: "test-token",
-        allowedToolsInput:
+        allowedTools: parseToolRules(
           "Bash(git status), mcp__github_comment__update_comment",
+          "allowed_tools",
+        ),
       });
       const withoutTools = await prepareAgentMode({
         context,
         octokit: mockOctokit,
         githubToken: "test-token",
-        allowedToolsInput: undefined,
+        allowedTools: [],
       });
 
-      expect(Object.keys(JSON.parse(withTools.mcpConfig).mcpServers)).toEqual([
-        "github_comment",
-      ]);
-      expect(JSON.parse(withoutTools.mcpConfig).mcpServers).toEqual({});
+      expect(Object.keys(withTools.mcpServers)).toEqual(["github_comment"]);
+      expect(withoutTools.mcpServers).toEqual({});
 
       // Verify return structure - should fall back to repository.default_branch when no env vars set
       expect(withoutTools).toEqual({
@@ -102,7 +103,7 @@ describe("Agent Mode", () => {
           currentBranch: "main",
           agentBranch: undefined,
         },
-        mcpConfig: expect.any(String),
+        mcpServers: {},
         allowedTools: [],
         acceptEdits: false,
         readOnlyGit: false,
@@ -155,7 +156,7 @@ describe("Agent Mode", () => {
       context: contextWithDevelop,
       octokit: mockOctokit,
       githubToken: "test-token",
-      allowedToolsInput: undefined,
+      allowedTools: [],
     });
 
     expect(result.branchInfo.baseBranch).toBe("develop");
@@ -194,7 +195,7 @@ describe("Agent Mode", () => {
         context: contextWithPrompts,
         octokit: mockOctokit,
         githubToken: "test-token",
-        allowedToolsInput: undefined,
+        allowedTools: [],
       }),
     ).rejects.toThrow(
       "Workflow initiated by non-human actor: claude (type: Bot)",
@@ -226,7 +227,7 @@ describe("Agent Mode", () => {
         context: contextWithPrompts,
         octokit: mockOctokit,
         githubToken: "test-token",
-        allowedToolsInput: undefined,
+        allowedTools: [],
       }),
     ).resolves.toBeDefined();
   });
@@ -258,14 +259,14 @@ describe("Agent Mode", () => {
       context: contextWithPrompts,
       octokit: mockOctokit,
       githubToken: "test-token",
-      allowedToolsInput: undefined,
+      allowedTools: [],
     });
 
     // Note: We can't easily test file creation in this unit test,
     // but we can verify the method completes without errors
     // With our conditional MCP logic, agent mode with no allowed tools
     // should not include any MCP servers
-    expect(JSON.parse(result.mcpConfig).mcpServers).toEqual({});
+    expect(result.mcpServers).toEqual({});
   });
 
   describe("git credential configuration", () => {
@@ -290,7 +291,7 @@ describe("Agent Mode", () => {
         context,
         octokit: mockOctokit,
         githubToken: "test-token",
-        allowedToolsInput: undefined,
+        allowedTools: [],
       });
 
       expect(configureGitAuthSpy).toHaveBeenCalledTimes(1);
@@ -313,7 +314,7 @@ describe("Agent Mode", () => {
         context,
         octokit: mockOctokit,
         githubToken: "test-token",
-        allowedToolsInput: undefined,
+        allowedTools: [],
       });
 
       expect(configureGitAuthSpy).not.toHaveBeenCalled();

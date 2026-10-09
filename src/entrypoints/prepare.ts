@@ -84,7 +84,7 @@ async function run() {
       context,
       octokit,
       githubToken,
-      allowedToolsInput: readRunnerInputs(process.env).allowedTools,
+      allowedTools: readRunnerInputs(process.env).allowedTools,
     };
     if (modeName === "tag") {
       await prepareTagMode(prepareOptions);

@@ -1,6 +1,5 @@
 import { mkdir, rm, writeFile } from "fs/promises";
 import { prepareMcpConfig } from "../../mcp/install-mcp-server";
-import { ruleToolNames } from "../../runner/tool-rules";
 import {
   configureGitAuth,
   replaceCheckoutCredentials,
@@ -20,7 +19,7 @@ export async function prepareAgentMode({
   context,
   octokit,
   githubToken,
-  allowedToolsInput,
+  allowedTools,
 }: PrepareOptions): Promise<PrepareResult> {
   // Check if actor is human (prevents bot-triggered loops)
   await checkHumanActor(octokit.rest, context);
@@ -85,9 +84,6 @@ export async function prepareAgentMode({
 
   await writeFile(`${promptDir}/prompt.txt`, promptContent);
 
-  // The allowed_tools input decides which of the action's MCP servers start
-  const allowedTools = ruleToolNames(allowedToolsInput);
-
   // Check for branch info from environment variables (useful for auto-fix workflows)
   const agentBranch = process.env.AGENT_BRANCH || undefined;
   const defaultBranch = context.repository.default_branch || "main";
@@ -100,15 +96,15 @@ export async function prepareAgentMode({
     process.env.GITHUB_REF_NAME ||
     defaultBranch;
 
-  // Get our GitHub MCP servers config
-  const ourMcpConfig = await prepareMcpConfig({
+  // The allowed_tools input decides which of the action's MCP servers start
+  const mcpServers = await prepareMcpConfig({
     githubToken,
     owner: context.repository.owner,
     repo: context.repository.repo,
     branch: currentBranch,
     baseBranch: baseBranch,
     trackingCommentId: undefined, // No tracking comment in agent mode
-    allowedTools,
+    allowedTools: allowedTools.map((rule) => rule.tool),
     mode: "agent",
     context,
   });
@@ -120,7 +116,7 @@ export async function prepareAgentMode({
       currentBranch: baseBranch, // Use base branch as current when creating new branch
       agentBranch: agentBranch,
     },
-    mcpConfig: ourMcpConfig,
+    mcpServers,
     // Agent mode adds no rules of its own: allowed_tools alone decides.
     allowedTools: [],
     acceptEdits: false,

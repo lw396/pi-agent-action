@@ -1,5 +1,6 @@
-import { parseMcpConfig } from "./mcp-servers";
+import type { McpServers } from "./mcp-servers";
 import type { RunnerOptions } from "./run-pi";
+import { parseToolRules, type ToolRule } from "./tool-rules";
 
 /**
  * The action inputs the Runner uses, read once from the env vars that
@@ -12,8 +13,8 @@ export type RunnerInputs = {
   apiKey?: string;
   piArgs?: string;
   /** The allowed_tools input, which also decides the action's MCP servers. */
-  allowedTools?: string;
-  disallowedTools?: string;
+  allowedTools: ToolRule[];
+  disallowedTools: ToolRule[];
   jsonSchema?: string;
   /**
    * Untrusted input (allowed_non_write_users): keep secrets out of bash,
@@ -31,10 +32,14 @@ export type ModeRunSettings = {
   allowedTools: string[];
   acceptEdits: boolean;
   readOnlyGit: boolean;
-  /** The `{ "mcpServers": ... }` JSON that prepareMcpConfig() builds. */
-  mcpConfig: string;
+  /** The action's MCP servers the run needs. */
+  mcpServers: McpServers;
 };
 
+/**
+ * Read the Runner's inputs. Throws on a tool rule the action cannot enforce
+ * as written, so the run fails before anything is prepared.
+ */
 export function readRunnerInputs(env: NodeJS.ProcessEnv): RunnerInputs {
   return {
     promptFile:
@@ -42,8 +47,11 @@ export function readRunnerInputs(env: NodeJS.ProcessEnv): RunnerInputs {
     model: env.MODEL,
     apiKey: env.API_KEY,
     piArgs: env.PI_ARGS,
-    allowedTools: env.INPUT_ALLOWED_TOOLS,
-    disallowedTools: env.INPUT_DISALLOWED_TOOLS,
+    allowedTools: parseToolRules(env.INPUT_ALLOWED_TOOLS, "allowed_tools"),
+    disallowedTools: parseToolRules(
+      env.INPUT_DISALLOWED_TOOLS,
+      "disallowed_tools",
+    ),
     jsonSchema: env.JSON_SCHEMA,
     isolateBash:
       !!env.ALLOWED_NON_WRITE_USERS && env.SUBPROCESS_ISOLATION !== "false",
@@ -64,7 +72,10 @@ export function runnerOptions(
     apiKey: inputs.apiKey,
     piArgs: inputs.piArgs,
     // The mode's own rules come first, then the workflow's allowed_tools.
-    allowedTools: [...mode.allowedTools, inputs.allowedTools ?? ""].join("\n"),
+    allowedTools: [
+      ...parseToolRules(mode.allowedTools.join("\n"), "allowed_tools"),
+      ...inputs.allowedTools,
+    ],
     disallowedTools: inputs.disallowedTools,
     acceptEdits: mode.acceptEdits,
     readOnlyGit: mode.readOnlyGit,
@@ -72,6 +83,6 @@ export function runnerOptions(
     isolateBash: inputs.isolateBash,
     allowedBashEnv: inputs.allowedBashEnv,
     showFullOutput: inputs.showFullOutput,
-    mcpServers: parseMcpConfig(mode.mcpConfig),
+    mcpServers: mode.mcpServers,
   };
 }

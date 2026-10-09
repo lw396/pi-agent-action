@@ -125,7 +125,7 @@ describe("prepareMcpConfig", () => {
       mode: "tag",
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers).toBeDefined();
     expect(parsed.mcpServers.github).not.toBeDefined();
     expect(parsed.mcpServers.github_file_ops).not.toBeDefined();
@@ -147,7 +147,7 @@ describe("prepareMcpConfig", () => {
       context: mockContextWithSigning,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers).toBeDefined();
     expect(parsed.mcpServers.github).not.toBeDefined();
     expect(parsed.mcpServers.github_file_ops).toBeDefined();
@@ -171,7 +171,7 @@ describe("prepareMcpConfig", () => {
       context: mockContext,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers).toBeDefined();
     expect(parsed.mcpServers.github).toBeDefined();
     expect(parsed.mcpServers.github.command).toBe("docker");
@@ -192,7 +192,7 @@ describe("prepareMcpConfig", () => {
       context: mockPRContext,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers).toBeDefined();
     expect(parsed.mcpServers.github_inline_comment).toBeDefined();
     expect(parsed.mcpServers.github_inline_comment.env.GITHUB_TOKEN).toBe(
@@ -213,7 +213,7 @@ describe("prepareMcpConfig", () => {
       context: mockContext,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers).toBeDefined();
     expect(parsed.mcpServers.github).not.toBeDefined();
     expect(parsed.mcpServers.github_file_ops).not.toBeDefined();
@@ -234,7 +234,7 @@ describe("prepareMcpConfig", () => {
       context: mockContextWithSigning,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers.github_file_ops.args).toContain(
       "/test/action/path/src/mcp/github-file-ops-server.ts",
     );
@@ -258,7 +258,7 @@ describe("prepareMcpConfig", () => {
       },
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     const servers: Record<string, string> = {
       github_comment: "src/mcp/github-comment-server.ts",
       github_file_ops: "src/mcp/github-file-ops-server.ts",
@@ -294,7 +294,7 @@ describe("prepareMcpConfig", () => {
       context: mockContextWithSigning,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers.github_file_ops.env.REPO_DIR).toBe(process.cwd());
   });
 
@@ -312,7 +312,7 @@ describe("prepareMcpConfig", () => {
       context: mockPRContext,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers.github_ci).toBeDefined();
     expect(parsed.mcpServers.github_ci.env.GITHUB_TOKEN).toBe("workflow-token");
     expect(parsed.mcpServers.github_ci.env.PR_NUMBER).toBe("456");
@@ -332,7 +332,7 @@ describe("prepareMcpConfig", () => {
       context: mockContext,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers.github_ci).not.toBeDefined();
   });
 
@@ -357,7 +357,7 @@ describe("prepareMcpConfig", () => {
       context: mockPRContext,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers.github_ci).not.toBeDefined();
 
     delete process.env.DEFAULT_WORKFLOW_TOKEN;
@@ -377,7 +377,7 @@ describe("prepareMcpConfig", () => {
       context: mockPRContext,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers.github_ci).not.toBeDefined();
   });
 
@@ -393,7 +393,7 @@ describe("prepareMcpConfig", () => {
       context: mockContext,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers.github).toBeDefined();
     expect(parsed.mcpServers.github.command).toBe("docker");
     expect(parsed.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN).toBe(
@@ -413,7 +413,7 @@ describe("prepareMcpConfig", () => {
       context: mockPRContext,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers.github_inline_comment).toBeDefined();
     expect(parsed.mcpServers.github_inline_comment.env.GITHUB_TOKEN).toBe(
       "test-token",
@@ -433,7 +433,7 @@ describe("prepareMcpConfig", () => {
       context: mockContext,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers.github_comment).toBeDefined();
     expect(parsed.mcpServers.github_comment.env.GITHUB_TOKEN).toBe(
       "test-token",
@@ -454,7 +454,7 @@ describe("prepareMcpConfig", () => {
       context: mockPRContext,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers.github_ci).toBeDefined();
     expect(parsed.mcpServers.github_ci.env.GITHUB_TOKEN).toBe("workflow-token");
     expect(parsed.mcpServers.github_ci.env.PR_NUMBER).toBe("456");
@@ -474,7 +474,7 @@ describe("prepareMcpConfig", () => {
       context: mockContext,
     });
 
-    const parsed = JSON.parse(result);
+    const parsed = { mcpServers: result as Record<string, any> };
     expect(parsed.mcpServers.github).not.toBeDefined();
     expect(parsed.mcpServers.github_inline_comment).not.toBeDefined();
   });

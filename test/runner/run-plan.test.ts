@@ -11,7 +11,7 @@ const NO_MODE_SETTINGS: ModeRunSettings = {
   allowedTools: [],
   acceptEdits: false,
   readOnlyGit: false,
-  mcpConfig: "{}",
+  mcpServers: {},
 };
 
 describe("readRunnerInputs", () => {
@@ -22,7 +22,7 @@ describe("readRunnerInputs", () => {
       API_KEY: "key",
       PI_ARGS: "--thinking high",
       INPUT_ALLOWED_TOOLS: "Bash(npm test)",
-      INPUT_DISALLOWED_TOOLS: "WebFetch",
+      INPUT_DISALLOWED_TOOLS: "Write",
       JSON_SCHEMA: '{"type":"object"}',
       ALLOWED_BASH_ENV: "NPM_TOKEN",
     });
@@ -32,13 +32,21 @@ describe("readRunnerInputs", () => {
       model: "openai/gpt-5",
       apiKey: "key",
       piArgs: "--thinking high",
-      allowedTools: "Bash(npm test)",
-      disallowedTools: "WebFetch",
+      allowedTools: [
+        { text: "Bash(npm test)", tool: "bash", pattern: "npm test" },
+      ],
+      disallowedTools: [{ text: "Write", tool: "write" }],
       jsonSchema: '{"type":"object"}',
       isolateBash: false,
       allowedBashEnv: "NPM_TOKEN",
       showFullOutput: false,
     });
+  });
+
+  test("fails on a tool rule the Runner cannot enforce", () => {
+    expect(() =>
+      readRunnerInputs({ INPUT_DISALLOWED_TOOLS: "Edit(.env)" }),
+    ).toThrow("Invalid disallowed_tools: 'Edit(.env)'");
   });
 
   test("defaults to the prompt file the modes write under RUNNER_TEMP", () => {
@@ -77,7 +85,11 @@ describe("runnerOptions", () => {
       { ...NO_MODE_SETTINGS, allowedTools: ["Read", "Bash(git add:*)"] },
     );
 
-    expect(options.allowedTools).toBe("Read\nBash(git add:*)\nBash(npm test)");
+    expect(options.allowedTools!.map((rule) => rule.text)).toEqual([
+      "Read",
+      "Bash(git add:*)",
+      "Bash(npm test)",
+    ]);
   });
 
   test("passes the mode's settings and the action's MCP servers", () => {
@@ -86,7 +98,7 @@ describe("runnerOptions", () => {
       allowedTools: [],
       acceptEdits: true,
       readOnlyGit: true,
-      mcpConfig: JSON.stringify({ mcpServers: { github_comment: server } }),
+      mcpServers: { github_comment: server },
     });
 
     expect(options.acceptEdits).toBe(true);
@@ -98,7 +110,6 @@ describe("runnerOptions", () => {
     const options = runnerOptions(
       readRunnerInputs({
         MODEL: "openai/gpt-5",
-        INPUT_DISALLOWED_TOOLS: "WebFetch",
         ALLOWED_NON_WRITE_USERS: "*",
         INPUT_SHOW_FULL_OUTPUT: "true",
       }),
@@ -107,7 +118,6 @@ describe("runnerOptions", () => {
 
     expect(options).toMatchObject({
       model: "openai/gpt-5",
-      disallowedTools: "WebFetch",
       isolateBash: true,
       showFullOutput: true,
     });

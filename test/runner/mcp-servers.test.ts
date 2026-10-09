@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { runPi, type RunnerOptions } from "../../src/runner/run-pi";
 import { declaredToolNames } from "../pi-sdk/harness";
-import { fauxRuntime, readExecutionFile, useScratch } from "./harness";
+import { fauxRuntime, readExecutionFile, useScratch, rules } from "./harness";
 
 const getScratch = useScratch();
 
@@ -45,7 +45,7 @@ async function echo(
     model,
     cwd: scratch.cwd,
     modelRuntime,
-    allowedTools: TOOL,
+    allowedTools: rules(TOOL),
     ...options,
   });
 

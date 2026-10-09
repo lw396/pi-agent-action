@@ -12,6 +12,7 @@ import {
   type FauxResponseStep,
 } from "@earendil-works/pi-ai";
 import { runPi, type RunnerOptions } from "../../src/runner/run-pi";
+import { parseToolRules } from "../../src/runner/tool-rules";
 import { fauxRuntime, readExecutionFile, useScratch } from "./harness";
 
 const getScratch = useScratch();
@@ -33,10 +34,11 @@ type CallResult = {
  */
 async function runCalls(
   calls: ToolCall[],
-  options: Pick<
-    RunnerOptions,
-    "allowedTools" | "disallowedTools" | "acceptEdits" | "readOnlyGit"
-  > = {},
+  options: Pick<RunnerOptions, "acceptEdits" | "readOnlyGit"> & {
+    /** Rules as written in the allowed_tools and disallowed_tools inputs. */
+    allowedTools?: string;
+    disallowedTools?: string;
+  } = {},
 ): Promise<CallResult[]> {
   const steps: FauxResponseStep[] = [
     fauxAssistantMessage(
@@ -54,6 +56,11 @@ async function runCalls(
     cwd: scratch.cwd,
     modelRuntime,
     ...options,
+    allowedTools: parseToolRules(options.allowedTools, "allowed_tools"),
+    disallowedTools: parseToolRules(
+      options.disallowedTools,
+      "disallowed_tools",
+    ),
   });
 
   const records = readExecutionFile(result.executionFile!);
@@ -258,34 +265,17 @@ describe("tool permissions", () => {
     expect(ran("out.txt")).toBe(true);
   });
 
-  test("rules the action cannot enforce as written fail the run before the model is called", async () => {
-    const { faux, modelRuntime, model } = await fauxRuntime([
-      fauxAssistantMessage("unused"),
-    ]);
-    const scratch = getScratch();
-    await Bun.write(scratch.promptPath, "Run the tools.");
-
-    const cases: Array<[Partial<RunnerOptions>, string]> = [
-      [
-        { allowedTools: "Read(./src/**)" },
-        "only Bash rules can have a (pattern)",
-      ],
-      [{ disallowedTools: "WebFetch(domain:x.com) Edit(.env)" }, "Edit(.env)"],
-      [{ allowedTools: "Bash(git add:*" }, "unmatched '('"],
-      [{ allowedTools: "Bash()" }, "empty pattern"],
-    ];
-    for (const [options, message] of cases) {
-      await expect(
-        runPi(scratch.promptPath, {
-          model,
-          cwd: scratch.cwd,
-          modelRuntime,
-          ...options,
-        }),
-      ).rejects.toThrow(message);
-    }
-    expect(faux.state.callCount).toBe(0);
-  });
+  test.each([
+    ["allowed_tools", "Read(./src/**)", "only Bash rules can have a (pattern)"],
+    ["disallowed_tools", "WebFetch(domain:x.com) Edit(.env)", "Edit(.env)"],
+    ["allowed_tools", "Bash(git add:*", "unmatched '('"],
+    ["allowed_tools", "Bash()", "empty pattern"],
+  ])(
+    "%s rules the action cannot enforce as written are rejected: %s",
+    (input, text, message) => {
+      expect(() => parseToolRules(text, input)).toThrow(message);
+    },
+  );
 
   test("rules for Claude Code tools pi does not have are accepted and have no effect", async () => {
     const [result] = await runCalls([touch("first")], {

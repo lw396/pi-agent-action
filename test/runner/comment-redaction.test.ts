@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { runPi } from "../../src/runner/run-pi";
 import { collectSecretValues } from "../../src/github/utils/secret-values";
-import { fauxRuntime, readExecutionFile, useScratch } from "./harness";
+import { fauxRuntime, readExecutionFile, useScratch, rules } from "./harness";
 
 const getScratch = useScratch();
 
@@ -37,7 +37,7 @@ async function callTool(
     model,
     cwd: getScratch().cwd,
     modelRuntime,
-    allowedTools: name,
+    allowedTools: rules(name),
     mcpServers: { [server]: echoServer },
   });
   const end = readExecutionFile(result.executionFile!).find(
@@ -100,7 +100,7 @@ describe("MCP tool arguments", () => {
       model,
       cwd: getScratch().cwd,
       modelRuntime,
-      allowedTools: "Bash",
+      allowedTools: rules("Bash"),
     });
     const start = readExecutionFile(result.executionFile!).find(
       (r) => r.type === "tool_execution_start",

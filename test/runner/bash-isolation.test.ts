@@ -13,7 +13,7 @@ import {
 } from "@earendil-works/pi-ai";
 import { runPi, type RunnerOptions } from "../../src/runner/run-pi";
 import { BASH_ENV_ALLOWLIST } from "../../src/runner/env-allowlist";
-import { fauxRuntime, readExecutionFile, useScratch } from "./harness";
+import { fauxRuntime, readExecutionFile, useScratch, rules } from "./harness";
 
 const getScratch = useScratch();
 
@@ -75,7 +75,7 @@ async function runBash(
     model,
     cwd: getScratch().cwd,
     modelRuntime,
-    allowedTools: "Bash",
+    allowedTools: rules("Bash"),
     ...options,
   });
   const end = readExecutionFile(result.executionFile!).find(
@@ -156,7 +156,7 @@ describe("bash env allowlist", () => {
   test("still applies the tool rules to the isolated bash", async () => {
     const output = await runBash("echo should-not-run", {
       isolateBash: true,
-      allowedTools: "Bash(git status:*)",
+      allowedTools: rules("Bash(git status:*)"),
     });
     expect(output).not.toContain("should-not-run");
   });

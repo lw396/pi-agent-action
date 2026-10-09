@@ -5,6 +5,7 @@ import { isEntityContext } from "../github/context";
 import { redactSecrets } from "../github/utils/sanitizer";
 import { Octokit } from "@octokit/rest";
 import type { AutoDetectedMode } from "../modes/detector";
+import type { McpServers } from "../runner/mcp-servers";
 
 type PrepareConfigParams = {
   githubToken: string;
@@ -64,9 +65,10 @@ async function checkActionsReadPermission(
   }
 }
 
+/** The action's own MCP servers, by name, that the run needs. */
 export async function prepareMcpConfig(
   params: PrepareConfigParams,
-): Promise<string> {
+): Promise<McpServers> {
   const {
     githubToken,
     owner,
@@ -105,9 +107,7 @@ export async function prepareMcpConfig(
         tool === "mcp__github_ci" || tool.startsWith("mcp__github_ci__"),
     );
 
-    const baseMcpConfig: { mcpServers: Record<string, unknown> } = {
-      mcpServers: {},
-    };
+    const servers: McpServers = {};
 
     // Include comment server:
     // - Always in tag mode (for updating the tracking comment)
@@ -115,7 +115,7 @@ export async function prepareMcpConfig(
     const shouldIncludeCommentServer = !isAgentMode || hasGitHubCommentTools;
 
     if (shouldIncludeCommentServer) {
-      baseMcpConfig.mcpServers.github_comment = {
+      servers.github_comment = {
         command: "bun",
         args: bunServerArgs("src/mcp/github-comment-server.ts"),
         env: {
@@ -131,7 +131,7 @@ export async function prepareMcpConfig(
 
     // Include file ops server when commit signing is enabled
     if (context.inputs.useCommitSigning) {
-      baseMcpConfig.mcpServers.github_file_ops = {
+      servers.github_file_ops = {
         command: "bun",
         args: bunServerArgs("src/mcp/github-file-ops-server.ts"),
         env: {
@@ -154,7 +154,7 @@ export async function prepareMcpConfig(
       context.isPR &&
       (hasGitHubMcpTools || hasInlineCommentTools)
     ) {
-      baseMcpConfig.mcpServers.github_inline_comment = {
+      servers.github_inline_comment = {
         command: "bun",
         args: bunServerArgs("src/mcp/github-inline-comment-server.ts"),
         env: {
@@ -196,12 +196,12 @@ export async function prepareMcpConfig(
             "See: https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token",
         );
       } else {
-        baseMcpConfig.mcpServers.github_ci = {
+        servers.github_ci = {
           command: "bun",
           args: bunServerArgs("src/mcp/github-actions-server.ts"),
           env: {
             // Use workflow github token, not app token
-            GITHUB_TOKEN: process.env.DEFAULT_WORKFLOW_TOKEN,
+            GITHUB_TOKEN: process.env.DEFAULT_WORKFLOW_TOKEN!,
             REPO_OWNER: owner,
             REPO_NAME: repo,
             PR_NUMBER: context.entityNumber?.toString() || "",
@@ -212,7 +212,7 @@ export async function prepareMcpConfig(
     }
 
     if (hasGitHubMcpTools) {
-      baseMcpConfig.mcpServers.github = {
+      servers.github = {
         command: "docker",
         args: [
           "run",
@@ -231,9 +231,7 @@ export async function prepareMcpConfig(
       };
     }
 
-    // Return only our GitHub servers config
-    // User's config will be passed as separate --mcp-config flags
-    return JSON.stringify(baseMcpConfig, null, 2);
+    return servers;
   } catch (error) {
     core.setFailed(
       `Install MCP server failed with error: ${redactSecrets(String(error))}`,

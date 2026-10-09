@@ -7,13 +7,6 @@ import {
 /** The action's MCP servers by name, in the shape of an mcp.json entry. */
 export type McpServers = Record<string, McpServerConfig>;
 
-/** Parse the `{ "mcpServers": ... }` JSON that prepareMcpConfig() builds. */
-export function parseMcpConfig(json: string | undefined): McpServers {
-  if (!json) return {};
-  const config: { mcpServers?: McpServers } = JSON.parse(json);
-  return config.mcpServers ?? {};
-}
-
 /**
  * Escape a value for an MCP server's `env`, which pi reads as a template:
  * `$NAME` and `${NAME}` expand environment variables and a leading `!` runs

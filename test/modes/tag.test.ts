@@ -11,6 +11,7 @@ import * as mcp from "../../src/mcp/install-mcp-server";
 import * as gitConfig from "../../src/github/operations/git-config";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { runPi } from "../../src/runner/run-pi";
+import { parseToolRules } from "../../src/runner/tool-rules";
 import { readRunnerInputs, runnerOptions } from "../../src/runner/run-plan";
 import { fauxRuntime, readExecutionFile, useScratch } from "../runner/harness";
 
@@ -62,7 +63,7 @@ describe("Tag Mode", () => {
         (prepareMcpConfigSpy = spyOn(
           mcp,
           "prepareMcpConfig",
-        ).mockImplementation(async () => "{}")),
+        ).mockImplementation(async () => ({}))),
       ];
     });
 
@@ -79,7 +80,7 @@ describe("Tag Mode", () => {
         context,
         octokit: {} as any,
         githubToken: "test-token",
-        allowedToolsInput: undefined,
+        allowedTools: [],
       });
 
       expect(configureGitAuthSpy).toHaveBeenCalledTimes(1);
@@ -102,7 +103,7 @@ describe("Tag Mode", () => {
         context,
         octokit: {} as any,
         githubToken: "test-token",
-        allowedToolsInput: undefined,
+        allowedTools: [],
       });
 
       expect(configureGitAuthSpy).not.toHaveBeenCalled();
@@ -119,7 +120,7 @@ describe("Tag Mode", () => {
         context: { ...mockIssueCommentContext },
         octokit: {} as any,
         githubToken: "test-token",
-        allowedToolsInput: undefined,
+        allowedTools: [],
       });
 
       expect(result.allowedTools).toEqual(
@@ -147,7 +148,7 @@ describe("Tag Mode", () => {
         },
         octokit: {} as any,
         githubToken: "test-token",
-        allowedToolsInput: undefined,
+        allowedTools: [],
       });
 
       expect(result.allowedTools).toEqual(
@@ -164,8 +165,10 @@ describe("Tag Mode", () => {
         context: { ...mockIssueCommentContext },
         octokit: {} as any,
         githubToken: "test-token",
-        allowedToolsInput:
+        allowedTools: parseToolRules(
           "Bash(npm test), mcp__github_inline_comment__create_inline_comment",
+          "allowed_tools",
+        ),
       });
 
       const { allowedTools } = prepareMcpConfigSpy.mock.calls[0][0];
@@ -221,7 +224,7 @@ describe("Tag Mode", () => {
           async () => ({ baseBranch: "main" }) as any,
         ),
         spyOn(createPrompt, "createPrompt").mockImplementation(async () => {}),
-        spyOn(mcp, "prepareMcpConfig").mockImplementation(async () => "{}"),
+        spyOn(mcp, "prepareMcpConfig").mockImplementation(async () => ({})),
         spyOn(gitConfig, "configureGitAuth").mockImplementation(async () => {}),
       ];
       let prepared;
@@ -230,7 +233,7 @@ describe("Tag Mode", () => {
           context: { ...mockIssueCommentContext },
           octokit: {} as any,
           githubToken: "test-token",
-          allowedToolsInput: undefined,
+          allowedTools: [],
         });
       } finally {
         for (const spy of spies) spy.mockRestore();

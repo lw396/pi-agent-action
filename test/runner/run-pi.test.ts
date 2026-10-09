@@ -11,6 +11,7 @@ import {
   OIDC_AND_INPUT_VARS,
   readExecutionFile,
   useScratch,
+  rules,
 } from "./harness";
 
 const getScratch = useScratch();
@@ -134,7 +135,7 @@ describe("runPi", () => {
       model,
       cwd: getScratch().cwd,
       modelRuntime,
-      allowedTools: "Bash",
+      allowedTools: rules("Bash"),
     });
 
     const records = readExecutionFile(result.executionFile!);
@@ -346,7 +347,7 @@ describe("runPi", () => {
       model,
       cwd: getScratch().cwd,
       modelRuntime,
-      allowedTools: "Bash",
+      allowedTools: rules("Bash"),
     });
 
     const bashEnd = readExecutionFile(result.executionFile!).find(
@@ -380,7 +381,7 @@ describe("runPi", () => {
           model,
           cwd: getScratch().cwd,
           modelRuntime,
-          allowedTools: "Bash",
+          allowedTools: rules("Bash"),
           showFullOutput,
         });
         return log.mock.calls.map((args) => args.join(" ")).join("\n");

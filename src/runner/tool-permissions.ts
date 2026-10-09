@@ -5,7 +5,6 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import {
   commandMatchesPattern,
-  parseToolRules,
   ruleNamesTool,
   type ToolRule,
 } from "./tool-rules";
@@ -45,20 +44,6 @@ export type ToolPermissions = {
    */
   procHiddenFrom?: string;
 };
-
-/**
- * Parse the allowed_tools and disallowed_tools inputs. Throws on a rule the
- * action cannot enforce as written, so the run fails before the model starts.
- */
-export function parseToolPermissions(
-  allowedTools: string | undefined,
-  disallowedTools: string | undefined,
-): ToolPermissions {
-  return {
-    allowed: parseToolRules(allowedTools, "allowed_tools"),
-    disallowed: parseToolRules(disallowedTools, "disallowed_tools"),
-  };
-}
 
 function blocked(reason: string): ToolCallEventResult {
   return { block: true, reason: `${reason} Do not retry this call.` };

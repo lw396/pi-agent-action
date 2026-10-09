@@ -73,7 +73,6 @@ async function run() {
   // Before anything changes the environment: every redactSecrets() call in
   // this process, the Runner's included, redacts these values.
   collectSecretValues(process.env);
-  const runnerInputs = readRunnerInputs(process.env);
 
   let githubToken: string | undefined;
   let commentId: number | undefined;
@@ -93,6 +92,8 @@ async function run() {
   try {
     // Phase 1: Prepare
     assertNoRemovedInputs(process.env.ALL_INPUTS);
+    // Fails on a tool rule the Runner cannot enforce, before anything is set up.
+    const runnerInputs = readRunnerInputs(process.env);
     const actionInputsPresent = collectActionInputsPresence();
     context = parseGitHubContext();
     const modeName = detectMode(context);
@@ -157,7 +158,7 @@ async function run() {
       context,
       octokit,
       githubToken,
-      allowedToolsInput: runnerInputs.allowedTools,
+      allowedTools: runnerInputs.allowedTools,
     };
     const prepareResult =
       modeName === "tag"

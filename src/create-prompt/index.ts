@@ -26,79 +26,6 @@ export type { CommonFields, PreparedContext } from "./types";
 
 const GIT_PUSH_WRAPPER = `${process.env.GITHUB_ACTION_PATH}/scripts/git-push.sh`;
 
-// Tag mode defaults - these tools are needed for tag mode to function.
-// Edit/MultiEdit/Write are intentionally omitted: acceptEdits permission mode
-// auto-allows file edits inside $GITHUB_WORKSPACE and denies writes outside it.
-const BASE_ALLOWED_TOOLS = ["Glob", "Grep", "LS", "Read"];
-
-export function buildAllowedToolsString(
-  customAllowedTools?: string[],
-  includeActionsTools: boolean = false,
-  useCommitSigning: boolean = false,
-): string {
-  // Tag mode needs these tools to function properly
-  let baseTools = [...BASE_ALLOWED_TOOLS];
-
-  // Always include the comment update tool for tag mode
-  baseTools.push("mcp__github_comment__update_comment");
-
-  // Add commit signing tools if enabled
-  if (useCommitSigning) {
-    baseTools.push(
-      "mcp__github_file_ops__commit_files",
-      "mcp__github_file_ops__delete_files",
-    );
-  } else {
-    // When not using commit signing, add specific Bash git commands
-    baseTools.push(
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      `Bash(${GIT_PUSH_WRAPPER}:*)`,
-      "Bash(git rm:*)",
-    );
-  }
-
-  // Add GitHub Actions MCP tools if enabled
-  if (includeActionsTools) {
-    baseTools.push(
-      "mcp__github_ci__get_ci_status",
-      "mcp__github_ci__get_workflow_run_details",
-      "mcp__github_ci__download_job_log",
-    );
-  }
-
-  let allAllowedTools = baseTools.join(",");
-  if (customAllowedTools && customAllowedTools.length > 0) {
-    allAllowedTools = `${allAllowedTools},${customAllowedTools.join(",")}`;
-  }
-  return allAllowedTools;
-}
-
-export function buildDisallowedToolsString(
-  customDisallowedTools?: string[],
-  allowedTools?: string[],
-): string {
-  // Tag mode: Disable WebSearch and WebFetch by default for security
-  let disallowedTools = ["WebSearch", "WebFetch"];
-
-  // If user has explicitly allowed some default disallowed tools, remove them
-  if (allowedTools && allowedTools.length > 0) {
-    disallowedTools = disallowedTools.filter(
-      (tool) => !allowedTools.includes(tool),
-    );
-  }
-
-  let allDisallowedTools = disallowedTools.join(",");
-  if (customDisallowedTools && customDisallowedTools.length > 0) {
-    if (allDisallowedTools) {
-      allDisallowedTools = `${allDisallowedTools},${customDisallowedTools.join(",")}`;
-    } else {
-      allDisallowedTools = customDisallowedTools.join(",");
-    }
-  }
-  return allDisallowedTools;
-}
-
 export function prepareContext(
   context: ParsedGitHubContext,
   trackingCommentId: string,
@@ -971,21 +898,6 @@ export async function createPrompt(
       console.log(userRequest);
       console.log("========================");
     }
-
-    // NOTE: these env var exports are dead — nothing reads ALLOWED_TOOLS / DISALLOWED_TOOLS.
-    // The live path is modes/tag/index.ts which passes the allowed tools to the Runner directly.
-    // Kept only so the H1 report's pointed-to file stays in sync with the live fix.
-    const hasActionsReadPermission = false;
-
-    const allAllowedTools = buildAllowedToolsString(
-      [],
-      hasActionsReadPermission,
-      context.inputs.useCommitSigning,
-    );
-    const allDisallowedTools = buildDisallowedToolsString([], []);
-
-    core.exportVariable("ALLOWED_TOOLS", allAllowedTools);
-    core.exportVariable("DISALLOWED_TOOLS", allDisallowedTools);
   } catch (error) {
     core.setFailed(
       `Create prompt failed with error: ${redactSecrets(String(error))}`,
