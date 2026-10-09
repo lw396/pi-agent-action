@@ -92,6 +92,11 @@ type BaseContext = {
     branchNameTemplate?: string;
     useStickyComment: boolean;
     classifyInlineComments: boolean;
+    /**
+     * Whether commits go through the GitHub API (use_commit_signing). False
+     * when ssh_signing_key is set, which takes precedence: commits then go
+     * through git, signed with the key.
+     */
     useCommitSigning: boolean;
     sshSigningKey: string;
     botId: string;
@@ -153,7 +158,9 @@ export function parseGitHubContext(): GitHubContext {
       branchNameTemplate: process.env.BRANCH_NAME_TEMPLATE,
       useStickyComment: process.env.USE_STICKY_COMMENT === "true",
       classifyInlineComments: process.env.CLASSIFY_INLINE_COMMENTS !== "false",
-      useCommitSigning: process.env.USE_COMMIT_SIGNING === "true",
+      useCommitSigning:
+        process.env.USE_COMMIT_SIGNING === "true" &&
+        !process.env.SSH_SIGNING_KEY,
       sshSigningKey: process.env.SSH_SIGNING_KEY || "",
       botId: process.env.BOT_ID ?? String(APP_BOT_ID),
       botName: process.env.BOT_NAME ?? APP_BOT_LOGIN,

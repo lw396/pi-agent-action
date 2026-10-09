@@ -390,7 +390,6 @@ describe("parseGitHubContext", () => {
       process.env.USE_STICKY_COMMENT = "true";
       process.env.CLASSIFY_INLINE_COMMENTS = "false";
       process.env.USE_COMMIT_SIGNING = "true";
-      process.env.SSH_SIGNING_KEY = "ssh-key-material";
       process.env.BOT_ID = "111";
       process.env.BOT_NAME = "custom-bot";
       process.env.ALLOWED_BOTS = "dependabot[bot]";
@@ -417,7 +416,7 @@ describe("parseGitHubContext", () => {
       expect(inputs.useStickyComment).toBe(true);
       expect(inputs.classifyInlineComments).toBe(false);
       expect(inputs.useCommitSigning).toBe(true);
-      expect(inputs.sshSigningKey).toBe("ssh-key-material");
+      expect(inputs.sshSigningKey).toBe("");
       expect(inputs.botId).toBe("111");
       expect(inputs.botName).toBe("custom-bot");
       expect(inputs.allowedBots).toBe("dependabot[bot]");
@@ -425,6 +424,22 @@ describe("parseGitHubContext", () => {
       expect(inputs.trackProgress).toBe(true);
       expect(inputs.includeCommentsByActor).toBe("alice");
       expect(inputs.excludeCommentsByActor).toBe("bob");
+    });
+
+    test("ssh_signing_key takes precedence over use_commit_signing", () => {
+      process.env.USE_COMMIT_SIGNING = "true";
+      process.env.SSH_SIGNING_KEY = "ssh-key-material";
+
+      setEvent("issues", {
+        action: "opened",
+        issue: { number: 1 },
+        repository: repositoryPayload,
+      } as unknown as IssuesEvent);
+
+      const { inputs } = parseGitHubContext();
+
+      expect(inputs.sshSigningKey).toBe("ssh-key-material");
+      expect(inputs.useCommitSigning).toBe(false);
     });
 
     test("boolean inputs only accept the lowercase string true", () => {
