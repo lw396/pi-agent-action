@@ -8,7 +8,7 @@
 
 1. OIDC token 由 GitHub Actions 签发（`iss` 为 `https://token.actions.githubusercontent.com`，用其 JWKS 验签），`aud` 是本项目的 audience，没有过期。
 2. token 中的仓库装了本项目的 App。
-3. 发起请求的 workflow 文件（`job_workflow_ref` 中的路径）在仓库默认分支上存在，且内容与本次运行使用的版本（`workflow_sha`）相同。否则返回错误码 `workflow_not_found_on_default_branch`，action 跳过本次运行，与上游一致。这一条防止有人在分支或 PR 中修改 workflow，拿 App token 去做 workflow 原本不做的事。
+3. 发起请求的 workflow 文件（`workflow_ref` 中的路径）在仓库默认分支上存在，且内容与本次运行使用的版本（`workflow_sha`）相同。job 用的是同一仓库中的 reusable workflow 时（`job_workflow_ref`），它在 `job_workflow_sha` 的版本也要与默认分支上的相同；其他仓库中的 reusable workflow 由调用方的文件固定版本，不单独校验。否则返回错误码 `workflow_not_found_on_default_branch`，action 跳过本次运行，与上游一致。这一条防止有人在分支或 PR 中修改 workflow，拿 App token 去做 workflow 原本不做的事。
 4. 请求的权限不超过 App 拥有的权限。默认权限与上游相同（`contents`、`pull_requests`、`issues` 写），`additional_permissions` 可以在此基础上追加。
 
 签发的 token 只对 OIDC token 中的那一个仓库有效。吊销沿用 `action.yml` 中现有的 `always()` 步骤（`DELETE /installation/token`），服务不参与。

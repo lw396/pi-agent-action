@@ -3,3 +3,5 @@ node_modules
 
 **/.claude/settings.local.json
 __pycache__/
+.wrangler/
+.dev.vars*

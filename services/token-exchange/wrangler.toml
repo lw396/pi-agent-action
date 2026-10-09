@@ -1,0 +1,13 @@
+compatibility_date = "2026-10-01"
+main = "src/index.ts"
+name = "pi-agent-action"
+preview_urls = false
+workers_dev = true
+
+[vars]
+GITHUB_APP_ID = "5246881"
+GITHUB_APP_SLUG = "pi-agent-action"
+OIDC_AUDIENCE = "pi-agent-action"
+
+[observability]
+enabled = true
