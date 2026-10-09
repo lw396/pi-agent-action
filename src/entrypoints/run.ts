@@ -35,7 +35,6 @@ import { formatTurnsFromData } from "./format-turns";
 import type { ExecutionRecord } from "./format-turns";
 import { redactSecrets } from "../github/utils/sanitizer";
 import { collectSecretValues } from "../github/utils/secret-values";
-import { preparePrompt } from "../runner/prepare-prompt";
 import { runPi } from "../runner/run-pi";
 import { parseMcpConfig } from "../runner/mcp-servers";
 import { setExecutionFileOutputIfPresent } from "../runner/execution-file";
@@ -193,12 +192,7 @@ async function run() {
     const promptFile =
       process.env.INPUT_PROMPT_FILE ||
       `${process.env.RUNNER_TEMP}/pi-prompts/prompt.txt`;
-    const promptConfig = await preparePrompt({
-      prompt: "",
-      promptFile,
-    });
-
-    const runResult = await runPi(promptConfig.path, {
+    const runResult = await runPi(promptFile, {
       model: process.env.MODEL,
       apiKey: process.env.API_KEY,
       piArgs: process.env.PI_ARGS,

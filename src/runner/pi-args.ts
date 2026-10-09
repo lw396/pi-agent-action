@@ -55,14 +55,20 @@ function flagName(field: string): string {
   return `--${field.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
 }
 
-/** Split pi_args like a shell would, without running anything. */
-function splitWords(text: string): string[] {
-  // Whole-line comments, as in Upstream's claude_args.
-  const withoutComments = text
+/**
+ * Drop whole-line `#` comments from a multi-line input, as Upstream's
+ * claude_args allows. Used by pi_args, allowed_tools and disallowed_tools.
+ */
+export function stripCommentLines(text: string): string {
+  return text
     .split("\n")
     .filter((line) => !line.trim().startsWith("#"))
     .join("\n");
-  return parseShellWords(withoutComments).map((word) => {
+}
+
+/** Split pi_args like a shell would, without running anything. */
+function splitWords(text: string): string[] {
+  return parseShellWords(stripCommentLines(text)).map((word) => {
     if (typeof word === "string") return word;
     // An unquoted pattern such as mcp__github__* comes back as a glob.
     if ("op" in word && word.op === "glob") return word.pattern;

@@ -1,7 +1,9 @@
 import type {
+  Api,
   ClassifierApi,
   ClassifierModel,
   ClassifierQuestion,
+  Model,
   Usage,
 } from "@earendil-works/pi-ai";
 import {
@@ -56,12 +58,17 @@ For each numbered comment body below, respond with ONLY a JSON array of booleans
 Comments:
 `;
 
+type ChatModel = Model<Api>;
+
 type Choice =
   | { kind: "classifier"; model: ClassifierModel<ClassifierApi> }
-  | {
-      kind: "chat";
-      model: NonNullable<ReturnType<typeof resolveCliModel>["model"]>;
-    };
+  | { kind: "chat"; model: ChatModel };
+
+/** Log why comments cannot be classified; every comment is then posted. */
+function postAll(reason: string): null {
+  console.log(`${reason} — posting all unconfirmed comments`);
+  return null;
+}
 
 function findClassifier(
   modelRuntime: ModelRuntime,
@@ -76,9 +83,14 @@ function findClassifier(
   );
 }
 
+/**
+ * The model to classify with: classify_model as a classifier or chat model,
+ * else the model input as a chat model. Undefined, after logging why, when
+ * there is none.
+ */
 function chooseModel(
   modelRuntime: ModelRuntime,
-  mainModel: ReturnType<typeof resolveCliModel>["model"],
+  mainModel: ChatModel | undefined,
   classifyModel: string | undefined,
 ): Choice | undefined {
   if (classifyModel) {
@@ -86,12 +98,14 @@ function chooseModel(
     if (classifier) return { kind: "classifier", model: classifier };
     const chat = resolveCliModel({ cliModel: classifyModel, modelRuntime });
     if (chat.model) return { kind: "chat", model: chat.model };
-    console.log(
-      `::warning::classify_model '${classifyModel}' is not a model pi knows (${chat.error}) — posting all unconfirmed comments`,
+    postAll(
+      `::warning::classify_model '${classifyModel}' is not a model pi knows (${chat.error})`,
     );
     return undefined;
   }
-  return mainModel ? { kind: "chat", model: mainModel } : undefined;
+  if (mainModel) return { kind: "chat", model: mainModel };
+  postAll("No model to classify with");
+  return undefined;
 }
 
 function logUsage(model: { provider: string; id: string }, usage?: Usage) {
@@ -127,27 +141,23 @@ async function classifyWithClassifier(
   });
   logUsage(model, result.usage);
   if (result.stopReason !== "stop") {
-    console.log(
-      `Classification failed (${result.errorMessage ?? result.stopReason}) — posting all unconfirmed comments`,
+    return postAll(
+      `Classification failed (${result.errorMessage ?? result.stopReason})`,
     );
-    return null;
   }
   const verdicts = keys.map((key) => {
     const answer = result.answers[key];
     return answer?.type === "bool" ? answer.probability >= 0.5 : undefined;
   });
   if (verdicts.some((v) => v === undefined)) {
-    console.log(
-      "Classification response shape mismatch — posting all unconfirmed comments",
-    );
-    return null;
+    return postAll("Classification response shape mismatch");
   }
   return verdicts as boolean[];
 }
 
 async function classifyWithChat(
   modelRuntime: ModelRuntime,
-  model: Choice["model"] & { type?: "chat" },
+  model: ChatModel,
   bodies: string[],
 ): Promise<boolean[] | null> {
   const prompt =
@@ -158,21 +168,15 @@ async function classifyWithChat(
   });
   logUsage(model, response.usage);
   if (response.stopReason === "error" || response.stopReason === "aborted") {
-    console.log(
-      `Classification failed (${response.errorMessage ?? response.stopReason}) — posting all unconfirmed comments`,
+    return postAll(
+      `Classification failed (${response.errorMessage ?? response.stopReason})`,
     );
-    return null;
   }
   const text = response.content
     .map((block) => (block.type === "text" ? block.text : ""))
     .join("");
   const match = text.match(/\[[\s\S]*\]/);
-  if (!match) {
-    console.log(
-      "Could not parse classification response — posting all unconfirmed comments",
-    );
-    return null;
-  }
+  if (!match) return postAll("Could not parse classification response");
   let parsed: unknown;
   try {
     parsed = JSON.parse(match[0]);
@@ -184,10 +188,7 @@ async function classifyWithChat(
     parsed.length !== bodies.length ||
     !parsed.every((v) => typeof v === "boolean")
   ) {
-    console.log(
-      "Classification response shape mismatch — posting all unconfirmed comments",
-    );
-    return null;
+    return postAll("Classification response shape mismatch");
   }
   return parsed;
 }
@@ -216,21 +217,13 @@ export async function classifyComments(
       main,
       options.classifyModel?.trim() || undefined,
     );
-    if (!choice) {
-      if (!options.classifyModel?.trim()) {
-        console.log(
-          "No model to classify with — posting all unconfirmed comments",
-        );
-      }
-      return null;
-    }
+    if (!choice) return null;
     return choice.kind === "classifier"
       ? await classifyWithClassifier(modelRuntime, choice.model, bodies)
       : await classifyWithChat(modelRuntime, choice.model, bodies);
   } catch (e) {
-    console.log(
-      `Classification failed (${e instanceof Error ? e.message : String(e)}) — posting all unconfirmed comments`,
+    return postAll(
+      `Classification failed (${e instanceof Error ? e.message : String(e)})`,
     );
-    return null;
   }
 }

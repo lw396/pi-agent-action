@@ -77,16 +77,12 @@ export function checkWorkspacePath(
   if (target === undefined || root === undefined) {
     return { inside: false, reason: "outside" };
   }
-  const relativePath = relative(root, target);
-  if (
-    relativePath === "" ||
-    relativePath === ".." ||
-    relativePath.startsWith(`..${sep}`) ||
-    isAbsolute(relativePath)
-  ) {
+  if (target === root || !isWithin(target, root)) {
     return { inside: false, reason: "outside" };
   }
-  const parts = relativePath.split(sep).map((part) => part.toLowerCase());
+  const parts = relative(root, target)
+    .split(sep)
+    .map((part) => part.toLowerCase());
   if (parts.includes(".git")) return { inside: false, reason: "git" };
   return { inside: true };
 }

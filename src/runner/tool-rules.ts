@@ -1,4 +1,5 @@
 import * as core from "@actions/core";
+import { stripCommentLines } from "./pi-args";
 
 /**
  * Parsing of the allowed_tools and disallowed_tools inputs.
@@ -63,10 +64,7 @@ const UPSTREAM_ONLY_TOOLS = new Set([
  * shell-quoted --allowedTools value, are removed.
  */
 function splitRules(text: string, inputName: string): string[] {
-  const source = text
-    .split("\n")
-    .filter((line) => !line.trim().startsWith("#"))
-    .join("\n");
+  const source = stripCommentLines(text);
   const rules: string[] = [];
   let current = "";
   let depth = 0;

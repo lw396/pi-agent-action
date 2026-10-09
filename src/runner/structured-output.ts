@@ -1,5 +1,7 @@
 import { Type } from "@earendil-works/pi-ai";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
+import type { PiArgs } from "./pi-args";
+import type { ToolRule } from "./tool-rules";
 
 /** The tool the model calls with its result when json_schema is set. */
 export const SUBMIT_RESULT_TOOL = "submit_result";
@@ -9,8 +11,8 @@ export const MAX_REMINDERS = 2;
 
 const REMINDER = `You have not submitted your result. Call ${SUBMIT_RESULT_TOOL} now, with your final result as its arguments. The run fails if you do not.`;
 
-/** What the extension records during the run, read by the Runner afterwards. */
-export type StructuredOutputState = {
+/** What the extension records during the run. */
+type StructuredOutputState = {
   /** The arguments of the latest valid submit_result call. */
   result?: Record<string, unknown>;
   reminders: number;
@@ -22,7 +24,7 @@ export type StructuredOutputState = {
  * upstream's structured_output is an object of named fields, so other schemas
  * are refused before the model starts.
  */
-export function parseJsonSchema(
+function parseJsonSchema(
   input: string | undefined,
 ): Record<string, unknown> | undefined {
   if (!input?.trim()) return undefined;
@@ -56,7 +58,7 @@ export function parseJsonSchema(
  * tool removed, up to MAX_REMINDERS times. The Runner fails the run when there
  * is still no result.
  */
-export function structuredOutputExtension(
+function structuredOutputExtension(
   schema: Record<string, unknown>,
   state: StructuredOutputState,
 ): ExtensionFactory {
@@ -100,5 +102,58 @@ export function structuredOutputExtension(
         ],
       };
     });
+  };
+}
+
+/** Everything the Runner does differently when json_schema is set. */
+export type StructuredOutput = {
+  /** Submitting the result needs no rule; disallowed_tools can still block it. */
+  allowRule: ToolRule;
+  extension: ExtensionFactory;
+  /**
+   * The session's tools list. A --tools list or --no-tools from pi_args would
+   * leave out submit_result: pi activates only the tools a list names, and
+   * `tools` wins over `noTools`.
+   */
+  sessionTools(piArgs: PiArgs): string[] | undefined;
+  /** Why the session cannot submit a result, given its active tools. */
+  toolsProblem(activeTools: string[]): string | undefined;
+  /** Why the run failed for want of a result, once the session has ended. */
+  failure(): string | undefined;
+  /** The submitted result as JSON, for the structured_output output. */
+  output(): string | undefined;
+};
+
+/**
+ * Structured output for the json_schema input, or undefined when it is not
+ * set. Throws on a schema the action cannot use.
+ */
+export function createStructuredOutput(
+  input: string | undefined,
+): StructuredOutput | undefined {
+  const schema = parseJsonSchema(input);
+  if (!schema) return undefined;
+  const state: StructuredOutputState = { reminders: 0 };
+  return {
+    allowRule: { text: "json_schema", tool: SUBMIT_RESULT_TOOL },
+    extension: structuredOutputExtension(schema, state),
+    sessionTools({ tools, noTools }) {
+      if (tools) return [...tools, SUBMIT_RESULT_TOOL];
+      if (noTools === "all") return [SUBMIT_RESULT_TOOL];
+      return undefined;
+    },
+    toolsProblem(activeTools) {
+      if (activeTools.includes(SUBMIT_RESULT_TOOL)) return undefined;
+      return `pi_args leaves out the ${SUBMIT_RESULT_TOOL} tool, which json_schema needs. Remove it from --exclude-tools.`;
+    },
+    failure() {
+      if (state.result !== undefined) return undefined;
+      return `the model did not call ${SUBMIT_RESULT_TOOL}, which json_schema requires, after ${state.reminders} reminders`;
+    },
+    output() {
+      return state.result !== undefined
+        ? JSON.stringify(state.result)
+        : undefined;
+    },
   };
 }

@@ -8,11 +8,12 @@ import {
   ModelRuntime,
   resolveCliModel,
   SessionManager,
+  SettingsManager,
   type AgentSession,
   type AgentSessionEvent,
+  type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { redactSecrets } from "../github/utils/sanitizer";
-import { setupPiSettings } from "./setup-pi-settings";
 import { createModelRuntime } from "./model-runtime";
 import { isolatedBashTool } from "./bash-isolation";
 import { commentRedactionExtension } from "./comment-redaction";
@@ -23,12 +24,11 @@ import { mcpServerExtensions, type McpServers } from "./mcp-servers";
 import {
   parseToolPermissions,
   toolPermissionsExtension,
+  type ToolPermissions,
 } from "./tool-permissions";
 import {
-  parseJsonSchema,
-  structuredOutputExtension,
-  SUBMIT_RESULT_TOOL,
-  type StructuredOutputState,
+  createStructuredOutput,
+  type StructuredOutput,
 } from "./structured-output";
 
 export type RunnerOptions = {
@@ -142,64 +142,34 @@ export async function runPi(
 
   const piArgs = parsePiArgs(options.piArgs);
   const cwd = options.cwd ?? process.cwd();
-  const jsonSchema = parseJsonSchema(options.jsonSchema);
-  const permissions = parseToolPermissions(
-    options.allowedTools,
-    options.disallowedTools,
-  );
-  if (jsonSchema) {
-    // Submitting the result needs no rule; disallowed_tools can still block it.
-    permissions.allowed.push({ text: "json_schema", tool: SUBMIT_RESULT_TOOL });
-  }
-  const toolPermissions = {
-    ...permissions,
-    editableWorkspace: options.acceptEdits ? cwd : undefined,
-    readOnlyGit: options.readOnlyGit,
-    procHiddenFrom: options.isolateBash ? cwd : undefined,
-  };
-
-  const customTools = options.isolateBash
-    ? [
-        isolatedBashTool(cwd, {
-          allowedEnv: options.allowedBashEnv,
-          bwrapPath: options.bwrapPath,
-        }),
-      ]
-    : [];
-  if (!options.isolateBash && options.allowedBashEnv?.trim()) {
-    core.warning(
-      "allowed_bash_env has no effect: bash is only isolated when allowed_non_write_users is set and subprocess_isolation is not false.",
-    );
-  }
+  const structuredOutput = createStructuredOutput(options.jsonSchema);
+  const toolPermissions = buildToolPermissions(options, cwd, structuredOutput);
+  const customTools = bashTools(options, cwd);
+  const prompt = await readPrompt(promptPath);
 
   for (const name of AGENT_HIDDEN_ENV) {
     delete process.env[name];
   }
 
-  const prompt = await readFile(promptPath, "utf-8");
   const modelRuntime = options.modelRuntime ?? (await createModelRuntime());
-
-  const resolved = resolveCliModel({
-    cliModel: modelReference,
+  const model = await resolveModel(
     modelRuntime,
-  });
-  if (!resolved.model) {
-    throw new Error(`Cannot use model '${modelReference}': ${resolved.error}`);
-  }
-  if (options.apiKey) {
-    await modelRuntime.setRuntimeApiKey(
-      resolved.model.provider,
-      options.apiKey,
-    );
-  }
+    modelReference,
+    options.apiKey,
+  );
 
   // pi's global directory. Settings live in memory and sessions are not
   // persisted, so this stays empty; it only keeps pi away from ~/.pi/agent.
   const agentDir = await mkdtemp(
     join(process.env.RUNNER_TEMP || tmpdir(), "pi-agent-"),
   );
-  const settingsManager = setupPiSettings();
-  const structuredOutput: StructuredOutputState = { reminders: 0 };
+  // Settings live only in memory: neither ~/.pi/agent/settings.json nor the
+  // repository's .pi/settings.json is read, and nothing is written, so the
+  // agent cannot change configuration later processes in the job would read
+  // (docs/development/upstream-divergence.md). Pass every setting here at
+  // once: values applied afterwards with applyOverrides() are lost on reload
+  // (test/pi-sdk/settings.test.ts).
+  const settingsManager = SettingsManager.inMemory({});
   const resourceLoader = new DefaultResourceLoader({
     cwd,
     agentDir,
@@ -207,9 +177,7 @@ export async function runPi(
     extensionFactories: [
       toolPermissionsExtension(toolPermissions),
       commentRedactionExtension(),
-      ...(jsonSchema
-        ? [structuredOutputExtension(jsonSchema, structuredOutput)]
-        : []),
+      ...(structuredOutput ? [structuredOutput.extension] : []),
       ...mcpServerExtensions(
         options.mcpServers ?? {},
         join(agentDir, "mcp.log"),
@@ -224,10 +192,12 @@ export async function runPi(
   const { session } = await createAgentSession({
     cwd,
     agentDir,
-    model: resolved.model,
+    model: model.model,
     // --thinking wins over a :<thinking> suffix on the model, as in pi's CLI.
-    thinkingLevel: piArgs.thinkingLevel ?? resolved.thinkingLevel,
-    tools: withSubmitResult(piArgs, jsonSchema !== undefined),
+    thinkingLevel: piArgs.thinkingLevel ?? model.thinkingLevel,
+    tools: structuredOutput
+      ? structuredOutput.sessionTools(piArgs)
+      : piArgs.tools,
     excludeTools: piArgs.excludeTools,
     noTools: piArgs.noTools,
     customTools,
@@ -236,58 +206,25 @@ export async function runPi(
     settingsManager,
     sessionManager,
   });
-  if (
-    jsonSchema &&
-    !session.getActiveToolNames().includes(SUBMIT_RESULT_TOOL)
-  ) {
+  const toolsProblem = structuredOutput?.toolsProblem(
+    session.getActiveToolNames(),
+  );
+  if (toolsProblem) {
     session.dispose();
-    throw new Error(
-      `pi_args leaves out the ${SUBMIT_RESULT_TOOL} tool, which json_schema needs. Remove it from --exclude-tools.`,
-    );
+    throw new Error(toolsProblem);
   }
 
-  const records: unknown[] = [sessionManager.getHeader()];
-  session.subscribe((event) => {
-    if (OMITTED_EVENTS.has(event.type)) return;
-    records.push(event);
-    if (options.showFullOutput) {
-      console.log(redactSecrets(JSON.stringify(event, null, 2)));
-    }
-  });
-  if (!options.showFullOutput) {
-    console.log(
-      "Running pi (full output hidden for security). Rerun in debug mode or set show_full_output: true for every event in the log.",
-    );
-  }
-
-  let failure: string | undefined;
-  let stats;
-  const startedAt = Date.now();
-  try {
-    await session.bindExtensions({});
-    await session.prompt(command ? `${prompt}\n\n${command}` : prompt);
-    failure = sessionFailure(session.messages);
-    if (
-      failure === undefined &&
-      jsonSchema &&
-      structuredOutput.result === undefined
-    ) {
-      failure = `the model did not call ${SUBMIT_RESULT_TOOL}, which json_schema requires, after ${structuredOutput.reminders} reminders`;
-    }
-  } catch (error) {
-    failure = error instanceof Error ? error.message : String(error);
-  } finally {
-    // Totals for the whole run, so spend can be tracked per run.
-    const {
-      sessionFile: _file,
-      contextUsage: _context,
-      ...totals
-    } = session.getSessionStats();
-    stats = totals;
-    session.dispose();
-  }
-  const durationMs = Date.now() - startedAt;
-  records.push({ type: "session_stats", ...stats, durationMs });
+  const records = recordEvents(
+    session,
+    sessionManager.getHeader(),
+    options.showFullOutput,
+  );
+  const { failure, stats } = await runSession(
+    session,
+    command ? `${prompt}\n\n${command}` : prompt,
+    structuredOutput,
+  );
+  records.push({ type: "session_stats", ...stats });
   console.log(
     `pi used ${stats.tokens.total} tokens in ${stats.assistantMessages} responses, cost $${stats.cost.toFixed(4)}`,
   );
@@ -303,26 +240,129 @@ export async function runPi(
     conclusion: "success",
     executionFile,
     sessionId,
-    structuredOutput:
-      structuredOutput.result !== undefined
-        ? JSON.stringify(structuredOutput.result)
-        : undefined,
+    structuredOutput: structuredOutput?.output(),
   };
 }
 
+/** The prompt the mode wrote, which must exist and not be empty. */
+async function readPrompt(promptPath: string): Promise<string> {
+  let prompt: string;
+  try {
+    prompt = await readFile(promptPath, "utf-8");
+  } catch {
+    throw new Error(`Prompt file '${promptPath}' does not exist.`);
+  }
+  if (!prompt) {
+    throw new Error("Prompt file is empty. Please provide a non-empty prompt.");
+  }
+  return prompt;
+}
+
+/** The allowed_tools and disallowed_tools rules, and what the run allows besides. */
+function buildToolPermissions(
+  options: RunnerOptions,
+  cwd: string,
+  structuredOutput: StructuredOutput | undefined,
+): ToolPermissions {
+  const { allowed, disallowed } = parseToolPermissions(
+    options.allowedTools,
+    options.disallowedTools,
+  );
+  return {
+    allowed: structuredOutput
+      ? [...allowed, structuredOutput.allowRule]
+      : allowed,
+    disallowed,
+    editableWorkspace: options.acceptEdits ? cwd : undefined,
+    readOnlyGit: options.readOnlyGit,
+    procHiddenFrom: options.isolateBash ? cwd : undefined,
+  };
+}
+
+/** The isolated bash tool that replaces the built-in one, when bash is isolated. */
+function bashTools(options: RunnerOptions, cwd: string): ToolDefinition[] {
+  if (options.isolateBash) {
+    return [
+      isolatedBashTool(cwd, {
+        allowedEnv: options.allowedBashEnv,
+        bwrapPath: options.bwrapPath,
+      }),
+    ];
+  }
+  if (options.allowedBashEnv?.trim()) {
+    core.warning(
+      "allowed_bash_env has no effect: bash is only isolated when allowed_non_write_users is set and subprocess_isolation is not false.",
+    );
+  }
+  return [];
+}
+
+/** Resolve the model input, and give its provider the api_key input if set. */
+async function resolveModel(
+  modelRuntime: ModelRuntime,
+  reference: string,
+  apiKey: string | undefined,
+) {
+  const resolved = resolveCliModel({ cliModel: reference, modelRuntime });
+  if (!resolved.model) {
+    throw new Error(`Cannot use model '${reference}': ${resolved.error}`);
+  }
+  if (apiKey) {
+    await modelRuntime.setRuntimeApiKey(resolved.model.provider, apiKey);
+  }
+  return { model: resolved.model, thinkingLevel: resolved.thinkingLevel };
+}
+
 /**
- * The tools list for the session. A --tools list or --no-tools from pi_args
- * would leave out submit_result, which json_schema needs: pi activates only
- * the tools a list names, and `tools` wins over `noTools`.
+ * Collect the session's events for the Execution file, starting with the
+ * session header, and log them when showFullOutput is set.
  */
-function withSubmitResult(
-  piArgs: ReturnType<typeof parsePiArgs>,
-  needsSubmitResult: boolean,
-): string[] | undefined {
-  if (!needsSubmitResult) return piArgs.tools;
-  if (piArgs.tools) return [...piArgs.tools, SUBMIT_RESULT_TOOL];
-  if (piArgs.noTools === "all") return [SUBMIT_RESULT_TOOL];
-  return undefined;
+function recordEvents(
+  session: AgentSession,
+  header: unknown,
+  showFullOutput: boolean | undefined,
+): unknown[] {
+  const records: unknown[] = [header];
+  session.subscribe((event) => {
+    if (OMITTED_EVENTS.has(event.type)) return;
+    records.push(event);
+    if (showFullOutput) {
+      console.log(redactSecrets(JSON.stringify(event, null, 2)));
+    }
+  });
+  if (!showFullOutput) {
+    console.log(
+      "Running pi (full output hidden for security). Rerun in debug mode or set show_full_output: true for every event in the log.",
+    );
+  }
+  return records;
+}
+
+/**
+ * Prompt the session and dispose of it. Returns why the run failed, if it did,
+ * and the totals for the whole run, so spend can be tracked per run.
+ */
+async function runSession(
+  session: AgentSession,
+  prompt: string,
+  structuredOutput: StructuredOutput | undefined,
+) {
+  let failure: string | undefined;
+  const startedAt = Date.now();
+  try {
+    await session.bindExtensions({});
+    await session.prompt(prompt);
+    failure = sessionFailure(session.messages) ?? structuredOutput?.failure();
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error);
+  }
+  const {
+    sessionFile: _file,
+    contextUsage: _context,
+    ...totals
+  } = session.getSessionStats();
+  session.dispose();
+  return { failure, stats: { ...totals, durationMs: Date.now() - startedAt } };
 }
 
 /**

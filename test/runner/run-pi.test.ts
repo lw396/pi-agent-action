@@ -202,6 +202,23 @@ describe("runPi", () => {
     expect(faux.state.callCount).toBe(0);
   });
 
+  test("refuses to run without a prompt", async () => {
+    const { faux, model, modelRuntime } = await fauxRuntime([
+      fauxAssistantMessage("unused"),
+    ]);
+    const { cwd, promptPath } = getScratch();
+    const options = { model, cwd, modelRuntime };
+
+    await expect(runPi(promptPath, options)).rejects.toThrow(
+      `Prompt file '${promptPath}' does not exist.`,
+    );
+    await writePrompt("");
+    await expect(runPi(promptPath, options)).rejects.toThrow(
+      "Prompt file is empty",
+    );
+    expect(faux.state.callCount).toBe(0);
+  });
+
   test("applies pi's own arguments from pi_args", async () => {
     let seen: { reasoning?: string; transcript: string } | undefined;
     const { modelRuntime, model } = await fauxRuntime([
