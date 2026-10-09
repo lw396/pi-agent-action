@@ -2,7 +2,6 @@ import * as core from "@actions/core";
 import { mkdtemp, readFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -14,6 +13,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { redactSecrets } from "../github/utils/sanitizer";
 import { setupPiSettings } from "./setup-pi-settings";
+import { createModelRuntime } from "./model-runtime";
 import { isolatedBashTool } from "./bash-isolation";
 import { commentRedactionExtension } from "./comment-redaction";
 import { parsePiArgs } from "./pi-args";
@@ -120,14 +120,6 @@ const AGENT_HIDDEN_ENV = [
   "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
   "ALL_INPUTS",
 ];
-
-async function createModelRuntime(): Promise<ModelRuntime> {
-  return ModelRuntime.create({
-    credentials: new InMemoryCredentialStore(), // never reads or writes auth.json
-    modelsPath: null, // no models.json
-    refreshOnCreate: false, // static catalog only, no network at startup
-  });
-}
 
 /**
  * Run one pi session on the prompt in promptPath, in this process (ADR-0001).

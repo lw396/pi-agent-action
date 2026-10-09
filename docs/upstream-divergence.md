@@ -113,13 +113,13 @@
 - **本仓库**：不传入，也没有对应机制；设置了也不生效，运行不报错
 - **说明**：这是 Claude Code 内部的功能，pi 没有。`allowed_tools` 中的 `Bash(脚本路径:*)` 规则只能决定脚本能否运行，不能限制次数
 
-#### inline comment 分类的 key
+#### inline comment 分类的模型
 
 `multi-provider` · 用户可见：是
 
-- **上游**：读取 `anthropic_api_key` 输入，调用 Claude Haiku 分类
-- **本仓库**：读取 workflow env 中的 `ANTHROPIC_API_KEY`；没有时跳过分类，未确认的 inline comment 全部发布（与上游没有 key 时相同）
-- **说明**：`anthropic_api_key` 输入已删除；分类暂时只支持 Anthropic API
+- **上游**：读取 `anthropic_api_key` 输入，直接调用 Anthropic API 的 Claude Haiku 分类；没有 key 时跳过分类，未确认的 inline comment 全部发布
+- **本仓库**：通过 pi 的 `ModelRuntime` 分类（`src/runner/classify-comments.ts`）。新增可选输入 `classify_model`：是分类模型时，每条评论一个 `bool` 问题，一次请求问完，概率不低于 0.5 才发布；是对话模型时，沿用上游的 prompt，解析返回的布尔数组。不设时，`model` 的 provider 有付费的 jev 分类模型就用它（优先固定版本，不用 `-free` / `:free`），没有就用 `model` 本身。`api_key` 只用于 `model` 的 provider。任何失败（找不到模型、没有凭据、请求出错、无法解析）都退回全部发布。分类的模型、token 和 cost 单独打一行日志，不计入会话合计
+- **说明**：`anthropic_api_key` 输入已删除，只认 Anthropic 会让其他 provider 的用户没有分类。jev 这类分类模型直接返回概率，不用解析文本；只有部分 provider（TypeSafe、OpenRouter、Cloudflare、Vercel、OpenCode）提供，所以退回对话模型
 
 #### 触发词、触发标签与分支前缀的默认值
 
@@ -228,7 +228,7 @@
 
 - **上游**：`redactSecrets()` 按格式匹配 GitHub、Anthropic、AWS、Slack、JWT
 - **本仓库**：补上 OpenAI、OpenRouter、Google（Gemini）的格式，并新增按值匹配（`src/github/utils/secret-values.ts`）：启动时收集 bash env 白名单以外、长度不少于 16 的 env 值；同时是白名单变量的值、action 从自己的非凭据类输入设置的变量（`ACTION_SETTINGS_ENV`，如 `PROMPT`、`MODEL`；`PI_ARGS` 等透传参数不在其中）、已存在的绝对路径或路径列表除外，把原文、base64（单独编码及嵌在更长内容中的 3 种对齐偏移）和 URL 编码形式替换为 `[REDACTED]`。MCP 工具（action 注册的 server 都与 GitHub 交互，评论类工具在内）的参数在 pi 进程中由 `tool_call` 扩展（`src/runner/comment-redaction.ts`）脱敏后再送到 MCP server。tag mode 生成 prompt 失败、安装 MCP server 失败时的错误信息也经过 `redactSecrets()`（上游没有）
-- **说明**：格式未知的 provider（如 OpenCode）只能按值识别。MCP server 进程的 env 中没有 provider key，所以按值脱敏在 pi 进程中完成。workflow 自己设置的、不是密钥的长 env 值（如 URL、不存在的路径）仍会被替换。写进 `prompt` 的 secret 只有在它自己也是 env 变量时才会被识别。post-buffered inline comments 步骤只能看到 job 级 `env:` 中的 key。刻意混淆过的输出挡不住
+- **说明**：格式未知的 provider（如 OpenCode）只能按值识别。MCP server 进程的 env 中没有 provider key，所以按值脱敏在 pi 进程中完成。workflow 自己设置的、不是密钥的长 env 值（如 URL、不存在的路径）仍会被替换。写进 `prompt` 的 secret 只有在它自己也是 env 变量时才会被识别。刻意混淆过的输出挡不住
 
 ### 输出与报告
 

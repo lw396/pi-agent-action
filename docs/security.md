@@ -93,7 +93,6 @@ Redaction is a last line of defense, and it has limits:
 
 - Output the model has deliberately obfuscated — split, reversed, encoded some other way — gets through.
 - A secret is only recognized if it is in the environment under its own name or matches a known format. A secret written into `prompt`, or a short one, is not. Pass secrets through `env:` rather than interpolating them into the prompt.
-- The step that posts buffered inline comments sees only the job-level `env:`, so a secret set only on the action's step is not redacted there.
 - Long non-secret values in the environment, such as URLs and paths that do not exist, are redacted too. To keep one visible in the output, write it into `prompt` instead of `env:`.
 
 ## Using this action with `pull_request_target` or `workflow_run`

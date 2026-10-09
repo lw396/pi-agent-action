@@ -1,18 +1,19 @@
 #!/usr/bin/env bun
 /**
  * Reads buffered inline-comment calls from /tmp/inline-comments-buffer.jsonl,
- * classifies each as "real review" vs "test/probe" using Haiku, and posts
- * only the real ones. Calls with confirmed=false are never posted.
+ * classifies each as "real review" vs "test/probe" through pi
+ * (src/runner/classify-comments.ts), and posts only the real ones. Calls with
+ * confirmed=false are never posted.
  *
- * If the Anthropic API is unavailable (Bedrock/Vertex users without a direct
- * key), falls back to posting everything with confirmed !== false. This
- * preserves backward compatibility — before this change, all unconfirmed
- * calls posted immediately.
+ * When classification is not possible (no model, no credentials, a failed
+ * request), falls back to posting everything with confirmed !== false, as
+ * Upstream does without an Anthropic key.
  */
 import { readFileSync } from "fs";
 import { createOctokit } from "../github/api/client";
 import { redactSecrets } from "../github/utils/sanitizer";
 import { collectSecretValues } from "../github/utils/secret-values";
+import { classifyComments } from "../runner/classify-comments";
 
 const BUFFER_PATH = "/tmp/inline-comments-buffer.jsonl";
 
@@ -26,89 +27,6 @@ type BufferedComment = {
   body: string;
   confirmed?: boolean;
 };
-
-const CLASSIFICATION_PROMPT = `You are classifying PR inline comments as either REAL code review feedback or TEST/PROBE calls.
-
-A TEST/PROBE call is when an automated agent is checking whether a commenting tool works. These typically:
-- Start with phrases like "Test comment", "Testing if", "Can I", "Does this work", "Checking if"
-- Have generic/placeholder content not specific to any code
-- Exist to verify tool functionality, not to provide review feedback
-
-A REAL review comment:
-- Discusses specific code, logic, bugs, or style
-- Provides actionable feedback for the PR author
-- References concrete aspects of the change
-
-For each numbered comment body below, respond with ONLY a JSON array of booleans where true = REAL review comment, false = test/probe. No other text.
-
-Comments:
-`;
-
-async function classifyComments(bodies: string[]): Promise<boolean[] | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.log(
-      "ANTHROPIC_API_KEY not set — skipping classification, posting all unconfirmed comments",
-    );
-    return null;
-  }
-
-  const prompt =
-    CLASSIFICATION_PROMPT +
-    bodies.map((b, i) => `${i + 1}. ${JSON.stringify(b)}`).join("\n");
-
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5",
-        max_tokens: 1024,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!res.ok) {
-      console.log(
-        `Classification API returned ${res.status} — posting all unconfirmed comments`,
-      );
-      return null;
-    }
-
-    const data = (await res.json()) as {
-      content: { type: string; text: string }[];
-    };
-    const text = data.content.find((c) => c.type === "text")?.text ?? "";
-    const match = text.match(/\[[\s\S]*\]/);
-    if (!match) {
-      console.log(
-        "Could not parse classification response — posting all unconfirmed comments",
-      );
-      return null;
-    }
-    const parsed = JSON.parse(match[0]);
-    if (
-      !Array.isArray(parsed) ||
-      parsed.length !== bodies.length ||
-      !parsed.every((v) => typeof v === "boolean")
-    ) {
-      console.log(
-        "Classification response shape mismatch — posting all unconfirmed comments",
-      );
-      return null;
-    }
-    return parsed;
-  } catch (e) {
-    console.log(
-      `Classification failed (${e instanceof Error ? e.message : String(e)}) — posting all unconfirmed comments`,
-    );
-    return null;
-  }
-}
 
 async function postComment(
   octokit: ReturnType<typeof createOctokit>["rest"],
@@ -192,7 +110,14 @@ async function main() {
   }
 
   // Classify candidates
-  const verdicts = await classifyComments(candidates.map((c) => c.body));
+  const verdicts = await classifyComments(
+    candidates.map((c) => c.body),
+    {
+      model: process.env.MODEL,
+      classifyModel: process.env.CLASSIFY_MODEL,
+      apiKey: process.env.API_KEY,
+    },
+  );
   const toPost =
     verdicts === null
       ? candidates

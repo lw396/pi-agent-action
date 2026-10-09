@@ -137,6 +137,16 @@ inputs:
     description: "Buffer inline comments without confirmed=true and classify them (real review vs test/probe) before posting after the session ends. Set to 'false' to post all inline comments immediately (pre-buffering behavior)."
     required: false
     default: "true"
+  classify_model:
+    description: >-
+      The model that classifies buffered inline comments, as provider/id: a
+      classifier model (such as opencode/jev-1.13) or a chat model. When
+      empty, the paid jev classifier of the model input's provider is used if
+      there is one, and the model input itself otherwise. Its provider's key
+      comes from the workflow env; api_key only applies to the model input's
+      provider. If classification fails, every buffered comment is posted.
+    required: false
+    default: ""
   use_commit_signing:
     description: "Enable commit signing using GitHub's commit signature verification. When false, Claude uses standard git commands"
     required: false
@@ -443,6 +453,10 @@ runs:
         REPO_OWNER: ${{ github.event.repository.owner.login }}
         REPO_NAME: ${{ github.event.repository.name }}
         PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+        # Classification goes through pi; provider keys come from the workflow env.
+        MODEL: ${{ inputs.model }}
+        CLASSIFY_MODEL: ${{ inputs.classify_model }}
+        API_KEY: ${{ inputs.api_key }}
       run: |
         BUN_BIN="${GITHUB_ACTION_PATH}/bin/bun"
         [ -x "$BUN_BIN" ] || BUN_BIN="bun"
