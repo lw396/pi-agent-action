@@ -226,7 +226,7 @@ export async function runPi(
     session.getActiveToolNames(),
   );
   if (toolsProblem) {
-    session.dispose();
+    await closeSession(session);
     throw new Error(toolsProblem);
   }
 
@@ -361,8 +361,21 @@ async function runSession(
     contextUsage: _context,
     ...totals
   } = session.getSessionStats();
-  session.dispose();
+  await closeSession(session);
   return { failure, stats: { ...totals, durationMs: Date.now() - startedAt } };
+}
+
+/**
+ * Shut the session's extensions down, then dispose of the session. dispose()
+ * alone does not emit session_shutdown, so the MCP servers' processes would
+ * keep running and the action would not exit until the job timed out.
+ */
+async function closeSession(session: AgentSession) {
+  const runner = session.extensionRunner;
+  if (runner.hasHandlers("session_shutdown")) {
+    await runner.emit({ type: "session_shutdown", reason: "quit" });
+  }
+  session.dispose();
 }
 
 /**

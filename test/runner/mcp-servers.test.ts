@@ -2,7 +2,7 @@
 // `direct` exposure, checked through runPi() with pi's faux provider and a
 // real stdio server (test/fixtures/echo-env-mcp-server.ts).
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { runPi, type RunnerOptions } from "../../src/runner/run-pi";
@@ -106,9 +106,42 @@ describe("the action's MCP servers", () => {
     expect(declared).not.toContain("mcp__extra__echo_env");
   }, 30_000);
 
+  test("are stopped when the run ends", async () => {
+    // Record the server's pid; exec keeps it the same process.
+    const pidFile = join(getScratch().root, "server.pid");
+    await echo(["ECHO_VALUE"], {
+      mcpServers: {
+        echo: {
+          command: "sh",
+          args: [
+            "-c",
+            `echo $$ > ${pidFile}; exec ${process.execPath} run ${ECHO_SERVER}`,
+          ],
+          env: { ECHO_VALUE: "hello" },
+        },
+      },
+    });
+
+    const pid = Number(readFileSync(pidFile, "utf8").trim());
+    const deadline = Date.now() + 5_000;
+    while (isRunning(pid) && Date.now() < deadline) await Bun.sleep(50);
+    const running = isRunning(pid);
+    if (running) process.kill(pid);
+    expect(running).toBe(false);
+  }, 30_000);
+
   test("are left out of the session when there are none", async () => {
     const { declared } = await echo([], {});
 
     expect(declared.some((name) => name.startsWith("mcp__"))).toBe(false);
   });
 });
+
+function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
