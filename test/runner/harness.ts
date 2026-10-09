@@ -3,7 +3,7 @@
 // directory is touched: RUNNER_TEMP and HOME point into it for the duration
 // of each test.
 import { afterEach, beforeEach } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -92,9 +92,7 @@ export async function fauxRuntime(responses: FauxResponseStep[]) {
   return { faux, modelRuntime, model: `${model.provider}/${model.id}` };
 }
 
-export function readExecutionFile(path: string): Array<Record<string, any>> {
-  return JSON.parse(readFileSync(path, "utf-8"));
-}
+export { readExecutionFile } from "../../src/runner/execution-file";
 
 /** Rules written as in the allowed_tools input, parsed as readRunnerInputs() does. */
 export function rules(text: string): ToolRule[] {

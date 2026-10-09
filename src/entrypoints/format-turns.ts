@@ -1,8 +1,13 @@
 #!/usr/bin/env bun
 
-import { readFileSync, existsSync } from "fs";
+import { existsSync } from "fs";
 import { exit } from "process";
 import { redactSecrets } from "../github/utils/sanitizer";
+import {
+  readExecutionFile,
+  sessionStats,
+  type ExecutionRecord,
+} from "../runner/execution-file";
 
 export type ToolUse = {
   type: string;
@@ -16,16 +21,6 @@ export type ToolResult = {
   tool_use_id?: string;
   content?: any;
   is_error?: boolean;
-};
-
-/**
- * One record of the Runner's Execution file: pi's session header, a session
- * event (`message_end`, `tool_execution_end`, `agent_settled`, ...), or the
- * closing `session_stats` totals. See src/runner/run-pi.ts.
- */
-export type ExecutionRecord = {
-  type: string;
-  [key: string]: any;
 };
 
 export type GroupedContent = {
@@ -318,7 +313,7 @@ export function groupTurnsNaturally(data: ExecutionRecord[]): GroupedContent[] {
 
   // The Runner ends the file with the run's totals, as Claude Code ended its
   // output with a result message.
-  const stats = data.findLast((record) => record.type === "session_stats");
+  const stats = sessionStats(data);
   if (stats) {
     groupedContent.push({
       type: failed ? "final_error" : "final_result",
@@ -430,9 +425,7 @@ function main(): void {
   }
 
   try {
-    // Read the JSON file
-    const fileContent = readFileSync(jsonFile, "utf-8");
-    const data: ExecutionRecord[] = JSON.parse(fileContent);
+    const data = readExecutionFile(jsonFile);
 
     // Print to stdout (so it can be captured by shell)
     console.log(formatTurnsFromData(data));

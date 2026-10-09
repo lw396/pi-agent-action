@@ -19,10 +19,16 @@ describe("executionDetailsFrom", () => {
 
   test("is null for anything else", () => {
     expect(executionDetailsFrom([])).toBeNull();
-    expect(executionDetailsFrom({})).toBeNull();
     expect(executionDetailsFrom([{ type: "agent_settled" }])).toBeNull();
     expect(
       executionDetailsFrom([{ type: "session_stats", cost: 1 }]),
+    ).toBeNull();
+    // Only a closing record counts: a run that died after it is incomplete.
+    expect(
+      executionDetailsFrom([
+        { type: "session_stats", cost: 1, durationMs: 1 },
+        { type: "agent_settled" },
+      ]),
     ).toBeNull();
   });
 });

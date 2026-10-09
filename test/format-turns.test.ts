@@ -4,12 +4,12 @@ import { join } from "path";
 import {
   formatTurnsFromData,
   detectContentType,
-  type ExecutionRecord,
   formatResultContent,
   formatToolWithResult,
   type ToolUse,
   type ToolResult,
 } from "../src/entrypoints/format-turns";
+import type { ExecutionRecord } from "../src/runner/execution-file";
 
 describe("detectContentType", () => {
   test("detects JSON objects", () => {

@@ -31,12 +31,14 @@ import { validateBranchName } from "../github/operations/branch";
 import { assertNoRemovedInputs } from "./removed-inputs";
 import { updateCommentLink } from "./update-comment-link";
 import { formatTurnsFromData } from "./format-turns";
-import type { ExecutionRecord } from "./format-turns";
 import { redactSecrets } from "../github/utils/sanitizer";
 import { collectSecretValues } from "../github/utils/secret-values";
 import { runPi } from "../runner/run-pi";
 import { readRunnerInputs, runnerOptions } from "../runner/run-plan";
-import { setExecutionFileOutputIfPresent } from "../runner/execution-file";
+import {
+  readExecutionFile,
+  setExecutionFileOutputIfPresent,
+} from "../runner/execution-file";
 
 /**
  * Write the step summary from the Runner's Execution file.
@@ -46,9 +48,7 @@ async function writeStepSummary(executionFile: string): Promise<void> {
   if (!summaryFile) return;
 
   try {
-    const fileContent = readFileSync(executionFile, "utf-8");
-    const data: ExecutionRecord[] = JSON.parse(fileContent);
-    const markdown = formatTurnsFromData(data);
+    const markdown = formatTurnsFromData(readExecutionFile(executionFile));
     await appendFile(summaryFile, markdown);
     console.log("Successfully formatted pi Agent report");
   } catch (error) {

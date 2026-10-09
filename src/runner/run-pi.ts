@@ -19,7 +19,11 @@ import { isolatedBashTool } from "./bash-isolation";
 import { commentRedactionExtension } from "./comment-redaction";
 import { parsePiArgs } from "./pi-args";
 import { expandSlashCommand } from "./slash-command";
-import { writeExecutionFile } from "./execution-file";
+import {
+  writeExecutionFile,
+  type ExecutionRecord,
+  type SessionStatsRecord,
+} from "./execution-file";
 import { mcpServerExtensions, type McpServers } from "./mcp-servers";
 import {
   toolPermissionsExtension,
@@ -236,7 +240,8 @@ export async function runPi(
     command ? `${prompt}\n\n${command}` : prompt,
     structuredOutput,
   );
-  records.push({ type: "session_stats", ...stats });
+  const totals: SessionStatsRecord = { type: "session_stats", ...stats };
+  records.push(totals);
   core.info(
     `pi used ${stats.tokens.total} tokens in ${stats.assistantMessages} responses, cost $${stats.cost.toFixed(4)}`,
   );
@@ -314,10 +319,10 @@ async function resolveModel(
  */
 function recordEvents(
   session: AgentSession,
-  header: unknown,
+  header: ExecutionRecord | null,
   showFullOutput: boolean | undefined,
-): unknown[] {
-  const records: unknown[] = [header];
+): ExecutionRecord[] {
+  const records: ExecutionRecord[] = header ? [header] : [];
   session.subscribe((event) => {
     if (OMITTED_EVENTS.has(event.type)) return;
     records.push(event);

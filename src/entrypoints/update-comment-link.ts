@@ -1,5 +1,4 @@
 import type { Octokits } from "../github/api/client";
-import * as fs from "fs/promises";
 import {
   updateCommentBody,
   type CommentUpdateInput,
@@ -10,6 +9,11 @@ import { GITHUB_SERVER_URL } from "../github/api/config";
 import { checkAndCommitOrDeleteBranch } from "../github/operations/branch-cleanup";
 import { updateComment } from "../github/operations/comments/update-comment";
 import { encodeBranchNameForUrl } from "../github/operations/comments/common";
+import {
+  readExecutionFile,
+  sessionStats,
+  type ExecutionRecord,
+} from "../runner/execution-file";
 
 type ExecutionDetails = {
   total_cost_usd?: number;
@@ -22,21 +26,11 @@ type ExecutionDetails = {
  * Runner's Execution file. Upstream read Claude Code's closing result message.
  */
 export function executionDetailsFrom(
-  outputData: unknown,
+  records: ExecutionRecord[],
 ): ExecutionDetails | null {
-  if (!Array.isArray(outputData) || outputData.length === 0) return null;
-  const lastElement = outputData[outputData.length - 1];
-  if (
-    lastElement?.type !== "session_stats" ||
-    typeof lastElement.cost !== "number" ||
-    typeof lastElement.durationMs !== "number"
-  ) {
-    return null;
-  }
-  return {
-    total_cost_usd: lastElement.cost,
-    duration_ms: lastElement.durationMs,
-  };
+  const stats = sessionStats(records);
+  if (!stats) return null;
+  return { total_cost_usd: stats.cost, duration_ms: stats.durationMs };
 }
 
 export type UpdateCommentLinkParams = {
@@ -203,8 +197,9 @@ export async function updateCommentLink(
     // Check for existence of output file and parse it if available
     try {
       if (params.outputFile) {
-        const fileContent = await fs.readFile(params.outputFile, "utf8");
-        executionDetails = executionDetailsFrom(JSON.parse(fileContent));
+        executionDetails = executionDetailsFrom(
+          readExecutionFile(params.outputFile),
+        );
       }
 
       actionFailed = !params.agentSuccess;
