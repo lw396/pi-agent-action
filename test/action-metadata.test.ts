@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import { REMOVED_INPUTS } from "../src/entrypoints/removed-inputs";
+import { APP_BOT_ID, APP_BOT_LOGIN } from "../src/github/constants";
 
 const metadata = readFileSync(
   new URL("../action.yml", import.meta.url),
@@ -24,6 +25,13 @@ function inputsMatching(pattern: RegExp): string[] {
 }
 
 describe("action metadata", () => {
+  test("defaults bot_id and bot_name to the pi-agent-action app's bot", () => {
+    expect(inputDefault("bot_id")).toBe(String(APP_BOT_ID));
+    expect(inputDefault("bot_name")).toBe(APP_BOT_LOGIN);
+    expect(inputBlock("bot_id")).not.toMatch(/claude/i);
+    expect(inputBlock("bot_name")).not.toMatch(/claude/i);
+  });
+
   test("should expose the conclusion output from the run step", () => {
     expect(metadata).toMatch(
       /^  conclusion:\n    description: .+\n    value: \$\{\{ steps\.run\.outputs\.conclusion \}\}$/m,

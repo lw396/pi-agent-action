@@ -37,7 +37,6 @@ import {
   type ParsedGitHubContext,
 } from "../src/github/context";
 import { checkContainsTrigger } from "../src/github/validation/trigger";
-import { CLAUDE_APP_BOT_ID, CLAUDE_BOT_LOGIN } from "../src/github/constants";
 import { createMockContext, createMockAutomationContext } from "./mockContext";
 
 const ENV_KEYS = [
@@ -351,8 +350,8 @@ describe("parseGitHubContext", () => {
       expect(inputs.classifyInlineComments).toBe(true);
       expect(inputs.useCommitSigning).toBe(false);
       expect(inputs.sshSigningKey).toBe("");
-      expect(inputs.botId).toBe(String(CLAUDE_APP_BOT_ID));
-      expect(inputs.botName).toBe(CLAUDE_BOT_LOGIN);
+      expect(inputs.botId).toBe("339978130");
+      expect(inputs.botName).toBe("pi-agent-action[bot]");
       expect(inputs.allowedBots).toBe("");
       expect(inputs.allowedNonWriteUsers).toBe("");
       expect(inputs.trackProgress).toBe(false);

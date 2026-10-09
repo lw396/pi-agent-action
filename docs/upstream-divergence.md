@@ -129,6 +129,14 @@
 - **本仓库**：`@pi`、`pi`、`pi/`
 - **说明**：想保留旧行为，需要显式设置 `trigger_phrase`、`label_trigger`、`branch_prefix`
 
+#### GitHub App 与 token 换取服务
+
+`branding` · 用户可见：是 · ADR：[0003](adr/0003-own-github-app-token-exchange.md)
+
+- **上游**：没传 `github_token` 时，用 audience 为 `claude-code-github-action` 的 OIDC token 向 `api.anthropic.com/api/github/github-app-token-exchange` 换取 Claude App 的 token；`bot_id` / `bot_name` 默认 `41898282` / `claude[bot]`；`use_sticky_comment` 按 Claude App 的 bot（ID 209825114，或登录名含 `claude` 的 bot）找已有评论
+- **本仓库**：audience 为 `pi-agent-action`，向本项目的 Token exchange service（`https://pi-agent-action.8d7h5sbqdh.workers.dev/api/github/github-app-token-exchange`，`services/token-exchange/`）换取 [pi-agent-action App](https://github.com/apps/pi-agent-action) 的 token；`bot_id` / `bot_name` 默认 `339978130` / `pi-agent-action[bot]`；`use_sticky_comment` 按本项目 App 的 bot（ID 339978130，或登录名含 `pi-agent-action` 的 bot）找已有评论。服务的接口和错误码与上游一致，`src/github/token.ts` 只换了端点、audience 和一条日志
+- **说明**：本项目不是官方产品，不能用 Anthropic 的服务和 Claude 的 bot 身份。没装本项目 App 的仓库要传 `github_token`，否则换取失败并提示安装 App
+
 ### 工具与权限
 
 #### 工具权限

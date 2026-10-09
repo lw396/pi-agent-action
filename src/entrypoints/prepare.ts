@@ -87,7 +87,7 @@ async function run() {
 
     // MCP config is handled by individual modes (tag/agent) and included in their claude_args output
 
-    // Expose the GitHub token (Claude App token) as an output
+    // Expose the GitHub token (GitHub App token) as an output
     core.setOutput("github_token", githubToken);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

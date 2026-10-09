@@ -2,7 +2,7 @@ import { describe, expect, test, spyOn, beforeEach, afterEach } from "bun:test";
 import * as core from "@actions/core";
 import { checkWritePermissions } from "../src/github/validation/permissions";
 import type { ParsedGitHubContext } from "../src/github/context";
-import { CLAUDE_APP_BOT_ID, CLAUDE_BOT_LOGIN } from "../src/github/constants";
+import { APP_BOT_ID, APP_BOT_LOGIN } from "../src/github/constants";
 import { createMockAutomationContext } from "./mockContext";
 
 describe("checkWritePermissions", () => {
@@ -71,8 +71,8 @@ describe("checkWritePermissions", () => {
       classifyInlineComments: true,
       useCommitSigning: false,
       sshSigningKey: "",
-      botId: String(CLAUDE_APP_BOT_ID),
-      botName: CLAUDE_BOT_LOGIN,
+      botId: String(APP_BOT_ID),
+      botName: APP_BOT_LOGIN,
       allowedBots: "",
       allowedNonWriteUsers: "",
       trackProgress: false,

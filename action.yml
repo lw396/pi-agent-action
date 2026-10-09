@@ -156,13 +156,13 @@ inputs:
     required: false
     default: ""
   bot_id:
-    description: "GitHub user ID to use for git operations (defaults to Claude's bot ID)"
+    description: "GitHub user ID to use for git operations (defaults to the pi-agent-action app's bot ID, see src/github/constants.ts)"
     required: false
-    default: "41898282" # Claude's bot ID - see src/github/constants.ts
+    default: "339978130"
   bot_name:
-    description: "GitHub username to use for git operations (defaults to Claude's bot name)"
+    description: "GitHub username to use for git operations (defaults to the pi-agent-action app's bot name)"
     required: false
-    default: "claude[bot]"
+    default: "pi-agent-action[bot]"
   track_progress:
     description: "Force tag mode with tracking comments for pull_request and issue events. Only applicable to pull_request (opened, synchronize, ready_for_review, reopened, labeled) and issue (opened, edited, labeled, assigned) events."
     required: false

@@ -10,7 +10,7 @@ import type {
   PullRequestReviewEvent,
   PullRequestReviewCommentEvent,
 } from "@octokit/webhooks-types";
-import { CLAUDE_APP_BOT_ID, CLAUDE_BOT_LOGIN } from "../src/github/constants";
+import { APP_BOT_ID, APP_BOT_LOGIN } from "../src/github/constants";
 
 const defaultInputs = {
   prompt: "",
@@ -22,8 +22,8 @@ const defaultInputs = {
   classifyInlineComments: true,
   useCommitSigning: false,
   sshSigningKey: "",
-  botId: String(CLAUDE_APP_BOT_ID),
-  botName: CLAUDE_BOT_LOGIN,
+  botId: String(APP_BOT_ID),
+  botName: APP_BOT_LOGIN,
   allowedBots: "",
   allowedNonWriteUsers: "",
   trackProgress: false,

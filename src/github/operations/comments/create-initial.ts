@@ -13,8 +13,7 @@ import {
   type ParsedGitHubContext,
 } from "../../context";
 import type { Octokit } from "@octokit/rest";
-
-const CLAUDE_APP_BOT_ID = 209825114;
+import { APP_BOT_ID } from "../../constants";
 
 export async function createInitialComment(
   octokit: Octokit,
@@ -39,10 +38,10 @@ export async function createInitialComment(
         issue_number: context.entityNumber,
       });
       const existingComment = comments.data.find((comment) => {
-        const idMatch = comment.user?.id === CLAUDE_APP_BOT_ID;
+        const idMatch = comment.user?.id === APP_BOT_ID;
         const botNameMatch =
           comment.user?.type === "Bot" &&
-          comment.user?.login.toLowerCase().includes("claude");
+          comment.user?.login.toLowerCase().includes("pi-agent-action");
         const bodyMatch = comment.body === initialBody;
 
         return idMatch || botNameMatch || bodyMatch;

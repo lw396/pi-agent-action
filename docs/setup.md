@@ -8,6 +8,8 @@
 2. Pick a model and add its provider's credentials to your repository secrets ([Learn how to use secrets in GitHub Actions](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions)); see [Model Providers](#model-providers) below
 3. Add a workflow file to your repository's `.github/workflows/`, starting from the [Quickstart](../README.md#quickstart). To authenticate as the app, grant the job `id-token: write` and leave `github_token` unset: the action exchanges the workflow's GitHub OIDC token for a token of the app
 
+> Not installing the app? Set `github_token` instead: either `${{ secrets.GITHUB_TOKEN }}` (no app needed, but pushes and pull requests made with it do not start other workflows) or a token of [your own app](#using-a-custom-github-app). The job then does not need `id-token: write`.
+
 ## Model Providers
 
 The action runs any model pi supports, so you are not tied to one API. Set the `model` input to `<provider>/<model-id>` and pass the provider's credentials in the workflow `env:`, under the variable name pi reads for that provider. For providers that use a single API key, the `api_key` input works too.

@@ -3,11 +3,11 @@
  */
 
 /**
- * Claude App bot user ID
+ * pi-agent-action App bot user ID
  */
-export const CLAUDE_APP_BOT_ID = 41898282;
+export const APP_BOT_ID = 339978130;
 
 /**
- * Claude bot username
+ * pi-agent-action App bot username
  */
-export const CLAUDE_BOT_LOGIN = "claude[bot]";
+export const APP_BOT_LOGIN = "pi-agent-action[bot]";

@@ -66,8 +66,20 @@ describe("setupGitHubToken", () => {
   test("returns app token from OIDC exchange", async () => {
     await expect(setupGitHubToken()).resolves.toBe("app-token");
 
-    expect(getIDTokenSpy).toHaveBeenCalledWith("claude-code-github-action");
+    expect(getIDTokenSpy).toHaveBeenCalledWith("pi-agent-action");
     expect(setSecretSpy).toHaveBeenCalledWith("app-token");
+  });
+
+  test("exchanges the OIDC token at the project's token exchange service", async () => {
+    await setupGitHubToken();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe(
+      "https://pi-agent-action.8d7h5sbqdh.workers.dev/api/github/github-app-token-exchange",
+    );
+    expect(init.method).toBe("POST");
+    expect(init.headers.Authorization).toBe("Bearer oidc-token");
   });
 
   test("skips without retrying when workflow is missing from default branch", async () => {
@@ -95,6 +107,9 @@ describe("setupGitHubToken", () => {
     expect(warningSpy).toHaveBeenCalledWith(
       `Skipping action due to workflow validation: ${message}`,
     );
+    const logged = consoleLogSpy.mock.calls.flat().join("\n");
+    expect(logged).toContain("workflow validation");
+    expect(logged).not.toMatch(/claude|anthropic/i);
   });
 
   test("skips without retrying when workflow validation message has no error code", async () => {

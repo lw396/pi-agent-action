@@ -150,22 +150,16 @@ On public repos, you can also use `include_comments_by_actor` to allowlist which
 
 ## GitHub App Permissions
 
-Without a `github_token` input, the action obtains a token for the GitHub App that claude-code-action's setup installs, through the same OIDC token exchange as claude-code-action. That app requests the following permissions:
-
-### Currently Used Permissions
+Without a `github_token` input, the action exchanges the workflow's GitHub OIDC token (the job needs `id-token: write`) at this project's token exchange service for a token of the [pi-agent-action app](https://github.com/apps/pi-agent-action). The service issues a token only for the repository the workflow runs in, and only when the workflow file matches the version on the default branch; see [ADR-0003](./adr/0003-own-github-app-token-exchange.md). The app has these permissions:
 
 - **Contents** (Read & Write): For reading repository files and creating branches
 - **Pull Requests** (Read & Write): For reading PR data and creating/updating pull requests
 - **Issues** (Read & Write): For reading issue data and updating issue comments
+- **Actions** (Read): For workflow runs and job logs (the CI tools); requested with `additional_permissions: actions: read`
+- **Checks** (Read): For check run results; requested with `additional_permissions: checks: read`
+- **Metadata** (Read): Required by GitHub
 
-### Permissions for Future Features
-
-The following permissions are requested but not yet actively used:
-
-- **Discussions** (Read & Write): For interaction with GitHub Discussions
-- **Actions** (Read): For accessing workflow run data and logs
-- **Checks** (Read): For reading check run results
-- **Workflows** (Read & Write): For triggering and managing GitHub Actions workflows
+Tokens get Contents, Pull Requests and Issues by default. The service refuses a request for more than the app has. The app has no Workflows permission, so the agent cannot change files under `.github/workflows/`.
 
 ## Commit Signing
 

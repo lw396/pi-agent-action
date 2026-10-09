@@ -55,7 +55,7 @@ function isWorkflowValidationError(
 
 async function getOidcToken(): Promise<string> {
   try {
-    const oidcToken = await core.getIDToken("claude-code-github-action");
+    const oidcToken = await core.getIDToken("pi-agent-action");
 
     return oidcToken;
   } catch (error) {
@@ -118,7 +118,7 @@ async function exchangeForAppToken(
   }
 
   const response = await fetch(
-    "https://api.anthropic.com/api/github/github-app-token-exchange",
+    "https://pi-agent-action.8d7h5sbqdh.workers.dev/api/github/github-app-token-exchange",
     fetchOptions,
   );
 
@@ -130,7 +130,7 @@ async function exchangeForAppToken(
       const message = getAppTokenExchangeErrorMessage(responseJson);
       core.warning(`Skipping action due to workflow validation: ${message}`);
       console.log(
-        "Action skipped due to workflow validation error. This is expected when adding Claude Code workflows to new repositories or on PRs with workflow changes. If you're seeing this, your workflow will begin working once you merge your PR.",
+        "Action skipped due to workflow validation error. This is expected when adding pi-agent-action workflows to new repositories or on PRs with workflow changes. If you're seeing this, your workflow will begin working once you merge your PR.",
       );
       throw new WorkflowValidationSkipError(message);
     }

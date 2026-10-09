@@ -8,7 +8,7 @@ import type {
   PullRequestReviewCommentEvent,
   WorkflowRunEvent,
 } from "@octokit/webhooks-types";
-import { CLAUDE_APP_BOT_ID, CLAUDE_BOT_LOGIN } from "./constants";
+import { APP_BOT_ID, APP_BOT_LOGIN } from "./constants";
 // Custom types for GitHub Actions events that aren't webhooks
 export type WorkflowDispatchEvent = {
   action?: never;
@@ -156,8 +156,8 @@ export function parseGitHubContext(): GitHubContext {
       classifyInlineComments: process.env.CLASSIFY_INLINE_COMMENTS !== "false",
       useCommitSigning: process.env.USE_COMMIT_SIGNING === "true",
       sshSigningKey: process.env.SSH_SIGNING_KEY || "",
-      botId: process.env.BOT_ID ?? String(CLAUDE_APP_BOT_ID),
-      botName: process.env.BOT_NAME ?? CLAUDE_BOT_LOGIN,
+      botId: process.env.BOT_ID ?? String(APP_BOT_ID),
+      botName: process.env.BOT_NAME ?? APP_BOT_LOGIN,
       allowedBots: process.env.ALLOWED_BOTS ?? "",
       allowedNonWriteUsers: process.env.ALLOWED_NON_WRITE_USERS ?? "",
       trackProgress: process.env.TRACK_PROGRESS === "true",

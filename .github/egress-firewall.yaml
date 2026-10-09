@@ -9,6 +9,10 @@ allow:
   - opencode.ai
   # GitHub API: calls made by the action and its MCP servers
   - api.github.com
+  # Token exchange service (services/token-exchange/, ADR-0003): the action
+  # trades the workflow's OIDC token for a pi-agent-action app token here when a
+  # job runs it without github_token
+  - pi-agent-action.8d7h5sbqdh.workers.dev
   # Bun release downloads (oven-sh/setup-bun in action.yml)
   - release-assets.githubusercontent.com
   # npm packages (bun install in action.yml)
