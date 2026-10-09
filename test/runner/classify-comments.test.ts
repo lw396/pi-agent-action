@@ -12,10 +12,7 @@ import {
   type FauxResponseStep,
 } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import {
-  classifyComments,
-  pickClassifierModel,
-} from "../../src/runner/classify-comments";
+import { classifyComments } from "../../src/runner/classify-comments";
 
 const PROVIDER = "faux";
 
@@ -127,71 +124,12 @@ afterEach(() => {
 });
 
 const BODIES = ["This loop is off by one.", "Test comment"];
-
-describe("pickClassifierModel", () => {
-  test("picks the provider's paid jev model, preferring a pinned version", async () => {
-    const h = await harness({
-      classifiers: [
-        "jev-1.13-free",
-        "~typesafe/jev-latest",
-        "typesafe/jev-1.13",
-        "other/decider",
-      ],
-    });
-    expect(pickClassifierModel(h.modelRuntime, PROVIDER)?.id).toBe(
-      "typesafe/jev-1.13",
-    );
-  });
-
-  test("picks jev-latest when it is the only paid jev model", async () => {
-    const h = await harness({ classifiers: ["jev-latest", "jev:free"] });
-    expect(pickClassifierModel(h.modelRuntime, PROVIDER)?.id).toBe(
-      "jev-latest",
-    );
-  });
-
-  test("picks nothing when the provider has no paid jev model", async () => {
-    const h = await harness({ classifiers: ["jev-1.13-free", "other/clef"] });
-    expect(pickClassifierModel(h.modelRuntime, PROVIDER)).toBeUndefined();
-  });
-});
+const JEV = `${PROVIDER}/jev-1.13`;
 
 describe("classifyComments", () => {
-  test("uses the main model's jev classifier when classify_model is not set", async () => {
+  test("uses the model input's chat model when classify_model is not set, even if the provider has a classifier", async () => {
     const h = await harness({
       classifiers: ["jev-1.13"],
-      classify: (context) => ({
-        answers: {
-          ...Object.fromEntries(
-            Object.keys(context.questions).map((key, i) => [
-              key,
-              { type: "bool" as const, probability: i === 0 ? 0.8 : 0.1 },
-            ]),
-          ),
-        },
-      }),
-    });
-    const verdicts = await classifyComments(BODIES, {
-      model: `${PROVIDER}/chat-model`,
-      modelRuntime: h.modelRuntime,
-    });
-    expect(verdicts).toEqual([true, false]);
-    expect(h.classifyCalls).toHaveLength(1);
-    expect(h.classifyCalls[0]!.model).toBe("jev-1.13");
-    // Every comment is in the state and has a bool question of its own.
-    const { state, questions } = h.classifyCalls[0]!.context;
-    expect(JSON.stringify(state)).toContain(BODIES[0]!);
-    expect(JSON.stringify(state)).toContain(BODIES[1]!);
-    expect(Object.values(questions).map((q) => q.type)).toEqual([
-      "bool",
-      "bool",
-    ]);
-    expect(h.chatCalls()).toBe(0);
-    expect(logs.join("\n")).toMatch(/faux\/jev-1\.13.*10 tokens.*\$0\.0010/);
-  });
-
-  test("falls back to the main chat model when the provider has no jev", async () => {
-    const h = await harness({
       chat: [fauxAssistantMessage("[true, false]")],
     });
     const verdicts = await classifyComments(BODIES, {
@@ -201,16 +139,38 @@ describe("classifyComments", () => {
     expect(verdicts).toEqual([true, false]);
     expect(h.chatCalls()).toBe(1);
     expect(h.classifyCalls).toHaveLength(0);
+    expect(logs.join("\n")).toContain("faux/chat-model");
   });
 
-  test("uses a classifier named in classify_model", async () => {
-    const h = await harness({ classifiers: ["jev-1.13", "kev-4b"] });
-    await classifyComments(BODIES, {
+  test("asks a classifier named in classify_model one bool question per comment", async () => {
+    const h = await harness({
+      classifiers: ["jev-1.13", "kev-4b"],
+      classify: (context) => ({
+        answers: Object.fromEntries(
+          Object.keys(context.questions).map((key, i) => [
+            key,
+            { type: "bool" as const, probability: i === 0 ? 0.8 : 0.1 },
+          ]),
+        ),
+      }),
+    });
+    const verdicts = await classifyComments(BODIES, {
       model: `${PROVIDER}/chat-model`,
       classifyModel: `${PROVIDER}/kev-4b`,
       modelRuntime: h.modelRuntime,
     });
+    expect(verdicts).toEqual([true, false]);
     expect(h.classifyCalls.map((c) => c.model)).toEqual(["kev-4b"]);
+    // Every comment is in the state and has a bool question of its own.
+    const { state, questions } = h.classifyCalls[0]!.context;
+    expect(JSON.stringify(state)).toContain(BODIES[0]!);
+    expect(JSON.stringify(state)).toContain(BODIES[1]!);
+    expect(Object.values(questions).map((q) => q.type)).toEqual([
+      "bool",
+      "bool",
+    ]);
+    expect(h.chatCalls()).toBe(0);
+    expect(logs.join("\n")).toMatch(/faux\/kev-4b.*10 tokens.*\$0\.0010/);
   });
 
   test("uses a chat model named in classify_model", async () => {
@@ -227,11 +187,21 @@ describe("classifyComments", () => {
     expect(h.classifyCalls).toHaveLength(0);
   });
 
-  test("the api_key input authenticates the main model's provider", async () => {
+  test("works with classify_model alone, without the model input", async () => {
+    const h = await harness({ classifiers: ["jev-1.13"] });
+    const verdicts = await classifyComments(BODIES, {
+      classifyModel: JEV,
+      modelRuntime: h.modelRuntime,
+    });
+    expect(verdicts).toEqual([true, true]);
+  });
+
+  test("the api_key input authenticates the model input's provider", async () => {
     delete process.env.FAUX_TEST_API_KEY;
     const h = await harness({ classifiers: ["jev-1.13"] });
     const verdicts = await classifyComments(BODIES, {
       model: `${PROVIDER}/chat-model`,
+      classifyModel: JEV,
       apiKey: "key-from-the-input",
       modelRuntime: h.modelRuntime,
     });
@@ -240,7 +210,7 @@ describe("classifyComments", () => {
   });
 
   describe("returns null, so every comment is posted", () => {
-    test("when no model is set", async () => {
+    test("when neither model nor classify_model is set", async () => {
       const h = await harness({ classifiers: ["jev-1.13"] });
       expect(
         await classifyComments(BODIES, { modelRuntime: h.modelRuntime }),
@@ -258,22 +228,24 @@ describe("classifyComments", () => {
       ).toBeNull();
       expect(logs.join("\n")).toContain("::warning::");
       expect(h.classifyCalls).toHaveLength(0);
+      expect(h.chatCalls()).toBe(0);
     });
 
-    test("when the provider has no credentials", async () => {
+    test("when the classifier's provider has no credentials", async () => {
       delete process.env.FAUX_TEST_API_KEY;
       const h = await harness({ classifiers: ["jev-1.13"] });
       expect(
         await classifyComments(BODIES, {
-          model: `${PROVIDER}/chat-model`,
+          classifyModel: JEV,
           modelRuntime: h.modelRuntime,
         }),
       ).toBeNull();
     });
 
-    test("when the classifier stops with an error", async () => {
+    test("when the classifier stops with an error, without trying another model", async () => {
       const h = await harness({
         classifiers: ["jev-1.13"],
+        chat: [fauxAssistantMessage("[true, true]")],
         classify: () => ({
           stopReason: "error",
           errorMessage: "rate limited",
@@ -283,10 +255,12 @@ describe("classifyComments", () => {
       expect(
         await classifyComments(BODIES, {
           model: `${PROVIDER}/chat-model`,
+          classifyModel: JEV,
           modelRuntime: h.modelRuntime,
         }),
       ).toBeNull();
       expect(logs.join("\n")).toContain("rate limited");
+      expect(h.chatCalls()).toBe(0);
     });
 
     test("when the classifier leaves a comment unanswered", async () => {
@@ -298,7 +272,7 @@ describe("classifyComments", () => {
       });
       expect(
         await classifyComments(BODIES, {
-          model: `${PROVIDER}/chat-model`,
+          classifyModel: JEV,
           modelRuntime: h.modelRuntime,
         }),
       ).toBeNull();

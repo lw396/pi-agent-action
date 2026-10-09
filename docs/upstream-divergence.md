@@ -118,8 +118,8 @@
 `multi-provider` · 用户可见：是
 
 - **上游**：读取 `anthropic_api_key` 输入，直接调用 Anthropic API 的 Claude Haiku 分类；没有 key 时跳过分类，未确认的 inline comment 全部发布
-- **本仓库**：通过 pi 的 `ModelRuntime` 分类（`src/runner/classify-comments.ts`）。新增可选输入 `classify_model`：是分类模型时，每条评论一个 `bool` 问题，一次请求问完，概率不低于 0.5 才发布；是对话模型时，沿用上游的 prompt，解析返回的布尔数组。不设时，`model` 的 provider 有付费的 jev 分类模型就用它（优先固定版本，不用 `-free` / `:free`），没有就用 `model` 本身。`api_key` 只用于 `model` 的 provider。任何失败（找不到模型、没有凭据、请求出错、无法解析）都退回全部发布。分类的模型、token 和 cost 单独打一行日志，不计入会话合计
-- **说明**：`anthropic_api_key` 输入已删除，只认 Anthropic 会让其他 provider 的用户没有分类。jev 这类分类模型直接返回概率，不用解析文本；只有部分 provider（TypeSafe、OpenRouter、Cloudflare、Vercel、OpenCode）提供，所以退回对话模型
+- **本仓库**：通过 pi 的 `ModelRuntime` 分类（`src/runner/classify-comments.ts`）。新增可选输入 `classify_model`：是分类模型时，每条评论一个 `bool` 问题，一次请求问完，概率不低于 0.5 才发布；是对话模型时，沿用上游的 prompt，解析返回的布尔数组。不设时用 `model`（对话模型）分类，不自动选择分类模型。`api_key` 只用于 `model` 的 provider。任何失败（找不到模型、没有凭据、请求出错、无法解析）都退回全部发布，不换其他模型重试。分类的模型、token 和 cost 单独打一行日志，不计入会话合计
+- **说明**：`anthropic_api_key` 输入已删除，只认 Anthropic 会让其他 provider 的用户没有分类。jev 这类分类模型直接返回概率，不用解析文本，但只有部分 provider（TypeSafe、OpenRouter、Cloudflare、Vercel、OpenCode）提供，而且 key 能否调用取决于套餐，所以只在显式设置时使用；默认用 `model`，行为可预期，不会因为套餐限制让分类失效
 
 #### 触发词、触发标签与分支前缀的默认值
 

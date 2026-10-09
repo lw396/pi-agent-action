@@ -140,11 +140,11 @@ inputs:
   classify_model:
     description: >-
       The model that classifies buffered inline comments, as provider/id: a
-      classifier model (such as opencode/jev-1.13) or a chat model. When
-      empty, the paid jev classifier of the model input's provider is used if
-      there is one, and the model input itself otherwise. Its provider's key
-      comes from the workflow env; api_key only applies to the model input's
-      provider. If classification fails, every buffered comment is posted.
+      classifier model (such as opencode/jev-1.13 or typesafe/jev-latest) or
+      a chat model. When empty, the model input classifies them. Its
+      provider's key comes from the workflow env; api_key only applies to the
+      model input's provider. If classification fails, every buffered comment
+      is posted.
     required: false
     default: ""
   use_commit_signing:

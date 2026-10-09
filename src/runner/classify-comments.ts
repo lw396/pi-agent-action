@@ -15,9 +15,11 @@ import { createModelRuntime } from "./model-runtime";
  * test/probe calls, after the session ends.
  *
  * Upstream asks Claude Haiku through the Anthropic API. Here the model goes
- * through pi, so any provider works: a classifier model (jev) answers one
- * bool question per comment; a chat model gets Upstream's prompt and answers
- * with a JSON array. Any failure returns null, and every comment is posted.
+ * through pi, so any provider works. classify_model picks it: a classifier
+ * model (jev) answers one bool question per comment; a chat model gets
+ * Upstream's prompt and answers with a JSON array. Without classify_model the
+ * model input classifies, as a chat model. Any failure returns null, and
+ * every comment is posted; another model is never tried.
  */
 
 export type ClassifyOptions = {
@@ -54,30 +56,6 @@ For each numbered comment body below, respond with ONLY a JSON array of booleans
 Comments:
 `;
 
-/** Matches the free tier of a model, such as jev-1.13-free or x:free. */
-const FREE_MODEL = /[-:]free$/;
-
-/**
- * The jev classifier to use for a provider when classify_model is not set:
- * a paid one, since a free tier may be rate limited or have other data
- * terms, and a pinned version before `latest`. Undefined when the provider
- * offers none.
- */
-export function pickClassifierModel(
-  modelRuntime: ModelRuntime,
-  provider: string,
-): ClassifierModel<ClassifierApi> | undefined {
-  const candidates = modelRuntime
-    .getModelsOfType("classifier", provider)
-    .filter((m) => /jev/i.test(m.id) && !FREE_MODEL.test(m.id));
-  const byPreference = [...candidates].sort((a, b) => {
-    const latest = Number(/latest/.test(a.id)) - Number(/latest/.test(b.id));
-    if (latest !== 0) return latest;
-    return b.id.localeCompare(a.id, undefined, { numeric: true });
-  });
-  return byPreference[0];
-}
-
 type Choice =
   | { kind: "classifier"; model: ClassifierModel<ClassifierApi> }
   | {
@@ -113,11 +91,7 @@ function chooseModel(
     );
     return undefined;
   }
-  if (!mainModel) return undefined;
-  const classifier = pickClassifierModel(modelRuntime, mainModel.provider);
-  return classifier
-    ? { kind: "classifier", model: classifier }
-    : { kind: "chat", model: mainModel };
+  return mainModel ? { kind: "chat", model: mainModel } : undefined;
 }
 
 function logUsage(model: { provider: string; id: string }, usage?: Usage) {
