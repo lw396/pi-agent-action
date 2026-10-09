@@ -170,7 +170,7 @@ inputs:
     required: false
     default: "false"
   show_full_output:
-    description: "Show full JSON output from Claude Code. WARNING: This outputs ALL Claude messages including tool execution results which may contain secrets, API keys, or other sensitive information. These logs are publicly visible in GitHub Actions. Only enable for debugging in non-sensitive environments."
+    description: "Log every pi event (model responses, tool calls and tool results) as JSON in the job log; a debug rerun does the same. Known secret formats and secret env values are redacted, but WARNING: tool results may still contain secrets or other sensitive information, and these logs are publicly visible in GitHub Actions. Only enable for debugging in non-sensitive environments."
     required: false
     default: "false"
 

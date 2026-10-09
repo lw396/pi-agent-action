@@ -216,6 +216,9 @@ async function run() {
         !!process.env.ALLOWED_NON_WRITE_USERS &&
         process.env.SUBPROCESS_ISOLATION !== "false",
       allowedBashEnv: process.env.ALLOWED_BASH_ENV,
+      // A debug rerun shows everything, as in Upstream.
+      showFullOutput:
+        process.env.INPUT_SHOW_FULL_OUTPUT === "true" || core.isDebug(),
       mcpServers: parseMcpConfig(prepareResult.mcpConfig),
     });
 

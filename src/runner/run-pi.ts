@@ -12,6 +12,7 @@ import {
   type AgentSession,
   type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
+import { redactSecrets } from "../github/utils/sanitizer";
 import { setupPiSettings } from "./setup-pi-settings";
 import { isolatedBashTool } from "./bash-isolation";
 import { commentRedactionExtension } from "./comment-redaction";
@@ -74,6 +75,12 @@ export type RunnerOptions = {
    * a missing file to exercise the fallback.
    */
   bwrapPath?: string;
+  /**
+   * The show_full_output input, or a debug rerun: log every event recorded in
+   * the Execution file, redacted. Off by default, since the job log is public
+   * on public repositories.
+   */
+  showFullOutput?: boolean;
   /** The action's MCP servers, registered with `direct` exposure. */
   mcpServers?: McpServers;
   /** Working directory of the session. Defaults to process.cwd(). */
@@ -247,8 +254,17 @@ export async function runPi(
 
   const records: unknown[] = [sessionManager.getHeader()];
   session.subscribe((event) => {
-    if (!OMITTED_EVENTS.has(event.type)) records.push(event);
+    if (OMITTED_EVENTS.has(event.type)) return;
+    records.push(event);
+    if (options.showFullOutput) {
+      console.log(redactSecrets(JSON.stringify(event, null, 2)));
+    }
   });
+  if (!options.showFullOutput) {
+    console.log(
+      "Running pi (full output hidden for security). Rerun in debug mode or set show_full_output: true for every event in the log.",
+    );
+  }
 
   let failure: string | undefined;
   let stats;

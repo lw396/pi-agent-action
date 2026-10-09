@@ -76,6 +76,13 @@ describe("action metadata", () => {
     );
   });
 
+  test("passes the show_full_output input to the run step", () => {
+    expect(inputDefault("show_full_output")).toBe("false");
+    expect(metadata).toContain(
+      "        INPUT_SHOW_FULL_OUTPUT: ${{ inputs.show_full_output }}\n",
+    );
+  });
+
   test("defaults the triggers and branch prefix to pi branding", () => {
     expect(inputDefault("trigger_phrase")).toBe("@pi");
     expect(inputDefault("label_trigger")).toBe("pi");

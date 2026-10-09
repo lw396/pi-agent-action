@@ -1,6 +1,6 @@
 // Runner seam (issue #7): runPi() driven end to end by pi's faux provider.
 // See ./harness.ts for the scratch setup.
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
@@ -276,5 +276,51 @@ describe("runPi", () => {
     for (const name of OIDC_AND_INPUT_VARS) {
       expect(names).not.toContain(name);
     }
+  });
+
+  describe("show_full_output", () => {
+    // A GitHub token by format, so redactSecrets() catches it.
+    const TOKEN = "ghp_" + "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8";
+
+    async function runLogged(showFullOutput?: boolean) {
+      const { modelRuntime, model } = await fauxRuntime([
+        fauxAssistantMessage(
+          fauxToolCall("bash", { command: `echo ${TOKEN}` }),
+          { stopReason: "toolUse" },
+        ),
+        fauxAssistantMessage("Printed it."),
+      ]);
+      await writePrompt("Print the token.");
+      const log = spyOn(console, "log").mockImplementation(() => {});
+      try {
+        await runPi(getScratch().promptPath, {
+          model,
+          cwd: getScratch().cwd,
+          modelRuntime,
+          allowedTools: "Bash",
+          showFullOutput,
+        });
+        return log.mock.calls.map((args) => args.join(" ")).join("\n");
+      } finally {
+        log.mockRestore();
+      }
+    }
+
+    test("logs every recorded event, with secrets redacted", async () => {
+      const output = await runLogged(true);
+      expect(output).toContain('"type": "tool_execution_end"');
+      expect(output).toContain("Printed it.");
+      expect(output).toContain("echo [REDACTED_GITHUB_TOKEN]");
+      expect(output).not.toContain(TOKEN);
+      // Streaming deltas stay out of the log, as out of the execution file.
+      expect(output).not.toContain('"type": "message_update"');
+    });
+
+    test("logs no events by default", async () => {
+      const output = await runLogged();
+      expect(output).not.toContain('"type": "tool_execution_end"');
+      expect(output).not.toContain("Printed it.");
+      expect(output).toContain("show_full_output");
+    });
   });
 });
