@@ -1,7 +1,5 @@
 #!/usr/bin/env bun
 
-import * as core from "@actions/core";
-import { writeFile, mkdir, rm } from "fs/promises";
 import type { FetchDataResult } from "../github/data/fetcher";
 import {
   formatContext,
@@ -10,7 +8,7 @@ import {
   formatReviewComments,
   formatChangedFilesWithSHA,
 } from "../github/data/formatter";
-import { redactSecrets, sanitizeContent } from "../github/utils/sanitizer";
+import { sanitizeContent } from "../github/utils/sanitizer";
 import {
   isIssuesEvent,
   isIssueCommentEvent,
@@ -21,7 +19,6 @@ import type { ParsedGitHubContext } from "../github/context";
 import type { CommonFields, PreparedContext, EventData } from "./types";
 import { GITHUB_SERVER_URL } from "../github/api/config";
 import { extractUserRequest } from "../utils/extract-user-request";
-import { USER_REQUEST_FILENAME } from "../runner/slash-command";
 export type { CommonFields, PreparedContext } from "./types";
 
 const GIT_PUSH_WRAPPER = `${process.env.GITHUB_ACTION_PATH}/scripts/git-push.sh`;
@@ -844,64 +841,40 @@ function extractUserRequestFromContext(
   return null;
 }
 
-export async function createPrompt(
+/**
+ * The prompt for tag mode, and the trigger comment's request on its own, for
+ * the Runner to expand a slash command in it (e.g. "@pi /skill:review-pr").
+ */
+export function createPrompt(
   commentId: number,
   baseBranch: string | undefined,
   agentBranch: string | undefined,
   githubData: FetchDataResult,
   context: ParsedGitHubContext,
-) {
-  try {
-    const trackingCommentId = commentId.toString();
+): { prompt: string; userRequest?: string } {
+  const preparedContext = prepareContext(
+    context,
+    commentId.toString(),
+    baseBranch,
+    agentBranch,
+  );
 
-    const preparedContext = prepareContext(
-      context,
-      trackingCommentId,
-      baseBranch,
-      agentBranch,
-    );
+  const prompt = generatePrompt(
+    preparedContext,
+    githubData,
+    context.inputs.useCommitSigning,
+    "tag",
+  );
+  console.log("===== FINAL PROMPT =====");
+  console.log(prompt);
+  console.log("=======================");
 
-    // Clear any stale prompt files from a prior invocation. RUNNER_TEMP is documented
-    // to be emptied between jobs, but on non-ephemeral self-hosted runners this is
-    // not reliably honored — a stale user-request.txt left behind by a prior
-    // mention-mode invocation would not be overwritten by a subsequent agent-mode
-    // invocation, and would leak into the model's context.
-    const promptDir = `${process.env.RUNNER_TEMP || "/tmp"}/pi-prompts`;
-    await rm(promptDir, { recursive: true, force: true });
-    await mkdir(promptDir, { recursive: true });
-
-    // Generate the prompt directly
-    const promptContent = generatePrompt(
-      preparedContext,
-      githubData,
-      context.inputs.useCommitSigning,
-      "tag",
-    );
-
-    // Log the final prompt to console
-    console.log("===== FINAL PROMPT =====");
-    console.log(promptContent);
-    console.log("=======================");
-
-    // Write the prompt file
-    await writeFile(`${promptDir}/prompt.txt`, promptContent);
-
-    // Write the user request separately so the Runner can expand a slash
-    // command in it (e.g., "@pi /skill:review-pr"); see src/runner/slash-command.ts
-    const userRequest = extractUserRequestFromContext(
-      preparedContext,
-      githubData,
-    );
-    if (userRequest) {
-      await writeFile(`${promptDir}/${USER_REQUEST_FILENAME}`, userRequest);
-      console.log("===== USER REQUEST =====");
-      console.log(userRequest);
-      console.log("========================");
-    }
-  } catch (error) {
-    core.setFailed(
-      `Create prompt failed with error: ${redactSecrets(String(error))}`,
-    );
-    process.exit(1);
+  const userRequest =
+    extractUserRequestFromContext(preparedContext, githubData) ?? undefined;
+  if (userRequest) {
+    console.log("===== USER REQUEST =====");
+    console.log(userRequest);
+    console.log("========================");
   }
+  return { prompt, userRequest };
 }

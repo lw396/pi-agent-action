@@ -1,7 +1,7 @@
 import * as core from "@actions/core";
-import { mkdtemp, readFile } from "fs/promises";
+import { mkdtemp } from "fs/promises";
 import { tmpdir } from "os";
-import { dirname, join } from "path";
+import { join } from "path";
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -18,7 +18,7 @@ import { createModelRuntime } from "./model-runtime";
 import { isolatedBashTool } from "./bash-isolation";
 import { commentRedactionExtension } from "./comment-redaction";
 import { parsePiArgs } from "./pi-args";
-import { expandSlashCommand, USER_REQUEST_FILENAME } from "./slash-command";
+import { expandSlashCommand } from "./slash-command";
 import { writeExecutionFile } from "./execution-file";
 import { mcpServerExtensions, type McpServers } from "./mcp-servers";
 import {
@@ -39,6 +39,12 @@ export type RunnerOptions = {
    * provider's environment variable. Like pi's --api-key, it is not stored.
    */
   apiKey?: string;
+  /**
+   * Tag mode: the trigger comment's request without the trigger phrase, e.g.
+   * "/skill:review-pr focus on auth". A slash command in it is expanded and
+   * appended to the prompt.
+   */
+  userRequest?: string;
   /** The pi_args input: pi's own command-line flags, a supported subset. */
   piArgs?: string;
   /**
@@ -127,15 +133,18 @@ const AGENT_HIDDEN_ENV = [
 ];
 
 /**
- * Run one pi session on the prompt in promptPath, in this process (ADR-0001).
+ * Run one pi session on the prompt, in this process (ADR-0001).
  *
  * The Execution file is written whether the session succeeds or fails. A
  * failed session throws after the file is written, like Upstream's executor.
  */
 export async function runPi(
-  promptPath: string,
+  prompt: string,
   options: RunnerOptions,
 ): Promise<RunnerResult> {
+  if (!prompt) {
+    throw new Error("The prompt is empty. Please provide a non-empty prompt.");
+  }
   const modelReference = options.model?.trim();
   if (!modelReference) {
     // pi would otherwise pick a model on its own; CI must not depend on that.
@@ -149,7 +158,6 @@ export async function runPi(
   const structuredOutput = createStructuredOutput(options.jsonSchema);
   const toolPermissions = buildToolPermissions(options, cwd, structuredOutput);
   const customTools = bashTools(options, cwd);
-  const prompt = await readPrompt(promptPath);
 
   for (const name of AGENT_HIDDEN_ENV) {
     delete process.env[name];
@@ -190,7 +198,7 @@ export async function runPi(
     ...piArgs.resources,
   });
   await resourceLoader.reload();
-  const command = await expandRequestedCommand(promptPath, resourceLoader);
+  const command = expandRequestedCommand(options.userRequest, resourceLoader);
 
   const sessionManager = SessionManager.inMemory(cwd);
   const { session } = await createAgentSession({
@@ -246,20 +254,6 @@ export async function runPi(
     sessionId,
     structuredOutput: structuredOutput?.output(),
   };
-}
-
-/** The prompt the mode wrote, which must exist and not be empty. */
-async function readPrompt(promptPath: string): Promise<string> {
-  let prompt: string;
-  try {
-    prompt = await readFile(promptPath, "utf-8");
-  } catch {
-    throw new Error(`Prompt file '${promptPath}' does not exist.`);
-  }
-  if (!prompt) {
-    throw new Error("Prompt file is empty. Please provide a non-empty prompt.");
-  }
-  return prompt;
 }
 
 /** The allowed_tools and disallowed_tools rules, and what the run allows besides. */
@@ -384,22 +378,14 @@ function sessionFailure(
 
 /**
  * The expansion of a slash command in the trigger comment (/skill:<name> or
- * /<template>), read from the user request file tag mode writes next to the
- * prompt. Undefined when there is no request, or it is not a known command.
+ * /<template>). Undefined when there is no request, or it is not a known
+ * command.
  */
-async function expandRequestedCommand(
-  promptPath: string,
+function expandRequestedCommand(
+  request: string | undefined,
   sources: Parameters<typeof expandSlashCommand>[1],
-): Promise<string | undefined> {
-  let request: string;
-  try {
-    request = await readFile(
-      join(dirname(promptPath), USER_REQUEST_FILENAME),
-      "utf-8",
-    );
-  } catch {
-    return undefined;
-  }
+): string | undefined {
+  if (!request) return undefined;
   const expanded = expandSlashCommand(request, sources);
   if (expanded) {
     core.info(`Expanded ${request.trim().split(/\s/)[0]} from the request`);

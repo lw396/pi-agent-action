@@ -5,12 +5,6 @@ import {
   type Skill,
 } from "@earendil-works/pi-coding-agent";
 
-/**
- * Written next to the prompt file by tag mode: the trigger comment's request
- * without the trigger phrase, e.g. "/skill:review-pr focus on auth".
- */
-export const USER_REQUEST_FILENAME = "user-request.txt";
-
 const SKILL_PREFIX = "/skill:";
 
 /** The skills and prompt templates pi loaded for the session. */

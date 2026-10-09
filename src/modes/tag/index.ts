@@ -106,8 +106,7 @@ export async function prepareTagMode({
     }
   }
 
-  // Create prompt file
-  await createPrompt(
+  const { prompt, userRequest } = createPrompt(
     commentId,
     branchInfo.baseBranch,
     branchInfo.agentBranch,
@@ -169,6 +168,8 @@ export async function prepareTagMode({
   });
 
   return {
+    prompt,
+    userRequest,
     commentId,
     branchInfo,
     mcpServers,

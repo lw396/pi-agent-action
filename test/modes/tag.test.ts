@@ -59,7 +59,9 @@ describe("Tag Mode", () => {
               currentBranch: "claude/test",
             }) as any,
         ),
-        spyOn(createPrompt, "createPrompt").mockImplementation(async () => {}),
+        spyOn(createPrompt, "createPrompt").mockImplementation(() => ({
+          prompt: "Commit the notes.",
+        })),
         (prepareMcpConfigSpy = spyOn(
           mcp,
           "prepareMcpConfig",
@@ -183,7 +185,7 @@ describe("Tag Mode", () => {
     const getScratch = useScratch();
 
     test("runs git add, commit and read-only git commands, and blocks every other command", async () => {
-      const { cwd, promptPath } = getScratch();
+      const { cwd } = getScratch();
       const git = (...args: string[]) =>
         Bun.spawnSync(["git", ...args], { cwd }).exitCode;
       git("init", "-q");
@@ -210,7 +212,6 @@ describe("Tag Mode", () => {
         ),
         fauxAssistantMessage("Done."),
       ]);
-      await Bun.write(promptPath, "Commit the notes.");
       process.env.GITHUB_ACTION_PATH = "/action";
       const spies = [
         spyOn(actor, "checkHumanActor").mockImplementation(async () => {}),
@@ -223,7 +224,9 @@ describe("Tag Mode", () => {
         spyOn(branch, "setupBranch").mockImplementation(
           async () => ({ baseBranch: "main" }) as any,
         ),
-        spyOn(createPrompt, "createPrompt").mockImplementation(async () => {}),
+        spyOn(createPrompt, "createPrompt").mockImplementation(() => ({
+          prompt: "Commit the notes.",
+        })),
         spyOn(mcp, "prepareMcpConfig").mockImplementation(async () => ({})),
         spyOn(gitConfig, "configureGitAuth").mockImplementation(async () => {}),
       ];
@@ -239,7 +242,7 @@ describe("Tag Mode", () => {
         for (const spy of spies) spy.mockRestore();
       }
 
-      const result = await runPi(promptPath, {
+      const result = await runPi(prepared.prompt, {
         ...runnerOptions(readRunnerInputs({}), prepared),
         model,
         cwd,

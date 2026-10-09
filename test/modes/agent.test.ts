@@ -97,6 +97,7 @@ describe("Agent Mode", () => {
 
       // Verify return structure - should fall back to repository.default_branch when no env vars set
       expect(withoutTools).toEqual({
+        prompt: expect.any(String),
         commentId: undefined,
         branchInfo: {
           baseBranch: "main",
@@ -232,7 +233,7 @@ describe("Agent Mode", () => {
     ).resolves.toBeDefined();
   });
 
-  test("prepare creates prompt file with correct content", async () => {
+  test("prepare uses the prompt input as the prompt", async () => {
     const contextWithPrompts = createMockAutomationContext({
       eventName: "workflow_dispatch",
     });
@@ -262,10 +263,8 @@ describe("Agent Mode", () => {
       allowedTools: [],
     });
 
-    // Note: We can't easily test file creation in this unit test,
-    // but we can verify the method completes without errors
-    // With our conditional MCP logic, agent mode with no allowed tools
-    // should not include any MCP servers
+    expect(result.prompt).toBe("Custom prompt content");
+    // Agent mode with no allowed tools starts none of the action's MCP servers
     expect(result.mcpServers).toEqual({});
   });
 

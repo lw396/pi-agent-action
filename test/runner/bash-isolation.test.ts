@@ -70,8 +70,7 @@ async function runBash(
     }),
     fauxAssistantMessage("Done."),
   ]);
-  await Bun.write(getScratch().promptPath, "Run the command.");
-  const result = await runPi(getScratch().promptPath, {
+  const result = await runPi("Run the command.", {
     model,
     cwd: getScratch().cwd,
     modelRuntime,
@@ -130,9 +129,8 @@ describe("bash env allowlist", () => {
     const { faux, modelRuntime, model } = await fauxRuntime([
       fauxAssistantMessage("unused"),
     ]);
-    await Bun.write(getScratch().promptPath, "Run the command.");
     await expect(
-      runPi(getScratch().promptPath, {
+      runPi("Run the command.", {
         model,
         cwd: getScratch().cwd,
         modelRuntime,
@@ -169,8 +167,7 @@ describe("bash env allowlist", () => {
         return fauxAssistantMessage("Done.");
       },
     ]);
-    await Bun.write(getScratch().promptPath, "Say done.");
-    await runPi(getScratch().promptPath, {
+    await runPi("Say done.", {
       model,
       cwd: getScratch().cwd,
       modelRuntime,
@@ -191,8 +188,7 @@ async function runTool(
     fauxAssistantMessage(fauxToolCall(name, args), { stopReason: "toolUse" }),
     fauxAssistantMessage("Done."),
   ]);
-  await Bun.write(getScratch().promptPath, "Run the tool.");
-  const result = await runPi(getScratch().promptPath, {
+  const result = await runPi("Run the tool.", {
     model,
     cwd: getScratch().cwd,
     modelRuntime,

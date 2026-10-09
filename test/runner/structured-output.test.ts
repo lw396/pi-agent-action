@@ -42,8 +42,7 @@ async function run(
   extra: { jsonSchema?: string; piArgs?: string } = { jsonSchema: SCHEMA },
 ) {
   const { faux, modelRuntime, model } = await fauxRuntime(responses);
-  await Bun.write(getScratch().promptPath, "Review the change.");
-  const result = runPi(getScratch().promptPath, {
+  const result = runPi("Review the change.", {
     model,
     cwd: getScratch().cwd,
     modelRuntime,

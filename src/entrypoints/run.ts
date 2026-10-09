@@ -198,7 +198,7 @@ async function run() {
     }
 
     const runResult = await runPi(
-      runnerInputs.promptFile,
+      prepareResult.prompt,
       runnerOptions(runnerInputs, prepareResult),
     );
 

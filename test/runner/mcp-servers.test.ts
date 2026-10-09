@@ -39,9 +39,8 @@ async function echo(
     fauxAssistantMessage("Done."),
   ]);
   const scratch = getScratch();
-  await Bun.write(scratch.promptPath, "Echo the variables.");
 
-  const result = await runPi(scratch.promptPath, {
+  const result = await runPi("Echo the variables.", {
     model,
     cwd: scratch.cwd,
     modelRuntime,

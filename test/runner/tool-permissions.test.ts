@@ -49,9 +49,8 @@ async function runCalls(
   ];
   const { modelRuntime, model } = await fauxRuntime(steps);
   const scratch = getScratch();
-  await Bun.write(scratch.promptPath, "Run the tools.");
 
-  const result = await runPi(scratch.promptPath, {
+  const result = await runPi("Run the tools.", {
     model,
     cwd: scratch.cwd,
     modelRuntime,

@@ -13,6 +13,8 @@ export type PrepareOptions = {
 };
 
 export type PrepareResult = ModeRunSettings & {
+  /** The prompt the model gets. */
+  prompt: string;
   /** The tracking comment, which only tag mode creates. */
   commentId?: number;
   branchInfo: BranchInfo;

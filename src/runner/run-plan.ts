@@ -7,8 +7,6 @@ import { parseToolRules, type ToolRule } from "./tool-rules";
  * action.yml sets from them. Nothing else reads these variables.
  */
 export type RunnerInputs = {
-  /** The prompt file the mode writes. */
-  promptFile: string;
   model?: string;
   apiKey?: string;
   piArgs?: string;
@@ -28,6 +26,8 @@ export type RunnerInputs = {
 
 /** What a mode adds to the run, besides the workflow's inputs. */
 export type ModeRunSettings = {
+  /** The tag mode trigger comment's request, for slash command expansion. */
+  userRequest?: string;
   /** Rules the mode allows on top of the allowed_tools input. */
   allowedTools: string[];
   acceptEdits: boolean;
@@ -42,8 +42,6 @@ export type ModeRunSettings = {
  */
 export function readRunnerInputs(env: NodeJS.ProcessEnv): RunnerInputs {
   return {
-    promptFile:
-      env.INPUT_PROMPT_FILE || `${env.RUNNER_TEMP}/pi-prompts/prompt.txt`,
     model: env.MODEL,
     apiKey: env.API_KEY,
     piArgs: env.PI_ARGS,
@@ -68,6 +66,7 @@ export function runnerOptions(
   mode: ModeRunSettings,
 ): RunnerOptions {
   return {
+    userRequest: mode.userRequest,
     model: inputs.model,
     apiKey: inputs.apiKey,
     piArgs: inputs.piArgs,

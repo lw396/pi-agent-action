@@ -17,7 +17,6 @@ const NO_MODE_SETTINGS: ModeRunSettings = {
 describe("readRunnerInputs", () => {
   test("reads each input from its env var", () => {
     const inputs = readRunnerInputs({
-      INPUT_PROMPT_FILE: "/prompts/custom.txt",
       MODEL: "openai/gpt-5",
       API_KEY: "key",
       PI_ARGS: "--thinking high",
@@ -28,7 +27,6 @@ describe("readRunnerInputs", () => {
     });
 
     expect(inputs).toEqual({
-      promptFile: "/prompts/custom.txt",
       model: "openai/gpt-5",
       apiKey: "key",
       piArgs: "--thinking high",
@@ -47,12 +45,6 @@ describe("readRunnerInputs", () => {
     expect(() =>
       readRunnerInputs({ INPUT_DISALLOWED_TOOLS: "Edit(.env)" }),
     ).toThrow("Invalid disallowed_tools: 'Edit(.env)'");
-  });
-
-  test("defaults to the prompt file the modes write under RUNNER_TEMP", () => {
-    expect(readRunnerInputs({ RUNNER_TEMP: "/runner/temp" }).promptFile).toBe(
-      "/runner/temp/pi-prompts/prompt.txt",
-    );
   });
 
   test.each([
@@ -95,12 +87,14 @@ describe("runnerOptions", () => {
   test("passes the mode's settings and the action's MCP servers", () => {
     const server = { command: "bun", args: ["server.ts"] };
     const options = runnerOptions(readRunnerInputs({}), {
+      userRequest: "/skill:review-pr",
       allowedTools: [],
       acceptEdits: true,
       readOnlyGit: true,
       mcpServers: { github_comment: server },
     });
 
+    expect(options.userRequest).toBe("/skill:review-pr");
     expect(options.acceptEdits).toBe(true);
     expect(options.readOnlyGit).toBe(true);
     expect(options.mcpServers).toEqual({ github_comment: server });

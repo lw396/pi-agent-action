@@ -32,8 +32,7 @@ async function callTool(
     fauxAssistantMessage(fauxToolCall(name, args), { stopReason: "toolUse" }),
     fauxAssistantMessage("Done."),
   ]);
-  await Bun.write(getScratch().promptPath, "Post the comment.");
-  const result = await runPi(getScratch().promptPath, {
+  const result = await runPi("Post the comment.", {
     model,
     cwd: getScratch().cwd,
     modelRuntime,
@@ -95,8 +94,7 @@ describe("MCP tool arguments", () => {
       ),
       fauxAssistantMessage("Done."),
     ]);
-    await Bun.write(getScratch().promptPath, "Echo it.");
-    const result = await runPi(getScratch().promptPath, {
+    const result = await runPi("Echo it.", {
       model,
       cwd: getScratch().cwd,
       modelRuntime,

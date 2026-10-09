@@ -18,7 +18,6 @@ import { parseToolRules, type ToolRule } from "../../src/runner/tool-rules";
 export type Scratch = {
   root: string;
   cwd: string;
-  promptPath: string;
 };
 
 export const OIDC_AND_INPUT_VARS = [
@@ -52,7 +51,7 @@ export function useScratch(): () => Scratch {
     const cwd = join(root, "work");
     await Bun.write(join(cwd, ".keep"), "");
     await Bun.write(join(process.env.RUNNER_TEMP, ".keep"), "");
-    scratch = { root, cwd, promptPath: join(root, "prompt.txt") };
+    scratch = { root, cwd };
   });
 
   afterEach(() => {

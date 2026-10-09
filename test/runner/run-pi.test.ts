@@ -3,7 +3,7 @@
 import * as core from "@actions/core";
 import { describe, expect, spyOn, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { runPi } from "../../src/runner/run-pi";
 import {
@@ -15,10 +15,6 @@ import {
 } from "./harness";
 
 const getScratch = useScratch();
-
-async function writePrompt(text: string) {
-  await Bun.write(getScratch().promptPath, text);
-}
 
 describe("runPi", () => {
   test("appends the expansion of a slash command in the user request", async () => {
@@ -37,20 +33,16 @@ describe("runPi", () => {
         return fauxAssistantMessage("Reviewed.");
       },
     ]);
-    const { cwd, promptPath } = getScratch();
+    const { cwd } = getScratch();
     await Bun.write(
       join(cwd, ".pi/skills/review-pr/SKILL.md"),
       "---\nname: review-pr\ndescription: Review a pull request.\n---\n\nCheck the tests.\n",
     );
-    await writePrompt(
-      "<trigger_comment>@pi /skill:review-pr auth</trigger_comment>",
-    );
-    await Bun.write(
-      join(dirname(promptPath), "user-request.txt"),
-      "/skill:review-pr auth",
-    );
 
-    const result = await runPi(promptPath, { model, cwd, modelRuntime });
+    const result = await runPi(
+      "<trigger_comment>@pi /skill:review-pr auth</trigger_comment>",
+      { model, cwd, modelRuntime, userRequest: "/skill:review-pr auth" },
+    );
 
     expect(result.conclusion).toBe("success");
     expect(seen).toHaveLength(1);
@@ -74,14 +66,14 @@ describe("runPi", () => {
         return fauxAssistantMessage("Done.");
       },
     ]);
-    const { cwd, promptPath } = getScratch();
-    await writePrompt("Fix the bug.");
-    await Bun.write(
-      join(dirname(promptPath), "user-request.txt"),
-      "/skill:missing",
-    );
+    const { cwd } = getScratch();
 
-    await runPi(promptPath, { model, cwd, modelRuntime });
+    await runPi("Fix the bug.", {
+      model,
+      cwd,
+      modelRuntime,
+      userRequest: "/skill:missing",
+    });
 
     expect(seen).toEqual(["Fix the bug."]);
   });
@@ -90,9 +82,8 @@ describe("runPi", () => {
     const { modelRuntime, model } = await fauxRuntime([
       fauxAssistantMessage("All done."),
     ]);
-    await writePrompt("Say you are done.");
 
-    const result = await runPi(getScratch().promptPath, {
+    const result = await runPi("Say you are done.", {
       model,
       cwd: getScratch().cwd,
       modelRuntime,
@@ -129,9 +120,8 @@ describe("runPi", () => {
       }),
       fauxAssistantMessage("Said hi."),
     ]);
-    await writePrompt("Say hi with bash.");
 
-    const result = await runPi(getScratch().promptPath, {
+    const result = await runPi("Say hi with bash.", {
       model,
       cwd: getScratch().cwd,
       modelRuntime,
@@ -167,10 +157,9 @@ describe("runPi", () => {
         errorMessage: "400 invalid request: unsupported parameter",
       }),
     ]);
-    await writePrompt("Say you are done.");
 
     await expect(
-      runPi(getScratch().promptPath, {
+      runPi("Say you are done.", {
         model,
         cwd: getScratch().cwd,
         modelRuntime,
@@ -190,11 +179,10 @@ describe("runPi", () => {
     const { faux, modelRuntime } = await fauxRuntime([
       fauxAssistantMessage("unused"),
     ]);
-    await writePrompt("Say you are done.");
 
     for (const model of [undefined, "", "  "]) {
       await expect(
-        runPi(getScratch().promptPath, {
+        runPi("Say you are done.", {
           model,
           cwd: getScratch().cwd,
           modelRuntime,
@@ -208,16 +196,9 @@ describe("runPi", () => {
     const { faux, model, modelRuntime } = await fauxRuntime([
       fauxAssistantMessage("unused"),
     ]);
-    const { cwd, promptPath } = getScratch();
-    const options = { model, cwd, modelRuntime };
+    const options = { model, cwd: getScratch().cwd, modelRuntime };
 
-    await expect(runPi(promptPath, options)).rejects.toThrow(
-      `Prompt file '${promptPath}' does not exist.`,
-    );
-    await writePrompt("");
-    await expect(runPi(promptPath, options)).rejects.toThrow(
-      "Prompt file is empty",
-    );
+    await expect(runPi("", options)).rejects.toThrow("The prompt is empty");
     expect(faux.state.callCount).toBe(0);
   });
 
@@ -232,9 +213,8 @@ describe("runPi", () => {
         return fauxAssistantMessage("Done.");
       },
     ]);
-    await writePrompt("Say you are done.");
 
-    await runPi(getScratch().promptPath, {
+    await runPi("Say you are done.", {
       model,
       piArgs: `--thinking high
         # a comment line
@@ -255,9 +235,8 @@ describe("runPi", () => {
         return fauxAssistantMessage("Done.");
       },
     ]);
-    await writePrompt("Say you are done.");
 
-    await runPi(getScratch().promptPath, {
+    await runPi("Say you are done.", {
       model,
       apiKey: "key-from-the-api-key-input",
       cwd: getScratch().cwd,
@@ -275,9 +254,8 @@ describe("runPi", () => {
         return fauxAssistantMessage("Done.");
       },
     ]);
-    await writePrompt("Say you are done.");
 
-    await runPi(getScratch().promptPath, {
+    await runPi("Say you are done.", {
       model,
       cwd: getScratch().cwd,
       modelRuntime,
@@ -290,7 +268,6 @@ describe("runPi", () => {
     const { faux, modelRuntime, model } = await fauxRuntime([
       fauxAssistantMessage("unused"),
     ]);
-    await writePrompt("Say you are done.");
 
     const cases: Array<[string, string]> = [
       ["--model other/model", "use the model input"],
@@ -301,7 +278,7 @@ describe("runPi", () => {
     ];
     for (const [piArgs, message] of cases) {
       await expect(
-        runPi(getScratch().promptPath, {
+        runPi("Say you are done.", {
           model,
           piArgs,
           cwd: getScratch().cwd,
@@ -316,9 +293,8 @@ describe("runPi", () => {
     const { modelRuntime, model } = await fauxRuntime([
       fauxAssistantMessage("Done."),
     ]);
-    await writePrompt("Say you are done.");
 
-    await runPi(getScratch().promptPath, {
+    await runPi("Say you are done.", {
       model,
       cwd: getScratch().cwd,
       modelRuntime,
@@ -341,9 +317,8 @@ describe("runPi", () => {
       ),
       fauxAssistantMessage("Listed the environment."),
     ]);
-    await writePrompt("Print the environment.");
 
-    const result = await runPi(getScratch().promptPath, {
+    const result = await runPi("Print the environment.", {
       model,
       cwd: getScratch().cwd,
       modelRuntime,
@@ -374,10 +349,9 @@ describe("runPi", () => {
         ),
         fauxAssistantMessage("Printed it."),
       ]);
-      await writePrompt("Print the token.");
       const log = spyOn(core, "info").mockImplementation(() => {});
       try {
-        await runPi(getScratch().promptPath, {
+        await runPi("Print the token.", {
           model,
           cwd: getScratch().cwd,
           modelRuntime,

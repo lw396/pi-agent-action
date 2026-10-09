@@ -1,4 +1,3 @@
-import { mkdir, rm, writeFile } from "fs/promises";
 import { prepareMcpConfig } from "../../mcp/install-mcp-server";
 import {
   configureGitAuth,
@@ -70,19 +69,9 @@ export async function prepareAgentMode({
     }
   }
 
-  // Create prompt directory. Clear any stale files from a prior invocation first —
-  // see src/create-prompt/index.ts for context (non-ephemeral self-hosted runners
-  // do not reliably honor the RUNNER_TEMP cleanup contract).
-  const promptDir = `${process.env.RUNNER_TEMP || "/tmp"}/pi-prompts`;
-  await rm(promptDir, { recursive: true, force: true });
-  await mkdir(promptDir, { recursive: true });
-
-  // Write the prompt file - use the user's prompt directly
-  const promptContent =
+  const prompt =
     context.inputs.prompt ||
     `Repository: ${context.repository.owner}/${context.repository.repo}`;
-
-  await writeFile(`${promptDir}/prompt.txt`, promptContent);
 
   // Check for branch info from environment variables (useful for auto-fix workflows)
   const agentBranch = process.env.AGENT_BRANCH || undefined;
@@ -110,6 +99,7 @@ export async function prepareAgentMode({
   });
 
   return {
+    prompt,
     commentId: undefined,
     branchInfo: {
       baseBranch: baseBranch,
