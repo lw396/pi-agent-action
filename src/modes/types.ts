@@ -10,6 +10,8 @@ export type PrepareOptions = {
   githubToken: string;
   /** The allowed_tools input, which decides the action's MCP servers. */
   allowedTools: ToolRule[];
+  /** Content from users without write access can reach the model. */
+  untrustedInput: boolean;
 };
 
 export type PrepareResult = ModeRunSettings & {

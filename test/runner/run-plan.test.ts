@@ -35,6 +35,7 @@ describe("readRunnerInputs", () => {
       ],
       disallowedTools: [{ text: "Write", tool: "write" }],
       jsonSchema: '{"type":"object"}',
+      untrustedInput: false,
       isolateBash: false,
       allowedBashEnv: "NPM_TOKEN",
       showFullOutput: false,
@@ -56,6 +57,18 @@ describe("readRunnerInputs", () => {
   ])("isolates bash only for untrusted input: %p", (env, isolated) => {
     expect(readRunnerInputs(env).isolateBash).toBe(isolated);
   });
+
+  test.each([
+    [{}, false],
+    [{ ALLOWED_NON_WRITE_USERS: "alice" }, true],
+    // Opting out of bash isolation still keeps the token out of .git/config
+    [{ ALLOWED_NON_WRITE_USERS: "*", SUBPROCESS_ISOLATION: "false" }, true],
+  ])(
+    "treats input as untrusted when non-write users are allowed: %p",
+    (env, untrusted) => {
+      expect(readRunnerInputs(env).untrustedInput).toBe(untrusted);
+    },
+  );
 
   test.each([
     [{}, false],

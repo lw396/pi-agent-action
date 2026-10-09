@@ -80,11 +80,13 @@ async function run() {
     console.log(
       `Preparing with mode: ${modeName} for event: ${context.eventName}`,
     );
+    const runnerInputs = readRunnerInputs(process.env);
     const prepareOptions = {
       context,
       octokit,
       githubToken,
-      allowedTools: readRunnerInputs(process.env).allowedTools,
+      allowedTools: runnerInputs.allowedTools,
+      untrustedInput: runnerInputs.untrustedInput,
     };
     if (modeName === "tag") {
       await prepareTagMode(prepareOptions);

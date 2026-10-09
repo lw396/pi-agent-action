@@ -15,8 +15,15 @@ export type RunnerInputs = {
   disallowedTools: ToolRule[];
   jsonSchema?: string;
   /**
-   * Untrusted input (allowed_non_write_users): keep secrets out of bash,
-   * unless the workflow opts out with subprocess_isolation: false.
+   * allowed_non_write_users is set, so content from users without write
+   * access can reach the model. Prepare then keeps the GitHub token out of
+   * .git/config.
+   */
+  untrustedInput: boolean;
+  /**
+   * Untrusted input, and the workflow has not opted out with
+   * subprocess_isolation: false: bash gets only allowlisted variables and a
+   * sandbox, and the file tools cannot read /proc.
    */
   isolateBash: boolean;
   allowedBashEnv?: string;
@@ -41,6 +48,7 @@ export type ModeRunSettings = {
  * as written, so the run fails before anything is prepared.
  */
 export function readRunnerInputs(env: NodeJS.ProcessEnv): RunnerInputs {
+  const untrustedInput = !!env.ALLOWED_NON_WRITE_USERS;
   return {
     model: env.MODEL,
     apiKey: env.API_KEY,
@@ -51,8 +59,8 @@ export function readRunnerInputs(env: NodeJS.ProcessEnv): RunnerInputs {
       "disallowed_tools",
     ),
     jsonSchema: env.JSON_SCHEMA,
-    isolateBash:
-      !!env.ALLOWED_NON_WRITE_USERS && env.SUBPROCESS_ISOLATION !== "false",
+    untrustedInput,
+    isolateBash: untrustedInput && env.SUBPROCESS_ISOLATION !== "false",
     allowedBashEnv: env.ALLOWED_BASH_ENV,
     // RUNNER_DEBUG is what core.isDebug() reads.
     showFullOutput:

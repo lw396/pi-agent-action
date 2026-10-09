@@ -23,6 +23,7 @@ export async function configureGitAuth(
   githubToken: string,
   context: GitHubContext,
   user: GitUser,
+  untrustedInput: boolean,
 ) {
   console.log("Configuring git authentication for non-signing mode");
 
@@ -42,7 +43,7 @@ export async function configureGitAuth(
   await $`git config user.email "${botId}+${botName}@${noreplyDomain}"`;
   console.log(`✓ Set git user as ${botName}`);
 
-  await replaceCheckoutCredentials(githubToken, context);
+  await replaceCheckoutCredentials(githubToken, context, untrustedInput);
 
   console.log("Git authentication configured successfully");
 }
@@ -70,6 +71,7 @@ export async function configureGitAuth(
 export async function replaceCheckoutCredentials(
   githubToken: string,
   context: GitHubContext,
+  untrustedInput: boolean,
 ) {
   const serverUrl = new URL(GITHUB_SERVER_URL);
 
@@ -105,7 +107,7 @@ export async function replaceCheckoutCredentials(
       : "No existing authentication headers to remove",
   );
 
-  if (process.env.ALLOWED_NON_WRITE_USERS) {
+  if (untrustedInput) {
     // When processing content from non-write users, use a credential helper
     // instead of embedding the token in the remote URL. The helper script reads
     // from GH_TOKEN at auth time, so .git/config stays token-free. Written as a

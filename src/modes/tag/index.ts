@@ -28,6 +28,7 @@ export async function prepareTagMode({
   octokit,
   githubToken,
   allowedTools: workflowAllowedTools,
+  untrustedInput,
 }: PrepareOptions): Promise<PrepareResult> {
   // Tag mode only handles entity-based events
   if (!isEntityContext(context)) {
@@ -76,7 +77,7 @@ export async function prepareTagMode({
       id: parseInt(context.inputs.botId),
     };
     try {
-      await configureGitAuth(githubToken, context, user);
+      await configureGitAuth(githubToken, context, user, untrustedInput);
     } catch (error) {
       console.error("Failed to configure git authentication:", error);
       throw error;
@@ -89,7 +90,7 @@ export async function prepareTagMode({
     };
 
     try {
-      await configureGitAuth(githubToken, context, user);
+      await configureGitAuth(githubToken, context, user, untrustedInput);
     } catch (error) {
       console.error("Failed to configure git authentication:", error);
       throw error;
@@ -99,7 +100,7 @@ export async function prepareTagMode({
     // the credential actions/checkout left in git config should still be
     // replaced with the action's own.
     try {
-      await replaceCheckoutCredentials(githubToken, context);
+      await replaceCheckoutCredentials(githubToken, context, untrustedInput);
     } catch (error) {
       console.error("Failed to configure git credentials:", error);
       throw error;

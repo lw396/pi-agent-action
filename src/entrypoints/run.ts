@@ -159,6 +159,7 @@ async function run() {
       octokit,
       githubToken,
       allowedTools: runnerInputs.allowedTools,
+      untrustedInput: runnerInputs.untrustedInput,
     };
     const prepareResult =
       modeName === "tag"

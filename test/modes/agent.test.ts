@@ -84,12 +84,14 @@ describe("Agent Mode", () => {
           "Bash(git status), mcp__github_comment__update_comment",
           "allowed_tools",
         ),
+        untrustedInput: false,
       });
       const withoutTools = await prepareAgentMode({
         context,
         octokit: mockOctokit,
         githubToken: "test-token",
         allowedTools: [],
+        untrustedInput: false,
       });
 
       expect(Object.keys(withTools.mcpServers)).toEqual(["github_comment"]);
@@ -158,6 +160,7 @@ describe("Agent Mode", () => {
       octokit: mockOctokit,
       githubToken: "test-token",
       allowedTools: [],
+      untrustedInput: false,
     });
 
     expect(result.branchInfo.baseBranch).toBe("develop");
@@ -197,6 +200,7 @@ describe("Agent Mode", () => {
         octokit: mockOctokit,
         githubToken: "test-token",
         allowedTools: [],
+        untrustedInput: false,
       }),
     ).rejects.toThrow(
       "Workflow initiated by non-human actor: claude (type: Bot)",
@@ -229,6 +233,7 @@ describe("Agent Mode", () => {
         octokit: mockOctokit,
         githubToken: "test-token",
         allowedTools: [],
+        untrustedInput: false,
       }),
     ).resolves.toBeDefined();
   });
@@ -261,6 +266,7 @@ describe("Agent Mode", () => {
       octokit: mockOctokit,
       githubToken: "test-token",
       allowedTools: [],
+      untrustedInput: false,
     });
 
     expect(result.prompt).toBe("Custom prompt content");
@@ -291,13 +297,16 @@ describe("Agent Mode", () => {
         octokit: mockOctokit,
         githubToken: "test-token",
         allowedTools: [],
+        untrustedInput: false,
       });
 
       expect(configureGitAuthSpy).toHaveBeenCalledTimes(1);
-      expect(configureGitAuthSpy).toHaveBeenCalledWith("test-token", context, {
-        login: context.inputs.botName,
-        id: parseInt(context.inputs.botId),
-      });
+      expect(configureGitAuthSpy).toHaveBeenCalledWith(
+        "test-token",
+        context,
+        { login: context.inputs.botName, id: parseInt(context.inputs.botId) },
+        false,
+      );
       // configureGitAuth performs the credential replacement itself; the mock
       // stands in for it here, so the standalone helper is not invoked.
       expect(replaceCheckoutCredentialsSpy).not.toHaveBeenCalled();
@@ -314,6 +323,7 @@ describe("Agent Mode", () => {
         octokit: mockOctokit,
         githubToken: "test-token",
         allowedTools: [],
+        untrustedInput: true,
       });
 
       expect(configureGitAuthSpy).not.toHaveBeenCalled();
@@ -321,6 +331,7 @@ describe("Agent Mode", () => {
       expect(replaceCheckoutCredentialsSpy).toHaveBeenCalledWith(
         "test-token",
         context,
+        true,
       );
     });
   });

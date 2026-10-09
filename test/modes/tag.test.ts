@@ -83,13 +83,16 @@ describe("Tag Mode", () => {
         octokit: {} as any,
         githubToken: "test-token",
         allowedTools: [],
+        untrustedInput: false,
       });
 
       expect(configureGitAuthSpy).toHaveBeenCalledTimes(1);
-      expect(configureGitAuthSpy).toHaveBeenCalledWith("test-token", context, {
-        login: context.inputs.botName,
-        id: parseInt(context.inputs.botId),
-      });
+      expect(configureGitAuthSpy).toHaveBeenCalledWith(
+        "test-token",
+        context,
+        { login: context.inputs.botName, id: parseInt(context.inputs.botId) },
+        false,
+      );
       // configureGitAuth performs the credential replacement itself; the mock
       // stands in for it here, so the standalone helper is not invoked.
       expect(replaceCheckoutCredentialsSpy).not.toHaveBeenCalled();
@@ -106,6 +109,7 @@ describe("Tag Mode", () => {
         octokit: {} as any,
         githubToken: "test-token",
         allowedTools: [],
+        untrustedInput: false,
       });
 
       expect(configureGitAuthSpy).not.toHaveBeenCalled();
@@ -113,6 +117,7 @@ describe("Tag Mode", () => {
       expect(replaceCheckoutCredentialsSpy).toHaveBeenCalledWith(
         "test-token",
         context,
+        false,
       );
     });
     test("allows the git commands it needs, and file edits in the workspace", async () => {
@@ -123,6 +128,7 @@ describe("Tag Mode", () => {
         octokit: {} as any,
         githubToken: "test-token",
         allowedTools: [],
+        untrustedInput: false,
       });
 
       expect(result.allowedTools).toEqual(
@@ -151,6 +157,7 @@ describe("Tag Mode", () => {
         octokit: {} as any,
         githubToken: "test-token",
         allowedTools: [],
+        untrustedInput: false,
       });
 
       expect(result.allowedTools).toEqual(
@@ -171,6 +178,7 @@ describe("Tag Mode", () => {
           "Bash(npm test), mcp__github_inline_comment__create_inline_comment",
           "allowed_tools",
         ),
+        untrustedInput: false,
       });
 
       const { allowedTools } = prepareMcpConfigSpy.mock.calls[0][0];
@@ -237,6 +245,7 @@ describe("Tag Mode", () => {
           octokit: {} as any,
           githubToken: "test-token",
           allowedTools: [],
+          untrustedInput: false,
         });
       } finally {
         for (const spy of spies) spy.mockRestore();

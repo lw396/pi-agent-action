@@ -59,7 +59,6 @@ describe("git-config", () => {
   let tempDir: string;
   let repoDir: string;
   let originalActionPath: string | undefined;
-  let originalNonWriteUsers: string | undefined;
   let originalGhToken: string | undefined;
   let originalGitEnv: Record<string, string | undefined>;
   let consoleLogSpy: any;
@@ -67,9 +66,7 @@ describe("git-config", () => {
   beforeEach(() => {
     originalCwd = process.cwd();
     originalActionPath = process.env.GITHUB_ACTION_PATH;
-    originalNonWriteUsers = process.env.ALLOWED_NON_WRITE_USERS;
     originalGhToken = process.env.GH_TOKEN;
-    delete process.env.ALLOWED_NON_WRITE_USERS;
     originalGitEnv = {};
     for (const name of GIT_ENV_OVERRIDES) {
       originalGitEnv[name] = process.env[name];
@@ -108,7 +105,6 @@ describe("git-config", () => {
     rmSync(tempDir, { recursive: true, force: true });
     consoleLogSpy?.mockRestore();
     restoreEnv("GITHUB_ACTION_PATH", originalActionPath);
-    restoreEnv("ALLOWED_NON_WRITE_USERS", originalNonWriteUsers);
     restoreEnv("GH_TOKEN", originalGhToken);
     for (const name of GIT_ENV_OVERRIDES) {
       restoreEnv(name, originalGitEnv[name]);
@@ -122,6 +118,7 @@ describe("git-config", () => {
       await replaceCheckoutCredentials(
         "test-token",
         createMockAutomationContext(),
+        false,
       );
 
       expect(gitConfigGetAll(EXTRAHEADER_KEY)).toBe("");
@@ -133,11 +130,10 @@ describe("git-config", () => {
     });
 
     test("uses a credential helper when non-write users are allowed", async () => {
-      process.env.ALLOWED_NON_WRITE_USERS = "someone";
-
       await replaceCheckoutCredentials(
         "helper-token",
         createMockAutomationContext(),
+        true,
       );
 
       expect(gitConfigGetAll(EXTRAHEADER_KEY)).toBe("");
@@ -154,7 +150,11 @@ describe("git-config", () => {
       git(["config", "--local", "--unset-all", EXTRAHEADER_KEY]);
 
       await expect(
-        replaceCheckoutCredentials("test-token", createMockAutomationContext()),
+        replaceCheckoutCredentials(
+          "test-token",
+          createMockAutomationContext(),
+          false,
+        ),
       ).resolves.toBeUndefined();
 
       expect(remoteUrl()).toContain("x-access-token:test-token@");
@@ -163,10 +163,12 @@ describe("git-config", () => {
 
   describe("configureGitAuth", () => {
     test("configures the git user and replaces the checkout credential", async () => {
-      await configureGitAuth("test-token", createMockAutomationContext(), {
-        login: "claude[bot]",
-        id: 42,
-      });
+      await configureGitAuth(
+        "test-token",
+        createMockAutomationContext(),
+        { login: "claude[bot]", id: 42 },
+        false,
+      );
 
       expect(gitConfigGetAll("user.name")).toBe("claude[bot]");
       expect(gitConfigGetAll("user.email")).toBe(

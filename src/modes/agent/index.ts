@@ -19,6 +19,7 @@ export async function prepareAgentMode({
   octokit,
   githubToken,
   allowedTools,
+  untrustedInput,
 }: PrepareOptions): Promise<PrepareResult> {
   // Check if actor is human (prevents bot-triggered loops)
   await checkHumanActor(octokit.rest, context);
@@ -38,7 +39,7 @@ export async function prepareAgentMode({
       id: parseInt(context.inputs.botId),
     };
     try {
-      await configureGitAuth(githubToken, context, user);
+      await configureGitAuth(githubToken, context, user, untrustedInput);
     } catch (error) {
       console.error("Failed to configure git authentication:", error);
       // Continue anyway - git operations may still work with default config
@@ -52,7 +53,7 @@ export async function prepareAgentMode({
 
     try {
       // Use the shared git configuration function
-      await configureGitAuth(githubToken, context, user);
+      await configureGitAuth(githubToken, context, user, untrustedInput);
     } catch (error) {
       console.error("Failed to configure git authentication:", error);
       // Continue anyway - git operations may still work with default config
@@ -62,7 +63,7 @@ export async function prepareAgentMode({
     // the credential actions/checkout left in git config should still be
     // replaced with the action's own.
     try {
-      await replaceCheckoutCredentials(githubToken, context);
+      await replaceCheckoutCredentials(githubToken, context, untrustedInput);
     } catch (error) {
       console.error("Failed to configure git credentials:", error);
       // Continue anyway - git operations may still work with default config
