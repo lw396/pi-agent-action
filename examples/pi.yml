@@ -1,4 +1,4 @@
-name: Claude Code
+name: pi
 
 on:
   issue_comment:
@@ -11,7 +11,7 @@ on:
     types: [submitted]
 
 jobs:
-  claude:
+  pi:
     if: |
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@pi')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@pi')) ||
@@ -22,37 +22,32 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
-      id-token: write
-      actions: read # Required for Claude to read CI results on PRs
+      id-token: write # Required to get a token of the pi-agent-action app
+      actions: read # Required for the agent to read CI results on PRs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
-      - name: Run Claude Code
-        id: claude
-        uses: anthropics/claude-code-action@v1
+      - name: Run pi
+        id: pi
+        uses: lw396/pi-agent-action@main
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Any model pi supports, as provider/model-id
+          model: anthropic/<model-id>
 
           # Optional: Customize the trigger phrase (default: @pi)
-          # trigger_phrase: "/claude"
+          # trigger_phrase: "/pi"
 
           # Optional: Trigger when specific user is assigned to an issue
-          # assignee_trigger: "claude-bot"
+          # assignee_trigger: "pi-bot"
 
-          # Optional: Configure Claude's behavior with CLI arguments
-          # claude_args: |
-          #   --model claude-opus-4-1-20250805
-          #   --max-turns 10
-          #   --allowedTools "Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*)"
-          #   --system-prompt "Follow our coding standards. Ensure all new code has tests. Use TypeScript for new files."
+          # Optional: Commands the agent may run besides git add/commit/push
+          # allowed_tools: "Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*)"
 
-          # Optional: Advanced settings configuration
-          # settings: |
-          #   {
-          #     "env": {
-          #       "NODE_ENV": "test"
-          #     }
-          #   }
+          # Optional: Extra instructions for the agent
+          # pi_args: --append-system-prompt "Follow our coding standards. Ensure all new code has tests. Use TypeScript for new files."
+        env:
+          # The provider's key, under the variable name pi reads
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

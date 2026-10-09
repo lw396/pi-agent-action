@@ -21,9 +21,9 @@ jobs:
           fetch-depth: 1
 
       - name: PR Review with Progress Tracking
-        uses: anthropics/claude-code-action@v1
+        uses: lw396/pi-agent-action@main
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: google/<model-id>
 
           # Enable progress tracking
           track_progress: true
@@ -64,9 +64,9 @@ jobs:
             Use top-level comments for general observations or praise.
 
           # Tools for comprehensive PR review
-          claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
-
+          allowed_tools: "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 # When track_progress is enabled:
 # - Creates a tracking comment with progress checkboxes
 # - Includes all PR context (comments, attachments, images)

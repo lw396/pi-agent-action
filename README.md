@@ -1,13 +1,26 @@
 # pi-agent-action
 
-A GitHub Action that runs the [pi coding agent](https://github.com/earendil-works/pi) on your issues and pull requests. Mention `@pi` in a comment to have it answer a question, review a change or implement a fix (tag mode), or give it a `prompt` to run an automation (agent mode). It works with any model pi supports.
+A GitHub Action that runs the [pi coding agent](https://github.com/earendil-works/pi) on your issues and pull requests, with the model of your choice. Mention `@pi` in a comment to have it answer a question, review a change or implement a fix, or give it a `prompt` to run an automation. Claude, GPT, Gemini, models on Amazon Bedrock or Google Vertex AI, OpenRouter and any other provider pi supports all work the same way: you pick the model, the workflow stays the same.
 
 > [!NOTE]
 > This project is based on [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action) (MIT) and is meant as a drop-in replacement for it. It is not an official product of Anthropic or of the pi project.
 >
-> It is a work in progress. This README, [docs/security.md](./docs/security.md) and [docs/upstream-divergence.md](./docs/upstream-divergence.md) describe pi-agent-action; the other pages under `docs/` still describe claude-code-action and will be rewritten.
+> Not released yet: there is no version tag, so pin a commit SHA or use `@main`. The action itself is complete; the pages listed as not yet rewritten under [Documentation](#documentation) still describe claude-code-action, and [`examples/`](./examples) has ready-to-use workflows.
+
+## Features
+
+- **Any model**: set `model` to `<provider>/<model-id>`; switching providers changes one input and one secret
+- **Two modes, picked automatically**: tag mode answers `@pi` mentions, assignments and labels on issues and pull requests; agent mode runs the `prompt` you give it, on any event
+- **Code review and implementation**: reads the issue or pull request, the diff and CI status, then answers, leaves inline review comments or pushes a branch with the fix
+- **Progress tracking**: a comment that updates as the agent works, with a link to the job run
+- **Structured output**: `json_schema` turns the agent's answer into validated JSON action outputs
+- **Explicit permissions**: the agent can always read files; every other tool call needs an `allowed_tools` rule
+- **Runs on your runner**: the agent runs inside the action on your GitHub runner, and model requests go straight to your provider
 
 ## Quickstart
+
+1. Add your provider's API key as a repository secret, e.g. `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` ([Model providers](#model-providers)).
+2. Add this workflow as `.github/workflows/pi.yml`:
 
 ```yaml
 name: pi
@@ -33,18 +46,48 @@ jobs:
       - uses: lw396/pi-agent-action@main
         with:
           # Required: a pi model as provider/id
-          model: openai/<model-id>
+          model: anthropic/<model-id>
           github_token: ${{ secrets.GITHUB_TOKEN }}
           # Optional: commands the agent may run besides git add/commit/push
           allowed_tools: "Bash(npm test:*)"
         env:
           # The provider's key, under the variable name pi reads
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-Only users with write access to the repository can trigger the action. Pass the provider key in the workflow `env:` under the name pi reads for that provider (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `OPENCODE_API_KEY`, ...), or in the `api_key` input.
+3. Comment `@pi <request>` on an issue or pull request.
 
-The Quickstart passes the workflow's `GITHUB_TOKEN`, so comments come from `github-actions[bot]`, and pushes and pull requests made with it do not start other workflows. To act as `pi-agent-action[bot]` instead, install the [pi-agent-action app](https://github.com/apps/pi-agent-action) on the repository, grant the job `id-token: write` and remove `github_token`: the action then exchanges the workflow's OIDC token for a token of the app. Repositories without the app keep `github_token`, or pass a token of their own app ([docs/setup.md](./docs/setup.md#using-a-custom-github-app)).
+Only users with write access to the repository can trigger the action. See [GitHub authentication](#github-authentication) to have it act as its own bot instead of `github-actions[bot]`.
+
+## Model providers
+
+Set `model` to `<provider>/<model-id>` and pass the provider's credentials in `env:`, under the variable name pi reads for that provider. For providers that use a single API key, the `api_key` input works too.
+
+| Provider           | `model`                     | Credentials in `env:`                                                               |
+| ------------------ | --------------------------- | ----------------------------------------------------------------------------------- |
+| Anthropic (Claude) | `anthropic/<model-id>`      | `ANTHROPIC_API_KEY`                                                                 |
+| OpenAI             | `openai/<model-id>`         | `OPENAI_API_KEY`                                                                    |
+| Google Gemini      | `google/<model-id>`         | `GEMINI_API_KEY`                                                                    |
+| OpenRouter         | `openrouter/<model-id>`     | `OPENROUTER_API_KEY`                                                                |
+| OpenCode           | `opencode/<model-id>`       | `OPENCODE_API_KEY`                                                                  |
+| Amazon Bedrock     | `amazon-bedrock/<model-id>` | AWS credentials and `AWS_REGION`                                                    |
+| Google Vertex AI   | `google-vertex/<model-id>`  | `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` and Application Default Credentials |
+
+Append `:<level>` to set a thinking level, e.g. `model: openai/<model-id>:high`. [docs/setup.md](./docs/setup.md#model-providers) has the details and the other providers.
+
+## GitHub authentication
+
+The action needs a GitHub token to read the issue or pull request, comment and push. There are three ways to give it one:
+
+| Option                                                             | Workflow                                                              | Comments and commits from | Pushes start other workflows |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------- | ---------------------------- |
+| The workflow's `GITHUB_TOKEN` (Quickstart)                         | `github_token: ${{ secrets.GITHUB_TOKEN }}`                           | `github-actions[bot]`     | No                           |
+| The [pi-agent-action app](https://github.com/apps/pi-agent-action) | Install the app, grant the job `id-token: write`, omit `github_token` | `pi-agent-action[bot]`    | Yes                          |
+| Your own GitHub App                                                | `github_token` from `actions/create-github-app-token`                 | Your app's bot            | Yes                          |
+
+With the pi-agent-action app, the action exchanges the workflow's GitHub OIDC token for a short-lived token of the app at this project's token exchange service; the app's private key never leaves that service. A repository without the app installed gets an error asking you to install it or set `github_token`. [docs/setup.md](./docs/setup.md#using-a-custom-github-app) explains how to create your own app, and [docs/security.md](./docs/security.md#github-app-permissions) lists the app's permissions.
+
+## Tools and security
 
 The agent can always read files. Any other tool call (bash, file edits outside tag mode, MCP tools) runs only if `allowed_tools` permits it, and there is no safety review of the calls it permits. Read [docs/security.md](./docs/security.md) before you allow broad tools such as `Bash`.
 
@@ -90,6 +133,7 @@ A workflow that still sets one of these inputs fails, naming the input and what 
 | `claude_args`                                                                                                                                    | See the flag table below                                                                                                                                          |
 | `settings`                                                                                                                                       | Not supported: remove it; move permission rules to `allowed_tools` / `disallowed_tools`                                                                           |
 | `plugins`, `plugin_marketplaces`                                                                                                                 | Not supported: remove them                                                                                                                                        |
+| `include_fix_links`                                                                                                                              | Remove it: its "Fix this" links opened Claude Code on the web, which pi has no equivalent of                                                                      |
 | `path_to_claude_code_executable`                                                                                                                 | Remove it: pi runs inside the action's own process, at the version the action pins                                                                                |
 
 Flags from `claude_args`:
@@ -128,6 +172,7 @@ Every row below changes something a workflow can observe. [docs/upstream-diverge
 | Output redaction                            | Known token formats                                                                                  | Also every env value of 16 or more characters that is not on the allowlist, so long non-secret values show as `[REDACTED]` in comments and the step summary                               | To keep a long non-secret value visible, write it into `prompt` instead of `env:`                                                                                            |
 | Structured output                           | `--json-schema` in `claude_args`                                                                     | `json_schema` input; same `structured_output` output                                                                                                                                      | `json_schema: '{"type":"object",...}'`                                                                                                                                       |
 | Execution file                              | Agent SDK messages; cost in the final `result` message                                               | pi events; totals in the final `session_stats` record                                                                                                                                     | None in YAML; a script that reads `execution_file` must read `session_stats` (`cost`, `durationMs`)                                                                          |
+| "Create a PR" link                          | Title `... Changes from Claude`; body signed `Generated with [Claude Code](https://claude.ai/code)`  | Title `... Changes from pi`; no signature                                                                                                                                                 | None                                                                                                                                                                         |
 | Step summary                                | `Claude Code Report` from SDK messages                                                               | `pi Agent Report` from pi events, with token and cost totals                                                                                                                              | None                                                                                                                                                                         |
 | Full output                                 | `show_full_output`, or `ACTIONS_STEP_DEBUG: true` in `env:`, prints messages unredacted              | `show_full_output`, or a run with debug logging enabled, prints pi events, redacted                                                                                                       | Replace `ACTIONS_STEP_DEBUG: true` in `env:` with `show_full_output: true`, or re-run the job with debug logging                                                             |
 | `session_id` output                         | Can be resumed with `--resume`                                                                       | pi's session ID; the session cannot be resumed                                                                                                                                            | Remove later steps that resume the session; read the run from `execution_file`                                                                                               |
@@ -135,10 +180,11 @@ Every row below changes something a workflow can observe. [docs/upstream-diverge
 
 ## Documentation
 
+- [Setup](./docs/setup.md): model providers, the GitHub App or your own, and handling secrets
 - [Security](./docs/security.md): access control, tool permissions, bash isolation, redaction, and what is weaker than in claude-code-action
 - [Differences from claude-code-action](./docs/upstream-divergence.md): every divergence and its reason
 - [Port proposal](./docs/pi-port-proposal.md): the plan, milestones and open questions
-- Not yet rewritten for pi: [Solutions](./docs/solutions.md), [Setup](./docs/setup.md), [Usage](./docs/usage.md), [Custom Automations](./docs/custom-automations.md), [Configuration](./docs/configuration.md), [Capabilities & Limitations](./docs/capabilities-and-limitations.md), [FAQ](./docs/faq.md)
+- Not yet rewritten for pi: [Solutions](./docs/solutions.md), [Usage](./docs/usage.md), [Custom Automations](./docs/custom-automations.md), [Configuration](./docs/configuration.md), [Capabilities & Limitations](./docs/capabilities-and-limitations.md), [FAQ](./docs/faq.md)
 
 ## Contributing
 

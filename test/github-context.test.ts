@@ -57,7 +57,6 @@ const ENV_KEYS = [
   "ALLOWED_BOTS",
   "ALLOWED_NON_WRITE_USERS",
   "TRACK_PROGRESS",
-  "INCLUDE_FIX_LINKS",
   "INCLUDE_COMMENTS_BY_ACTOR",
   "EXCLUDE_COMMENTS_BY_ACTOR",
 ] as const;
@@ -355,7 +354,6 @@ describe("parseGitHubContext", () => {
       expect(inputs.allowedBots).toBe("");
       expect(inputs.allowedNonWriteUsers).toBe("");
       expect(inputs.trackProgress).toBe(false);
-      expect(inputs.includeFixLinks).toBe(false);
       expect(inputs.includeCommentsByActor).toBe("");
       expect(inputs.excludeCommentsByActor).toBe("");
       expect(inputs.baseBranch).toBeUndefined();
@@ -398,7 +396,6 @@ describe("parseGitHubContext", () => {
       process.env.ALLOWED_BOTS = "dependabot[bot]";
       process.env.ALLOWED_NON_WRITE_USERS = "trusted-user";
       process.env.TRACK_PROGRESS = "true";
-      process.env.INCLUDE_FIX_LINKS = "true";
       process.env.INCLUDE_COMMENTS_BY_ACTOR = "alice";
       process.env.EXCLUDE_COMMENTS_BY_ACTOR = "bob";
 
@@ -426,7 +423,6 @@ describe("parseGitHubContext", () => {
       expect(inputs.allowedBots).toBe("dependabot[bot]");
       expect(inputs.allowedNonWriteUsers).toBe("trusted-user");
       expect(inputs.trackProgress).toBe(true);
-      expect(inputs.includeFixLinks).toBe(true);
       expect(inputs.includeCommentsByActor).toBe("alice");
       expect(inputs.excludeCommentsByActor).toBe("bob");
     });

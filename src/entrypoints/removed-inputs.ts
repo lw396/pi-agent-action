@@ -36,6 +36,8 @@ export const REMOVED_INPUTS: Record<string, string> = {
   plugin_marketplaces: "pi has no Claude Code plugins; remove the input",
   path_to_claude_code_executable:
     "pi runs inside the action's own process; remove the input",
+  include_fix_links:
+    "its 'Fix this' links opened Claude Code on the web, which pi has no equivalent of; remove the input",
 };
 
 /**

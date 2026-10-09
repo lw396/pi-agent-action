@@ -1,4 +1,4 @@
-name: Claude Commit Analysis
+name: pi Commit Analysis
 
 on:
   workflow_dispatch:
@@ -27,10 +27,10 @@ jobs:
         with:
           fetch-depth: 2 # Need at least 2 commits to analyze the latest
 
-      - name: Run Claude Analysis
-        uses: anthropics/claude-code-action@v1
+      - name: Run pi Analysis
+        uses: lw396/pi-agent-action@main
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: openrouter/<model-id>
           prompt: |
             REPO: ${{ github.repository }}
             BRANCH: ${{ github.ref_name }}
@@ -40,3 +40,5 @@ jobs:
             ${{ github.event.inputs.analysis_type == 'summarize-commit' && 'Task: Provide a clear, concise summary of what changed in the latest commit. Include the commit message, files changed, and the purpose of the changes.' || '' }}
 
             ${{ github.event.inputs.analysis_type == 'security-review' && 'Task: Review the latest commit for potential security vulnerabilities. Check for exposed secrets, insecure coding patterns, dependency vulnerabilities, or any other security concerns. Provide specific recommendations if issues are found.' || '' }}
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

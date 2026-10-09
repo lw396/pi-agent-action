@@ -13,6 +13,7 @@ on:
 permissions:
   contents: read
   actions: write
+  id-token: write # Required to get a token of the pi-agent-action app
 
 jobs:
   detect-flaky:
@@ -24,9 +25,13 @@ jobs:
 
       - name: Detect flaky test failures
         id: detect
-        uses: anthropics/claude-code-action@main
+        uses: lw396/pi-agent-action@main
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: anthropic/<model-id>
+          # The app token needs actions: read for gh run view
+          additional_permissions: |
+            actions: read
+          allowed_tools: "Bash(gh run view:*)"
           prompt: |
             The CI workflow failed: ${{ github.event.workflow_run.html_url }}
 
@@ -43,8 +48,9 @@ jobs:
             - is_flaky: true if likely flaky, false if real bug
             - confidence: number 0-1 indicating confidence level
             - summary: brief one-sentence explanation
-          claude_args: |
-            --json-schema '{"type":"object","properties":{"is_flaky":{"type":"boolean","description":"Whether this appears to be a flaky test failure"},"confidence":{"type":"number","minimum":0,"maximum":1,"description":"Confidence level in the determination"},"summary":{"type":"string","description":"One-sentence explanation of the failure"}},"required":["is_flaky","confidence","summary"]}'
+          json_schema: '{"type":"object","properties":{"is_flaky":{"type":"boolean","description":"Whether this appears to be a flaky test failure"},"confidence":{"type":"number","minimum":0,"maximum":1,"description":"Confidence level in the determination"},"summary":{"type":"string","description":"One-sentence explanation of the failure"}},"required":["is_flaky","confidence","summary"]}'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       # Auto-retry only if flaky AND high confidence (>= 0.7)
       - name: Retry flaky tests

@@ -89,6 +89,14 @@
 - **本仓库**：`action.yml` 只保留带 `deprecationMessage` 的占位声明；设置了其中任何一个（包括 `use_bedrock: "false"` 这样的值）时，运行在 prepare 一开始就失败，列出输入名、替代做法和 README 迁移对照表的链接（`src/entrypoints/removed-inputs.ts`）
 - **说明**：composite action 读不到未声明的输入，GitHub 只给一条警告；静默忽略会让 workflow 以为配置生效了。涉及的输入：`anthropic_api_key`、`claude_code_oauth_token`、workload identity 的 5 个输入、`use_bedrock` / `use_vertex` / `use_foundry`、`claude_args`、`settings`、`plugins`、`plugin_marketplaces`、`path_to_claude_code_executable`
 
+#### PR review 中的 "Fix this" 链接（`include_fix_links`）
+
+`pi-capability` · 用户可见：是
+
+- **上游**：`include_fix_links` 默认 `true`，PR review 的提示词要求模型为每个可修复的问题附上 `[Fix this →](https://claude.ai/code?q=...)` 链接，点开后在 Claude Code 网页版中带着上下文修复
+- **本仓库**：删除该提示词和输入；`include_fix_links` 留在 `action.yml` 中作为已删除输入的占位，设置了就失败（`src/entrypoints/removed-inputs.ts`）
+- **说明**：pi 没有对应的网页版，链接只能指向别家的产品；保留默认开启会让每次 review 都带上 Claude Code 的链接
+
 #### `path_to_claude_code_executable`
 
 `pi-capability` · 用户可见：是 · ADR：[0001](adr/0001-in-process-pi-sdk-runner.md)
@@ -128,6 +136,14 @@
 - **上游**：`@claude`、`claude`、`claude/`
 - **本仓库**：`@pi`、`pi`、`pi/`
 - **说明**：想保留旧行为，需要显式设置 `trigger_phrase`、`label_trigger`、`branch_prefix`
+
+#### "Create a PR" 链接的标题和正文
+
+`branding` · 用户可见：是
+
+- **上游**：tag mode 在分支有改动时给出预填的 "Create a PR" 链接，标题为 `<Issue|PR> #N: Changes from Claude`，正文和提示词要求模型写的 PR 正文都带签名 `Generated with [Claude Code](https://claude.ai/code)`
+- **本仓库**：标题为 `<Issue|PR> #N: Changes from pi`，正文和提示词都不再带签名（`src/entrypoints/update-comment-link.ts`、`src/create-prompt/index.ts`）
+- **说明**：本项目不是官方产品，不在用户仓库的 PR 中留下指向 Claude Code 的链接
 
 #### GitHub App 与 token 换取服务
 

@@ -40,7 +40,6 @@ describe("prepareMcpConfig", () => {
       allowedBots: "",
       allowedNonWriteUsers: "",
       trackProgress: false,
-      includeFixLinks: true,
       includeCommentsByActor: "",
       excludeCommentsByActor: "",
     },

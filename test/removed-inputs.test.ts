@@ -28,6 +28,12 @@ describe("assertNoRemovedInputs", () => {
     ).toThrow(/anthropic_api_key[\s\S]*settings/);
   });
 
+  test("fails on include_fix_links, whose links opened Claude Code", () => {
+    expect(() =>
+      assertNoRemovedInputs(inputs({ include_fix_links: "true" })),
+    ).toThrow(/include_fix_links/);
+  });
+
   test("counts a flag set to 'false' as used, so the line gets removed", () => {
     expect(() =>
       assertNoRemovedInputs(inputs({ use_bedrock: "false" })),

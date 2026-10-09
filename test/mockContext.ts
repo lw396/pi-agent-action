@@ -27,7 +27,6 @@ const defaultInputs = {
   allowedBots: "",
   allowedNonWriteUsers: "",
   trackProgress: false,
-  includeFixLinks: true,
   includeCommentsByActor: "",
   excludeCommentsByActor: "",
 };

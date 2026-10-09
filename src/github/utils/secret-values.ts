@@ -51,7 +51,6 @@ export const ACTION_SETTINGS_ENV: readonly string[] = [
   "BOT_ID",
   "BOT_NAME",
   "TRACK_PROGRESS",
-  "INCLUDE_FIX_LINKS",
   "ADDITIONAL_PERMISSIONS",
   "MODEL",
   "CLASSIFY_MODEL",

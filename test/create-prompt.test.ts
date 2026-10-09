@@ -181,6 +181,48 @@ describe("generatePrompt", () => {
     ); // from review comments
   });
 
+  test("does not ask for 'Fix this' links into another product's web app", async () => {
+    const envVars: PreparedContext = {
+      repository: "owner/repo",
+      claudeCommentId: "12345",
+      triggerPhrase: "@pi",
+      eventData: {
+        eventName: "pull_request_review",
+        isPR: true,
+        prNumber: "456",
+        commentBody: "@pi please review",
+      },
+      githubContext: createMockContext({ isPR: true }),
+    };
+
+    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+
+    expect(prompt).not.toContain("Fix this");
+    expect(prompt).not.toContain("claude.ai/code?q=");
+  });
+
+  test("does not ask for a product signature in the PR body", async () => {
+    const envVars: PreparedContext = {
+      repository: "owner/repo",
+      claudeCommentId: "12345",
+      triggerPhrase: "@pi",
+      eventData: {
+        eventName: "issues",
+        eventAction: "opened",
+        isPR: false,
+        issueNumber: "789",
+        baseBranch: "main",
+        claudeBranch: "pi/issue-789-20240101-1200",
+      },
+    };
+
+    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+
+    expect(prompt).toContain("[Create a PR]");
+    expect(prompt).not.toContain("Generated with");
+    expect(prompt).not.toContain("claude.ai");
+  });
+
   test("should generate prompt for issue opened event", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",

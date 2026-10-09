@@ -1,5 +1,5 @@
-name: "Claude Code Action v1.0"
-description: "Flexible GitHub automation platform with Claude. Auto-detects mode based on event type: PR reviews, @claude mentions, or custom automation."
+name: "pi Agent Action"
+description: "Run the pi coding agent on GitHub issues and pull requests, with any model pi supports. Auto-detects mode based on event type: PR reviews, @pi mentions, or custom automation."
 branding:
   icon: "at-sign"
   color: "orange"
@@ -69,9 +69,9 @@ inputs:
     required: false
     default: ""
 
-  # Claude Code configuration
+  # Agent configuration
   prompt:
-    description: "Instructions for Claude. Can be a direct prompt or custom template."
+    description: "Instructions for the agent. Can be a direct prompt or custom template."
     required: false
     default: ""
 
@@ -148,7 +148,7 @@ inputs:
     required: false
     default: ""
   use_commit_signing:
-    description: "Enable commit signing using GitHub's commit signature verification. When false, Claude uses standard git commands"
+    description: "Enable commit signing using GitHub's commit signature verification. When false, the agent uses standard git commands"
     required: false
     default: "false"
   ssh_signing_key:
@@ -167,10 +167,6 @@ inputs:
     description: "Force tag mode with tracking comments for pull_request and issue events. Only applicable to pull_request (opened, synchronize, ready_for_review, reopened, labeled) and issue (opened, edited, labeled, assigned) events."
     required: false
     default: "false"
-  include_fix_links:
-    description: "Include 'Fix this' links in PR code review feedback that open Claude Code with context to fix the identified issue"
-    required: false
-    default: "true"
   path_to_bun_executable:
     description: "Optional path to a custom Bun executable. If provided, skips automatic Bun installation and uses this executable instead. WARNING: Using an incompatible version may cause problems if the action requires specific Bun features. This input is typically not needed unless you're debugging something specific or have unique needs in your environment."
     required: false
@@ -247,6 +243,10 @@ inputs:
     description: "Removed in pi-agent-action. Setting it fails the run."
     required: false
     deprecationMessage: "path_to_claude_code_executable was removed in pi-agent-action and fails the run. See https://github.com/lw396/pi-agent-action#migrating-from-claude-code-action"
+  include_fix_links:
+    description: "Removed in pi-agent-action. Setting it fails the run."
+    required: false
+    deprecationMessage: "include_fix_links was removed in pi-agent-action and fails the run. See https://github.com/lw396/pi-agent-action#migrating-from-claude-code-action"
 
 outputs:
   conclusion:
@@ -256,10 +256,10 @@ outputs:
     description: "Path to the execution file: a JSON array with the session header and the session's events, including token usage and cost"
     value: ${{ steps.run.outputs.execution_file }}
   branch_name:
-    description: "The branch created by Claude Code for this execution"
+    description: "The branch created by the agent for this execution"
     value: ${{ steps.run.outputs.branch_name }}
   github_token:
-    description: "The GitHub token used by the action (Claude App token if available)"
+    description: "The GitHub token used by the action (the pi-agent-action app token when github_token is not set)"
     value: ${{ steps.run.outputs.github_token }}
   structured_output:
     description: "JSON string containing all structured output fields when the json_schema input is set. Use fromJSON() to parse: fromJSON(steps.id.outputs.structured_output).field_name"
@@ -351,7 +351,7 @@ runs:
         echo "/usr/bin" >> "$GITHUB_PATH"
         echo "/bin" >> "$GITHUB_PATH"
 
-    - name: Run Claude Code Action
+    - name: Run pi Agent Action
       id: run
       shell: bash
       run: |
@@ -387,7 +387,6 @@ runs:
         BOT_ID: ${{ inputs.bot_id }}
         BOT_NAME: ${{ inputs.bot_name }}
         TRACK_PROGRESS: ${{ inputs.track_progress }}
-        INCLUDE_FIX_LINKS: ${{ inputs.include_fix_links }}
         ADDITIONAL_PERMISSIONS: ${{ inputs.additional_permissions }}
         ALL_INPUTS: ${{ toJson(inputs) }}
 
@@ -440,7 +439,7 @@ runs:
       run: |
         BUN_BIN="${GITHUB_ACTION_PATH}/bin/bun"
         [ -x "$BUN_BIN" ] || BUN_BIN="bun"
-        # No --tsconfig-override: see the "Run Claude Code Action" step above.
+        # No --tsconfig-override: see the "Run pi Agent Action" step above.
         "$BUN_BIN" --no-env-file \
           --config="${GITHUB_ACTION_PATH}/bunfig.toml" \
           run ${GITHUB_ACTION_PATH}/src/entrypoints/cleanup-ssh-signing.ts
@@ -460,7 +459,7 @@ runs:
       run: |
         BUN_BIN="${GITHUB_ACTION_PATH}/bin/bun"
         [ -x "$BUN_BIN" ] || BUN_BIN="bun"
-        # No --tsconfig-override: see the "Run Claude Code Action" step above.
+        # No --tsconfig-override: see the "Run pi Agent Action" step above.
         "$BUN_BIN" --no-env-file \
           --config="${GITHUB_ACTION_PATH}/bunfig.toml" \
           run ${GITHUB_ACTION_PATH}/src/entrypoints/post-buffered-inline-comments.ts

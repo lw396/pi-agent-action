@@ -1,4 +1,4 @@
-name: Claude Review - Path Specific
+name: pi Review - Path Specific
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ on:
       # You can add more specific patterns as needed
 
 jobs:
-  claude-review-paths:
+  pi-review-paths:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -23,10 +23,10 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Claude Code Review
-        uses: anthropics/claude-code-action@v1
+      - name: pi Code Review
+        uses: lw396/pi-agent-action@main
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: openai/<model-id>
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
@@ -45,5 +45,6 @@ jobs:
             Since this PR touches critical source code paths, please be thorough
             in your review and provide inline comments where appropriate.
 
-          claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*), Bash(gh pr diff:*), Bash(gh pr view:*)"
+          allowed_tools: "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

@@ -27,7 +27,6 @@ describe("detectMode with enhanced routing", () => {
       allowedBots: "",
       allowedNonWriteUsers: "",
       trackProgress: false,
-      includeFixLinks: true,
       includeCommentsByActor: "",
       excludeCommentsByActor: "",
     },
