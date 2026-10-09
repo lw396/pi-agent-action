@@ -208,7 +208,9 @@ describe("parseEnvVarsWithContext", () => {
 
       expect(result.eventData.eventName).toBe("issues");
       expect(result.eventData.isPR).toBe(false);
-      expect(result.triggerUsername).toBe("jane-smith");
+      // The user who assigned the issue, not its author (jane-smith).
+      expect(result.triggerUsername).toBe("admin-user");
+      expect(result.triggerUserId).toBe(22222);
       if (
         result.eventData.eventName === "issues" &&
         result.eventData.eventAction === "assigned"

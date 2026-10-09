@@ -63,8 +63,9 @@ export function prepareContext(
     triggerUsername = context.payload.comment.user.login;
     triggerUserId = context.payload.comment.user.id;
   } else if (isIssuesEvent(context)) {
-    triggerUsername = context.payload.issue.user.login;
-    triggerUserId = context.payload.issue.user.id;
+    // The user who opened, assigned or labeled the issue, not its author.
+    triggerUsername = context.payload.sender.login;
+    triggerUserId = context.payload.sender.id;
   }
 
   // Create infrastructure fields object

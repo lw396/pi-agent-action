@@ -1156,7 +1156,10 @@ describe("prepareContext validation errors", () => {
       eventName: "issues",
       eventAction: "",
       isPR: false,
-      payload: { issue: { user: { login: "user1" } } } as any,
+      payload: {
+        issue: { user: { login: "user1" } },
+        sender: { login: "user1" },
+      } as any,
     });
 
     expect(() => prepareContext(context, commentId)).toThrow(
@@ -1169,7 +1172,10 @@ describe("prepareContext validation errors", () => {
       eventName: "issues",
       eventAction: "deleted",
       isPR: false,
-      payload: { issue: { user: { login: "user1" } } } as any,
+      payload: {
+        issue: { user: { login: "user1" } },
+        sender: { login: "user1" },
+      } as any,
     });
 
     expect(() =>
