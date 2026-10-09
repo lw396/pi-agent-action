@@ -11,8 +11,7 @@ name: Test MCP Servers
 #
 # Manual dispatch only for now, like test-runner.yml. Restore the
 # pull_request trigger (same-repository PRs only) and call this workflow from
-# ci-all.yml once a manual run has passed. See docs/development/pi-port-proposal.md,
-# "CI 与集成测试".
+# ci-all.yml once a manual run has passed. See ci-all.yml for what that takes.
 on:
   workflow_dispatch:
     inputs:

@@ -10,7 +10,7 @@ import { SettingsManager } from "@earendil-works/pi-coding-agent";
  *
  * This is an empty skeleton for settings the action will control later. Pass
  * every setting to inMemory() at once: values applied afterwards with
- * applyOverrides() are lost on reload (docs/development/pi-sdk-capabilities.md).
+ * applyOverrides() are lost on reload (test/pi-sdk/settings.test.ts).
  */
 export function setupPiSettings(): SettingsManager {
   return SettingsManager.inMemory({});

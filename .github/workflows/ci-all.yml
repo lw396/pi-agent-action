@@ -2,9 +2,15 @@
 # Individual test workflows are called as reusable workflows
 #
 # The integration test workflows (test-*.yml) call a real model with the
-# OPENCODE_API_KEY secret. They are manual dispatch only, and are added here
-# once a manual run has passed on the egress-firewall runner. See
-# docs/development/pi-port-proposal.md, "CI 与集成测试".
+# OPENCODE_API_KEY secret and are manual dispatch only for now. To add one
+# back here once a manual run has passed:
+#   - restore its pull_request and workflow_call triggers, for same-repository
+#     PRs only (fork PRs get no secrets);
+#   - keep it on ubuntu-24.04-firewall, or, if that runner is unavailable,
+#     add the job and the reason to the exemption table in
+#     .github/scripts/check_workflow_hardening.py instead of weakening it;
+#   - keep the model cheap, and filter on paths (src/runner/, src/mcp/,
+#     action.yml) if runs get expensive.
 name: CI All
 
 on:

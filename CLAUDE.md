@@ -17,9 +17,10 @@ A GitHub Action that runs the [pi coding agent](https://github.com/earendil-work
 
 ## Relationship to Upstream
 
-This project is ported from [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action) ("Upstream", fetched as the `upstream` remote) and is a drop-in replacement for its users. The port's plan and history are in `docs/development/pi-port-proposal.md`.
+This project is ported from [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action) ("Upstream", fetched as the `upstream` remote) and is a drop-in replacement for its users.
 
 - Keep `src/github/*` and `src/mcp/*` structurally close to Upstream so fixes can be cherry-picked. Identifiers were renamed for branding (`claudeBranch` → `agentBranch`, `claudeCommentId` → `trackingCommentId`, `updateClaudeComment` → `updateComment`, ...), so expect to adjust names when applying an Upstream patch.
+- To take fixes from Upstream: `git fetch upstream`, review `git log --oneline main..upstream/main` (most commits are automated version bumps), then `git cherry-pick <sha>`.
 - The pi executor (the Runner) lives in `src/runner/`. Upstream's `base-action/` has been removed.
 - Don't use "Claude" or Anthropic branding in new names, defaults, or user-facing text. References to Claude Code as Upstream's agent (migration notes, `CLAUDE.md` and `.claude/` paths that pi also reads) are fine.
 - Match Upstream behaviour unless one of four reasons applies: `pi-capability`, `multi-provider`, `branding`, or `scope`. Any behaviour that differs from Upstream must add or update an entry in `docs/development/upstream-divergence.md` in the same change, with its reason category. Check that list before cherry-picking from Upstream.
