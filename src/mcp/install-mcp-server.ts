@@ -6,6 +6,7 @@ import { redactSecrets } from "../github/utils/sanitizer";
 import { Octokit } from "@octokit/rest";
 import type { AutoDetectedMode } from "../modes/detector";
 import type { McpServers } from "../runner/mcp-servers";
+import { inlineCommentBufferPath } from "./inline-comment-buffer";
 
 type PrepareConfigParams = {
   githubToken: string;
@@ -166,6 +167,8 @@ export async function prepareMcpConfig(
           CLASSIFY_INLINE_COMMENTS: context.inputs.classifyInlineComments
             ? "true"
             : "false",
+          // pi passes a server only the env listed here, not RUNNER_TEMP.
+          INLINE_COMMENT_BUFFER: inlineCommentBufferPath(),
         },
       };
     }

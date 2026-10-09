@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { appendFileSync } from "fs";
 import { z } from "zod";
 import { createOctokit } from "../github/api/client";
 import { redactSecrets, sanitizeContent } from "../github/utils/sanitizer";
-import { removeBufferedComment } from "./inline-comment-buffer";
+import {
+  appendBufferedComment,
+  inlineCommentBufferPath,
+  removeBufferedComment,
+} from "./inline-comment-buffer";
 
 // Get repository and PR information from environment variables
 const REPO_OWNER = process.env.REPO_OWNER;
@@ -15,8 +18,9 @@ const PR_NUMBER = process.env.PR_NUMBER;
 // Calls without confirmed=true are buffered here instead of posted. This
 // prevents subagents from posting test/probe comments when they inherit this
 // tool and probe it after hitting unrelated errors. The action's post-step
-// reports the buffer count for diagnostics.
-const BUFFER_PATH = "/tmp/inline-comments-buffer.jsonl";
+// classifies them and posts the real ones.
+const BUFFER_PATH =
+  process.env.INLINE_COMMENT_BUFFER || inlineCommentBufferPath();
 const CLASSIFY_ENABLED = process.env.CLASSIFY_INLINE_COMMENTS !== "false";
 
 if (!REPO_OWNER || !REPO_NAME || !PR_NUMBER) {
@@ -109,9 +113,8 @@ server.tool(
       }
 
       if (CLASSIFY_ENABLED && confirmed !== true) {
-        appendFileSync(
-          BUFFER_PATH,
-          JSON.stringify({
+        appendBufferedComment(
+          {
             ts: new Date().toISOString(),
             path,
             line,
@@ -120,7 +123,8 @@ server.tool(
             commit_id,
             body: sanitizedBody,
             confirmed,
-          }) + "\n",
+          },
+          BUFFER_PATH,
         );
         return {
           content: [

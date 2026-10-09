@@ -8,7 +8,41 @@ import {
 } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { removeBufferedComment } from "../src/mcp/inline-comment-buffer";
+import {
+  appendBufferedComment,
+  inlineCommentBufferPath,
+  readBufferedComments,
+  removeBufferedComment,
+} from "../src/mcp/inline-comment-buffer";
+
+describe("the inline comment buffer", () => {
+  it("lives under RUNNER_TEMP, not in the shared /tmp", () => {
+    expect(inlineCommentBufferPath({ RUNNER_TEMP: "/runner/temp" })).toBe(
+      "/runner/temp/pi-inline-comments.jsonl",
+    );
+  });
+
+  it("reads back the comments appended to it, in order", () => {
+    const dir = mkdtempSync(join(tmpdir(), "inline-buffer-"));
+    const bufferPath = join(dir, "buffer.jsonl");
+    try {
+      expect(readBufferedComments(bufferPath)).toEqual([]);
+      const first = { ts: "t1", path: "a.ts", line: 1, body: "First" };
+      const second = {
+        ts: "t2",
+        path: "b.ts",
+        line: 2,
+        body: "Second",
+        confirmed: false,
+      };
+      appendBufferedComment(first, bufferPath);
+      appendBufferedComment(second, bufferPath);
+      expect(readBufferedComments(bufferPath)).toEqual([first, second]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("removeBufferedComment", () => {
   let dir: string;

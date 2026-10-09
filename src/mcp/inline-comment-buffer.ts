@@ -1,4 +1,49 @@
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+
+/**
+ * The inline comment server buffers calls without confirmed=true here, and
+ * the action's post-step classifies and posts them after the session.
+ */
+
+/** One buffered create_inline_comment call, a line of the buffer file. */
+export type BufferedComment = {
+  ts: string;
+  path: string;
+  line?: number;
+  startLine?: number;
+  side?: "LEFT" | "RIGHT";
+  commit_id?: string;
+  body: string;
+  confirmed?: boolean;
+};
+
+/**
+ * The buffer file, under RUNNER_TEMP: it holds this job's comments only, not
+ * those another job on a reused self-hosted runner left in /tmp.
+ */
+export function inlineCommentBufferPath(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  return join(env.RUNNER_TEMP || tmpdir(), "pi-inline-comments.jsonl");
+}
+
+export function appendBufferedComment(
+  comment: BufferedComment,
+  bufferPath: string,
+): void {
+  appendFileSync(bufferPath, JSON.stringify(comment) + "\n");
+}
+
+/** The buffered comments, in call order; none when there is no buffer. */
+export function readBufferedComments(bufferPath: string): BufferedComment[] {
+  if (!existsSync(bufferPath)) return [];
+  return readFileSync(bufferPath, "utf8")
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => JSON.parse(line));
+}
 
 export type BufferedCommentMatch = {
   path: string;
