@@ -49,7 +49,7 @@ describe("Tag Mode", () => {
           async () => ({ id: 42 }) as any,
         ),
         spyOn(fetcher, "fetchGitHubData").mockImplementation(
-          async () => ({}) as any,
+          async () => ({ changedFiles: [] }) as any,
         ),
         spyOn(branch, "setupBranch").mockImplementation(
           async () =>
@@ -96,6 +96,36 @@ describe("Tag Mode", () => {
       // configureGitAuth performs the credential replacement itself; the mock
       // stands in for it here, so the standalone helper is not invoked.
       expect(replaceCheckoutCredentialsSpy).not.toHaveBeenCalled();
+    });
+
+    test("hashes the changed files after checking out the PR's branch", async () => {
+      const calls: string[] = [];
+      const setupBranchSpy = spyOn(branch, "setupBranch").mockImplementation(
+        async () => {
+          calls.push("setupBranch");
+          return { baseBranch: "main", currentBranch: "feature" } as any;
+        },
+      );
+      const hashSpy = spyOn(fetcher, "hashChangedFiles").mockImplementation(
+        () => {
+          calls.push("hashChangedFiles");
+          return [];
+        },
+      );
+      try {
+        await prepareTagMode({
+          context: { ...mockIssueCommentContext },
+          octokit: {} as any,
+          githubToken: "test-token",
+          allowedTools: [],
+          untrustedInput: false,
+        });
+      } finally {
+        setupBranchSpy.mockRestore();
+        hashSpy.mockRestore();
+      }
+
+      expect(calls).toEqual(["setupBranch", "hashChangedFiles"]);
     });
 
     test("still replaces the checkout credential when API commit signing is enabled", async () => {
@@ -227,7 +257,7 @@ describe("Tag Mode", () => {
           async () => ({ id: 42 }) as any,
         ),
         spyOn(fetcher, "fetchGitHubData").mockImplementation(
-          async () => ({}) as any,
+          async () => ({ changedFiles: [] }) as any,
         ),
         spyOn(branch, "setupBranch").mockImplementation(
           async () => ({ baseBranch: "main" }) as any,

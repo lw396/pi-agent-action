@@ -1819,7 +1819,6 @@ describe("fetchGitHubData integration with time filtering", () => {
 
     // No file list is available, so the PR is processed without file-level context.
     expect(result.changedFiles).toEqual([]);
-    expect(result.changedFilesWithSHA).toEqual([]);
   });
 });
 

@@ -379,15 +379,49 @@ export type GitHubFileWithSHA = GitHubFile & {
   sha: string;
 };
 
-export type FetchDataResult = {
+/** What fetchGitHubData returns: the issue or PR as GitHub has it. */
+export type FetchedGitHubData = {
   contextData: GitHubPullRequest | GitHubIssue;
   comments: GitHubComment[];
   changedFiles: GitHubFile[];
-  changedFilesWithSHA: GitHubFileWithSHA[];
   reviewData: { nodes: GitHubReview[] } | null;
   imageUrlMap: Map<string, string>;
   triggerDisplayName?: string | null;
 };
+
+/**
+ * The data the tag mode prompt is built from: the fetched data, plus the
+ * changed files hashed from the working tree (see hashChangedFiles).
+ */
+export type FetchDataResult = FetchedGitHubData & {
+  changedFilesWithSHA: GitHubFileWithSHA[];
+};
+
+/**
+ * The blob SHA of each changed file as it is in the working tree. Call it
+ * after setupBranch has checked out the PR's branch, or the SHAs are those of
+ * the branch the workflow checked out.
+ */
+export function hashChangedFiles(
+  changedFiles: GitHubFile[],
+): GitHubFileWithSHA[] {
+  return changedFiles.map((file) => {
+    // Don't compute SHA for deleted files
+    if (file.changeType === "DELETED") {
+      return { ...file, sha: "deleted" };
+    }
+
+    try {
+      const sha = execFileSync("git", ["hash-object", file.path], {
+        encoding: "utf-8",
+      }).trim();
+      return { ...file, sha };
+    } catch (error) {
+      console.warn(`Failed to compute SHA for ${file.path}:`, error);
+      return { ...file, sha: "unknown" };
+    }
+  });
+}
 
 export async function fetchGitHubData({
   octokits,
@@ -400,7 +434,7 @@ export async function fetchGitHubData({
   originalBody,
   includeCommentsByActor,
   excludeCommentsByActor,
-}: FetchDataParams): Promise<FetchDataResult> {
+}: FetchDataParams): Promise<FetchedGitHubData> {
   const [owner, repo] = repository.split("/");
   if (!owner || !repo) {
     throw new Error("Invalid repository format. Expected 'owner/repo'.");
@@ -476,38 +510,6 @@ export async function fetchGitHubData({
   } catch (error) {
     console.error(`Failed to fetch ${isPR ? "PR" : "issue"} data:`, error);
     throw new Error(`Failed to fetch ${isPR ? "PR" : "issue"} data`);
-  }
-
-  // Compute SHAs for changed files
-  let changedFilesWithSHA: GitHubFileWithSHA[] = [];
-  if (isPR && changedFiles.length > 0) {
-    changedFilesWithSHA = changedFiles.map((file) => {
-      // Don't compute SHA for deleted files
-      if (file.changeType === "DELETED") {
-        return {
-          ...file,
-          sha: "deleted",
-        };
-      }
-
-      try {
-        // Use git hash-object to compute the SHA for the current file content
-        const sha = execFileSync("git", ["hash-object", file.path], {
-          encoding: "utf-8",
-        }).trim();
-        return {
-          ...file,
-          sha,
-        };
-      } catch (error) {
-        console.warn(`Failed to compute SHA for ${file.path}:`, error);
-        // Return original file without SHA if computation fails
-        return {
-          ...file,
-          sha: "unknown",
-        };
-      }
-    });
   }
 
   // Prepare all comments for image processing
@@ -633,7 +635,6 @@ export async function fetchGitHubData({
     contextData,
     comments,
     changedFiles,
-    changedFilesWithSHA,
     reviewData,
     imageUrlMap,
     triggerDisplayName,

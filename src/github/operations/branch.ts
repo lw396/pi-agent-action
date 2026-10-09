@@ -11,14 +11,14 @@ import { execFileSync } from "child_process";
 import type { ParsedGitHubContext } from "../context";
 import type { GitHubPullRequest } from "../types";
 import type { Octokits } from "../api/client";
-import type { FetchDataResult } from "../data/fetcher";
+import type { FetchedGitHubData } from "../data/fetcher";
 import { generateBranchName } from "../../utils/branch-template";
 import { fetchDepthArgs } from "./fetch-depth";
 
 /**
  * Extracts the first label from GitHub data, or returns undefined if no labels exist
  */
-function extractFirstLabel(githubData: FetchDataResult): string | undefined {
+function extractFirstLabel(githubData: FetchedGitHubData): string | undefined {
   const labels = githubData.contextData.labels?.nodes;
   return labels && labels.length > 0 ? labels[0]?.name : undefined;
 }
@@ -154,7 +154,7 @@ export type BranchInfo = {
 
 export async function setupBranch(
   octokits: Octokits,
-  githubData: FetchDataResult,
+  githubData: FetchedGitHubData,
   context: ParsedGitHubContext,
 ): Promise<BranchInfo> {
   const { owner, repo } = context.repository;

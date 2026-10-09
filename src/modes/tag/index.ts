@@ -5,6 +5,7 @@ import { setupGitAuth } from "../git-auth";
 import { prepareMcpConfig } from "../../mcp/install-mcp-server";
 import {
   fetchGitHubData,
+  hashChangedFiles,
   resolveTriggerTimestamp,
   extractOriginalTitle,
   extractOriginalBody,
@@ -42,7 +43,7 @@ export async function prepareTagMode({
   const originalTitle = extractOriginalTitle(context);
   const originalBody = extractOriginalBody(context);
 
-  const githubData = await fetchGitHubData({
+  const fetchedData = await fetchGitHubData({
     octokits: octokit,
     repository: `${context.repository.owner}/${context.repository.repo}`,
     prNumber: context.entityNumber.toString(),
@@ -56,7 +57,13 @@ export async function prepareTagMode({
   });
 
   // Setup branch
-  const branchInfo = await setupBranch(octokit, githubData, context);
+  const branchInfo = await setupBranch(octokit, fetchedData, context);
+
+  // Hash the PR's changed files now that its branch is checked out.
+  const githubData = {
+    ...fetchedData,
+    changedFilesWithSHA: hashChangedFiles(fetchedData.changedFiles),
+  };
 
   const commitMethod = await setupGitAuth({
     githubToken,
