@@ -1,9 +1,5 @@
 import { prepareMcpConfig } from "../../mcp/install-mcp-server";
-import {
-  configureGitAuth,
-  replaceCheckoutCredentials,
-  setupSshSigning,
-} from "../../github/operations/git-config";
+import { setupGitAuth } from "../git-auth";
 import { checkHumanActor } from "../../github/validation/actor";
 import type { PrepareOptions, PrepareResult } from "../types";
 
@@ -24,51 +20,13 @@ export async function prepareAgentMode({
   // Check if actor is human (prevents bot-triggered loops)
   await checkHumanActor(octokit.rest, context);
 
-  // Configure git authentication for agent mode (same as tag mode)
-  // SSH signing takes precedence if provided
-  const useSshSigning = !!context.inputs.sshSigningKey;
-  const useApiCommitSigning = context.inputs.useCommitSigning && !useSshSigning;
-
-  if (useSshSigning) {
-    // Setup SSH signing for commits
-    await setupSshSigning(context.inputs.sshSigningKey);
-
-    // Still configure git auth for push operations (user/email and remote URL)
-    const user = {
-      login: context.inputs.botName,
-      id: parseInt(context.inputs.botId),
-    };
-    try {
-      await configureGitAuth(githubToken, context, user, untrustedInput);
-    } catch (error) {
-      console.error("Failed to configure git authentication:", error);
-      // Continue anyway - git operations may still work with default config
-    }
-  } else if (!useApiCommitSigning) {
-    // Use bot_id and bot_name from inputs directly
-    const user = {
-      login: context.inputs.botName,
-      id: parseInt(context.inputs.botId),
-    };
-
-    try {
-      // Use the shared git configuration function
-      await configureGitAuth(githubToken, context, user, untrustedInput);
-    } catch (error) {
-      console.error("Failed to configure git authentication:", error);
-      // Continue anyway - git operations may still work with default config
-    }
-  } else {
-    // Commits go through the GitHub API, so no git user setup is needed, but
-    // the credential actions/checkout left in git config should still be
-    // replaced with the action's own.
-    try {
-      await replaceCheckoutCredentials(githubToken, context, untrustedInput);
-    } catch (error) {
-      console.error("Failed to configure git credentials:", error);
-      // Continue anyway - git operations may still work with default config
-    }
-  }
+  // Unlike tag mode, a run can go on without git credentials.
+  await setupGitAuth({
+    githubToken,
+    context,
+    untrustedInput,
+    failOnError: false,
+  });
 
   const prompt =
     context.inputs.prompt ||

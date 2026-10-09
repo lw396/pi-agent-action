@@ -1,11 +1,7 @@
 import { checkHumanActor } from "../../github/validation/actor";
 import { createInitialComment } from "../../github/operations/comments/create-initial";
 import { setupBranch } from "../../github/operations/branch";
-import {
-  configureGitAuth,
-  replaceCheckoutCredentials,
-  setupSshSigning,
-} from "../../github/operations/git-config";
+import { setupGitAuth } from "../git-auth";
 import { prepareMcpConfig } from "../../mcp/install-mcp-server";
 import {
   fetchGitHubData,
@@ -62,50 +58,12 @@ export async function prepareTagMode({
   // Setup branch
   const branchInfo = await setupBranch(octokit, githubData, context);
 
-  // Configure git authentication
-  // SSH signing takes precedence if provided
-  const useSshSigning = !!context.inputs.sshSigningKey;
-  const useApiCommitSigning = context.inputs.useCommitSigning && !useSshSigning;
-
-  if (useSshSigning) {
-    // Setup SSH signing for commits
-    await setupSshSigning(context.inputs.sshSigningKey);
-
-    // Still configure git auth for push operations (user/email and remote URL)
-    const user = {
-      login: context.inputs.botName,
-      id: parseInt(context.inputs.botId),
-    };
-    try {
-      await configureGitAuth(githubToken, context, user, untrustedInput);
-    } catch (error) {
-      console.error("Failed to configure git authentication:", error);
-      throw error;
-    }
-  } else if (!useApiCommitSigning) {
-    // Use bot_id and bot_name from inputs directly
-    const user = {
-      login: context.inputs.botName,
-      id: parseInt(context.inputs.botId),
-    };
-
-    try {
-      await configureGitAuth(githubToken, context, user, untrustedInput);
-    } catch (error) {
-      console.error("Failed to configure git authentication:", error);
-      throw error;
-    }
-  } else {
-    // Commits go through the GitHub API, so no git user setup is needed, but
-    // the credential actions/checkout left in git config should still be
-    // replaced with the action's own.
-    try {
-      await replaceCheckoutCredentials(githubToken, context, untrustedInput);
-    } catch (error) {
-      console.error("Failed to configure git credentials:", error);
-      throw error;
-    }
-  }
+  const commitMethod = await setupGitAuth({
+    githubToken,
+    context,
+    untrustedInput,
+    failOnError: true,
+  });
 
   const { prompt, userRequest } = createPrompt(
     commentId,
@@ -135,7 +93,7 @@ export async function prepareTagMode({
 
   // Add git commands when using git CLI (no API commit signing, or SSH signing)
   // SSH signing still uses git CLI, just with signing enabled
-  if (!useApiCommitSigning) {
+  if (commitMethod !== "api") {
     tagModeTools.push(
       "Bash(git add:*)",
       "Bash(git commit:*)",
