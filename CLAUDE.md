@@ -18,7 +18,7 @@ The rest of this file still describes the Claude-based code as it currently is. 
 - Keep `src/github/*` and `src/mcp/*` structurally close to upstream so fixes can be cherry-picked from the `upstream` remote.
 - The pi executor (the Runner) lives in `src/runner/`. Upstream's `base-action/` has been removed.
 - Don't use "Claude" or Anthropic branding in new names, defaults, or user-facing text.
-- Match upstream behaviour unless one of four reasons applies: `pi-capability`, `multi-provider`, `branding`, or `scope`. Any behaviour that differs from upstream must add or update a row in `docs/upstream-divergence.md` in the same change, with its reason category. Check that table before cherry-picking from upstream.
+- Match upstream behaviour unless one of four reasons applies: `pi-capability`, `multi-provider`, `branding`, or `scope`. Any behaviour that differs from upstream must add or update an entry in `docs/upstream-divergence.md` in the same change, with its reason category. Check that list before cherry-picking from upstream.
 - Domain terms are defined in `CONTEXT.md`; architectural decisions are in `docs/adr/`.
 
 ## What This Is

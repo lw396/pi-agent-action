@@ -92,7 +92,7 @@ pi 在 2026-10-02 发布了 1.0 版本，内置了 MCP 支持（参见 `packages
 - **新增**：`model`（必填）、`api_key`（可选）、`allowed_tools` / `disallowed_tools`（沿用 Claude 语法）、`json_schema`（输出仍叫 `structured_output`），以及 bash env 白名单的放行输入 `allowed_bash_env` 和关闭开关 `subprocess_isolation`。
 - **更换默认值**：触发词 `@claude` → `@pi`，触发标签 `claude` → `pi`，分支前缀 `claude/` → `pi/`；`bot_name` / `bot_id` 由 GitHub App 决定，待定。
 
-README 中要提供一张 claude-code-action → pi-agent-action 的迁移对照表，内容从 [`upstream-divergence.md`](upstream-divergence.md) 中挑出用户可见的行。
+README 中要提供一张 claude-code-action → pi-agent-action 的迁移对照表，内容从 [`upstream-divergence.md`](upstream-divergence.md) 中挑出用户可见的条目。
 
 ### 模型与认证：不设默认 provider，直接沿用 pi 的约定
 
@@ -151,7 +151,7 @@ pi 没有内置沙箱，也没有安全审查，但 `createBashTool()` 的 `spaw
 
   上游 2026-07 以来的 50 个提交中，有 43 个是自动版本升级，跟进成本很低。
 
-- **对齐原则**：功能和行为尽量与上游一致。只有 4 类原因允许偏离：`pi-capability`（pi 没有或做法不同的能力）、`multi-provider`（支持多个 provider 带来的差异）、`branding`（非官方产品，不使用 Claude 品牌）、`scope`（明确不做）。每一项偏离都登记在 [`upstream-divergence.md`](upstream-divergence.md) 中；cherry-pick 之前先查这张表。
+- **对齐原则**：功能和行为尽量与上游一致。只有 4 类原因允许偏离：`pi-capability`（pi 没有或做法不同的能力）、`multi-provider`（支持多个 provider 带来的差异）、`branding`（非官方产品，不使用 Claude 品牌）、`scope`（明确不做）。每一项偏离都登记在 [`upstream-divergence.md`](upstream-divergence.md) 中；cherry-pick 之前先查这份清单。
 - 尽量保持 `src/github/*`、`src/mcp/*` 的结构不变，方便 cherry-pick；Claude 专属部分可以放手重写。
 - pi 依赖锁定精确版本，用 Renovate/Dependabot 发升级 PR，升级 PR 要跑集成测试。
 - `base-action/` 不再作为独立包发布，也不再保持独立目录。上游把它放在独立目录，是因为它原本是一个独立仓库（2025-07 通过 `8335bda` 并入），之后又要镜像同步到 `anthropics/claude-code-base-action`，还要作为 npm 包发布。这几个原因对本项目都不成立。pi 执行器放在 `src/runner/`，`base-action/` 中通用的部分（`prepare-prompt.ts`、`retry.ts`、`execution-file.ts`）迁移过去，等没有代码再引用它后，整个目录删除。
