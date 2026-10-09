@@ -21,7 +21,7 @@ In scope:
 
 Out of scope, unless the action makes them worse than documented:
 
-- prompt injection that only does what the workflow's `allowed_tools` permits; [docs/security.md](./docs/security.md) describes these limits and how to configure around them
+- prompt injection that only does what the workflow's `allowed_tools` permits; [docs/security.md](../docs/security.md) describes these limits and how to configure around them
 - vulnerabilities in pi itself, which go to the [pi project](https://github.com/earendil-works/pi), or in claude-code-action, which go to [Anthropic](https://github.com/anthropics/claude-code-action/security)
 - the model providers' services
 

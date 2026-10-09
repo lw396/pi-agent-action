@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Thanks for reporting. Check the [FAQ](https://github.com/lw396/pi-agent-action/blob/main/docs/faq.md) first; many failures are permission or `allowed_tools` settings.
-        **Security problems:** do not file them here, see [SECURITY.md](https://github.com/lw396/pi-agent-action/blob/main/SECURITY.md).
+        **Security problems:** do not file them here, see [SECURITY.md](https://github.com/lw396/pi-agent-action/blob/main/.github/SECURITY.md).
   - type: textarea
     id: what-happened
     attributes:

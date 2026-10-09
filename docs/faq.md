@@ -111,4 +111,4 @@ The action redacts known token formats and every environment value of 16 charact
 
 ## Getting help
 
-Search the [issues](https://github.com/lw396/pi-agent-action/issues) or open a new one with your workflow file and the job log. Report security problems privately, as described in [SECURITY.md](../SECURITY.md).
+Search the [issues](https://github.com/lw396/pi-agent-action/issues) or open a new one with your workflow file and the job log. Report security problems privately, as described in [SECURITY.md](../.github/SECURITY.md).

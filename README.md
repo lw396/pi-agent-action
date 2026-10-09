@@ -191,7 +191,7 @@ Every row below changes something a workflow can observe.
 
 ## Contributing
 
-Bug reports, fixes and documentation improvements are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the development setup, and [SECURITY.md](./SECURITY.md) to report a vulnerability.
+Bug reports, fixes and documentation improvements are welcome. See [CONTRIBUTING.md](./.github/CONTRIBUTING.md) for the development setup, and [SECURITY.md](./.github/SECURITY.md) to report a vulnerability.
 
 ## License
 
