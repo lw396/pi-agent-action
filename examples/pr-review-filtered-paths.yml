@@ -27,6 +27,11 @@ jobs:
         uses: lw396/pi-agent-action@main
         with:
           model: openai/<model-id>
+
+          # Optional: Model that classifies held-back inline comments (default: model).
+          # Add its provider's key to env below.
+          # classify_model: typesafe/jev-latest
+
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
@@ -48,3 +53,4 @@ jobs:
           allowed_tools: "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
