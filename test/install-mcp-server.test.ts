@@ -94,20 +94,21 @@ describe("prepareMcpConfig", () => {
       },
     } as unknown as string[];
 
-    await expect(
-      prepareMcpConfig({
-        githubToken: "test-token",
-        owner: "test-owner",
-        repo: "test-repo",
-        branch: "test-branch",
-        baseBranch: "main",
-        allowedTools,
-        mode: "tag",
-        context: mockContext,
-      }),
-    ).rejects.toThrow("Process exit");
+    const message = await prepareMcpConfig({
+      githubToken: "test-token",
+      owner: "test-owner",
+      repo: "test-repo",
+      branch: "test-branch",
+      baseBranch: "main",
+      allowedTools,
+      mode: "tag",
+      context: mockContext,
+    }).then(
+      () => "",
+      (error: Error) => error.message,
+    );
 
-    const message: string = setFailedSpy.mock.calls[0][0];
+    expect(processExitSpy).not.toHaveBeenCalled();
     expect(message).toContain("Install MCP server failed");
     expect(message).not.toContain(token);
     expect(message).toContain("[REDACTED_GITHUB_TOKEN]");

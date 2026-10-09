@@ -236,9 +236,8 @@ export async function prepareMcpConfig(
 
     return servers;
   } catch (error) {
-    core.setFailed(
+    throw new Error(
       `Install MCP server failed with error: ${redactSecrets(String(error))}`,
     );
-    process.exit(1);
   }
 }
