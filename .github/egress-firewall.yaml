@@ -3,23 +3,15 @@
 # by default. Add a host only when a workflow step needs it, name it in full (no '*'), and say what uses it.
 mode: enforce
 allow:
-  # Claude API: model requests, and trading the workflow's GitHub identity token for a
-  # short-lived API token
-  - api.anthropic.com
   # OpenCode Zen API: model requests from the pi Runner in test-base-action.yml,
   # test-custom-executables.yml, test-mcp-servers.yml and
   # test-structured-output.yml (model opencode/..., key OPENCODE_API_KEY)
   - opencode.ai
-  # GitHub API: calls made by the Claude Code action and by the /review-pr command
+  # GitHub API: calls made by the action and its MCP servers
   - api.github.com
-  # Bun and Node.js release downloads (oven-sh/setup-bun and actions/setup-node)
+  # Bun release downloads (oven-sh/setup-bun in action.yml)
   - release-assets.githubusercontent.com
   # npm packages (bun install in action.yml)
   - registry.npmjs.org
   # Bun install script (test-custom-executables.yml, "Install Bun manually")
   - bun.sh
-  # apt packages bubblewrap and socat, which the Claude Code action installs when a
-  # workflow admits users without write access
-  - azure.archive.ubuntu.com
-  - archive.ubuntu.com
-  - security.ubuntu.com
