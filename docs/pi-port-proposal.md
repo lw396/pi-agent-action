@@ -115,6 +115,10 @@ pi 支持 30 多个 provider，每个 provider 从自己的环境变量读取 ke
 - **可选的通用 `api_key` 输入**：对应 pi 的 `--api-key`，供只想配置一个 secret 的用户使用。它要求同时设置 `model`。
 - Bedrock、Vertex 等云平台凭据，按 pi 的方式从环境中获取（例如 AWS 环境凭据、Google ADC），action 不再处理 OIDC 换取凭据。是否提供示例 workflow，到 M4 再决定。
 
+### GitHub token：本项目自己的 App 和换取服务
+
+用户没传 `github_token` 时，上游用 workflow 的 OIDC token 向 Anthropic 的服务换取 Claude GitHub App 的 token。本项目换成自己的公开 GitHub App，加上自己运行的 Token exchange service（Cloudflare Workers，代码在 `services/token-exchange/`）。服务接口与上游一致，`src/github/token.ts` 只换端点地址和 OIDC audience；不设过渡期，不再请求 Anthropic 的服务。服务签发 token 前的校验和取舍见 [ADR-0003](adr/0003-own-github-app-token-exchange.md)。
+
 ## 安全
 
 上游的防护分三层：egress firewall runner、网络白名单、`--permission-mode auto` 安全审查。在 `allowed_non_write_users` 场景下，Claude Code 还会用内置的一百多项黑名单清理子进程 env，并在 Linux 上用 bubblewrap 做 PID namespace 隔离（`CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`）。
@@ -199,6 +203,7 @@ pi 没有内置沙箱，也没有安全审查，但 `createBashTool()` 的 `spaw
 2. **M2 — tag mode 跑通**：现有 MCP server 以 `direct` 模式注册，跟踪评论、分支、提交都正常工作；`update_claude_comment` 改名为 `update_comment`；`SENSITIVE_PATHS` 补上 pi 路径；`test-mcp-servers.yml` 恢复自动运行。（2–3 天）
 3. **M3 — 安全与控制**：`allowed_tools` 与 `tool_call` 拦截扩展、bash 子进程隔离（env 白名单加 bwrap）、输出脱敏、structured output（`json_schema` 输入）；`test-structured-output.yml` 恢复自动运行。
 4. **M4 — 收尾**：重写 `format-turns.ts`，迁移 `action.yml` 输入，更新加固检查脚本，删除 `test-settings.yml`，处理 `test-custom-executables.yml`，补充迁移对照表和文档。
+5. **M5 — GitHub App 与 Token exchange service**：注册公开 GitHub App；在 `services/token-exchange/` 中实现换取服务并部署到 Cloudflare Workers；action 改用本项目的服务，确定 `bot_name` / `bot_id` 默认值，egress 白名单加上服务域名（ADR-0003）。
 
 ## 待决问题
 
@@ -206,7 +211,8 @@ pi 没有内置沙箱，也没有安全审查，但 `createBashTool()` 的 `spaw
 - ~~默认 provider 和 model 用什么？~~ 已决定：不设默认 provider，`model` 必填（见"模型与认证"）。开发和集成测试使用仓库 secret `OPENCODE_API_KEY`（OpenCode Zen/Go）；具体用哪个模型，在技术验证时从 OpenCode 的可用模型里挑一个便宜的。
 - ~~是否支持 Codeberg、Forgejo 等非 GitHub 平台？~~ 已决定：不支持，见"非目标"。
 - ~~`allowed_non_write_users` 场景下是否直接禁用 bash？~~ 已决定：不禁用，改用 env 白名单加 bwrap 隔离，见"安全"第 3 项。
-- `bot_name` / `bot_id` 的默认值（取决于 GitHub App 的名称）。
+- `bot_name` / `bot_id` 的默认值：取决于本项目 GitHub App 注册后的名称和 ID（M5，ADR-0003）。
+- Token exchange service 的域名：`*.workers.dev` 还是自己的域名（M5）。
 - ~~bash env 白名单的具体变量清单，以及放行输入的名称。~~ 已决定：清单见 `src/runner/env-allowlist.ts` 的 `BASH_ENV_ALLOWLIST`，放行输入为 `allowed_bash_env`，关闭开关为 `subprocess_isolation: false`。
 - ~~`path_to_claude_code_executable` 删除还是改写？~~ 已决定：删除，pi 在 action 进程内运行，没有可以替换的可执行文件；使用已删除的输入时运行失败，并指向 README 的迁移对照表。
 
