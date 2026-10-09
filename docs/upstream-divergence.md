@@ -55,7 +55,7 @@
 
 - **上游**：`claude_args`
 - **本仓库**：`pi_args`，只放 pi 自己的参数，且只接受对 action 有意义的一部分（`--thinking`、系统提示词、工具选择、关闭 skills / 提示词模板 / 上下文文件）；其他参数直接报错
-- **说明**：参数集不同。pi 在进程内运行，参数由 Runner 用 pi 的 `parseArgs()` 解析后逐项应用；会话、输出模式、资源路径等参数在 action 中没有意义或不安全。`--model`、`--provider`、`--api-key` 改用对应输入。静默忽略会让 workflow 以为生效了
+- **说明**：参数集不同。pi 在进程内运行，参数由 Runner 用 pi 的 `parseArgs()` 解析后逐项应用；会话、输出模式、资源路径等参数在 action 中没有意义或不安全。`--model`、`--provider`、`--api-key` 改用对应输入。静默忽略会让 workflow 以为生效了。`claude_args` 中常见的 `--max-turns`、`--permission-mode`、`--mcp-config` 没有对应；`--add-dir` 不需要，因为只读工具在任何路径都放行（见"工具规则的语法范围"一条）
 
 #### 仓库的设置文件
 
@@ -104,6 +104,14 @@
 - **上游**：run 步骤显式传入 `ANTHROPIC_*`、`CLAUDE_CODE_*`、Bedrock / Vertex / Foundry 配置、`MCP_TIMEOUT`、`OTEL_*` 等
 - **本仓库**：不再传入；workflow `env:` 中的变量照常到达 pi
 - **说明**：pi 不读这些变量。pi 的 provider 读自己的变量（如 `AWS_*`、`GOOGLE_CLOUD_PROJECT`），从 workflow env 传入即可。Claude Code 的遥测（`CLAUDE_CODE_ENABLE_TELEMETRY`、`OTEL_*`）没有对应
+
+#### 脚本调用次数上限（`CLAUDE_CODE_SCRIPT_CAPS`）
+
+`pi-capability` · 用户可见：是（在 workflow `env:` 中设置了 `CLAUDE_CODE_SCRIPT_CAPS` 的用户）
+
+- **上游**：run 步骤传入 workflow env 中的 `CLAUDE_CODE_SCRIPT_CAPS`，Claude Code 按其中的 JSON 限制每个脚本在一次运行中的调用次数
+- **本仓库**：不传入，也没有对应机制；设置了也不生效，运行不报错
+- **说明**：这是 Claude Code 内部的功能，pi 没有。`allowed_tools` 中的 `Bash(脚本路径:*)` 规则只能决定脚本能否运行，不能限制次数
 
 #### inline comment 分类的 key
 
@@ -280,6 +288,14 @@
 - **上游**：独立目录，镜像到 `claude-code-base-action` 并作为 npm 包发布
 - **本仓库**：删除，执行器放在 `src/runner/`
 - **说明**：上游保留独立目录的原因（原为独立仓库、需要镜像、需要发布 npm 包）对本项目都不成立
+
+#### `agent-approval-check` 子 action
+
+`scope` · 用户可见：是（使用 `anthropics/claude-code-action/agent-approval-check` 的用户）
+
+- **上游**：仓库中带有 `agent-approval-check/` 子 action，要求含 agent 提交的 PR 获得 N 个人工 approve
+- **本仓库**：删除，没有 `lw396/pi-agent-action/agent-approval-check`
+- **说明**：它不调用 agent，与执行引擎无关。需要它的 workflow 继续引用上游的子 action 即可；把 pi 的提交身份加进它的 `agent_emails` / `agent_logins`
 
 #### workflow 加固检查
 
