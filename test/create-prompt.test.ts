@@ -129,14 +129,14 @@ describe("generatePrompt", () => {
   test("should generate prompt for issue_comment event", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issue_comment",
         commentId: "67890",
         isPR: false,
         baseBranch: "main",
-        claudeBranch: "claude/issue-67890-20240101-1200",
+        agentBranch: "claude/issue-67890-20240101-1200",
         issueNumber: "67890",
         commentBody: "@claude please fix this",
       },
@@ -144,14 +144,16 @@ describe("generatePrompt", () => {
 
     const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
 
-    expect(prompt).toContain("You are Claude, an AI assistant");
+    expect(prompt).toContain("You are an AI coding agent");
     expect(prompt).toContain("<event_type>GENERAL_COMMENT</event_type>");
     expect(prompt).toContain("<is_pr>false</is_pr>");
     expect(prompt).toContain(
       "<trigger_context>issue comment with '@claude'</trigger_context>",
     );
     expect(prompt).toContain("<repository>owner/repo</repository>");
-    expect(prompt).toContain("<claude_comment_id>12345</claude_comment_id>");
+    expect(prompt).toContain(
+      "<tracking_comment_id>12345</tracking_comment_id>",
+    );
     expect(prompt).toContain("<trigger_username>Unknown</trigger_username>");
     expect(prompt).toContain("[user1 at 2023-01-01T01:00:00Z]: First comment"); // from formatted comments
     expect(prompt).not.toContain("filename\tstatus\tadditions\tdeletions\tsha"); // since it's not a PR
@@ -160,7 +162,7 @@ describe("generatePrompt", () => {
   test("should generate prompt for pull_request_review event", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "pull_request_review",
@@ -184,7 +186,7 @@ describe("generatePrompt", () => {
   test("does not ask for 'Fix this' links into another product's web app", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@pi",
       eventData: {
         eventName: "pull_request_review",
@@ -204,7 +206,7 @@ describe("generatePrompt", () => {
   test("does not ask for a product signature in the PR body", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@pi",
       eventData: {
         eventName: "issues",
@@ -212,7 +214,7 @@ describe("generatePrompt", () => {
         isPR: false,
         issueNumber: "789",
         baseBranch: "main",
-        claudeBranch: "pi/issue-789-20240101-1200",
+        agentBranch: "pi/issue-789-20240101-1200",
       },
     };
 
@@ -226,7 +228,7 @@ describe("generatePrompt", () => {
   test("should generate prompt for issue opened event", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issues",
@@ -234,7 +236,7 @@ describe("generatePrompt", () => {
         isPR: false,
         issueNumber: "789",
         baseBranch: "main",
-        claudeBranch: "claude/issue-789-20240101-1200",
+        agentBranch: "claude/issue-789-20240101-1200",
       },
     };
 
@@ -253,7 +255,7 @@ describe("generatePrompt", () => {
   test("should generate prompt for issue assigned event", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issues",
@@ -261,7 +263,7 @@ describe("generatePrompt", () => {
         isPR: false,
         issueNumber: "999",
         baseBranch: "develop",
-        claudeBranch: "claude/issue-999-20240101-1200",
+        agentBranch: "claude/issue-999-20240101-1200",
         assigneeTrigger: "claude-bot",
       },
     };
@@ -280,7 +282,7 @@ describe("generatePrompt", () => {
   test("should generate prompt for issue labeled event", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issues",
@@ -288,7 +290,7 @@ describe("generatePrompt", () => {
         isPR: false,
         issueNumber: "888",
         baseBranch: "main",
-        claudeBranch: "claude/issue-888-20240101-1200",
+        agentBranch: "claude/issue-888-20240101-1200",
         labelTrigger: "claude-task",
       },
     };
@@ -309,7 +311,7 @@ describe("generatePrompt", () => {
   test("should generate prompt for pull_request event", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "pull_request",
@@ -330,7 +332,7 @@ describe("generatePrompt", () => {
   test("should generate prompt for issue comment without custom fields", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issue_comment",
@@ -338,7 +340,7 @@ describe("generatePrompt", () => {
         isPR: false,
         issueNumber: "123",
         baseBranch: "main",
-        claudeBranch: "claude/issue-67890-20240101-1200",
+        agentBranch: "claude/issue-67890-20240101-1200",
         commentBody: "@claude please fix this",
       },
     };
@@ -353,7 +355,7 @@ describe("generatePrompt", () => {
   test("should use override_prompt when provided", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       prompt: "Simple prompt for reviewing PR",
       eventData: {
@@ -373,13 +375,13 @@ describe("generatePrompt", () => {
 
     // Agent mode: Prompt is passed through as-is
     expect(prompt).toBe("Simple prompt for reviewing PR");
-    expect(prompt).not.toContain("You are Claude, an AI assistant");
+    expect(prompt).not.toContain("You are an AI coding agent");
   });
 
   test("should pass through prompt without variable substitution", async () => {
     const envVars: PreparedContext = {
       repository: "test/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       triggerUsername: "john-doe",
       prompt: `Repository: $REPOSITORY
@@ -400,7 +402,7 @@ describe("generatePrompt", () => {
         isPR: true,
         prNumber: "456",
         commentBody: "Please review this code",
-        claudeBranch: "feature-branch",
+        agentBranch: "feature-branch",
         baseBranch: "main",
       },
     };
@@ -426,7 +428,7 @@ describe("generatePrompt", () => {
   test("should handle override_prompt for issues", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       prompt: "Review issue and provide feedback",
       eventData: {
@@ -435,7 +437,7 @@ describe("generatePrompt", () => {
         isPR: false,
         issueNumber: "789",
         baseBranch: "main",
-        claudeBranch: "claude/issue-789-20240101-1200",
+        agentBranch: "claude/issue-789-20240101-1200",
       },
     };
 
@@ -468,7 +470,7 @@ describe("generatePrompt", () => {
   test("should handle prompt without substitution", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       prompt: "PR: $PR_NUMBER, Issue: $ISSUE_NUMBER, Comment: $TRIGGER_COMMENT",
       eventData: {
@@ -495,7 +497,7 @@ describe("generatePrompt", () => {
   test("should not substitute variables when override_prompt is not provided", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issues",
@@ -503,20 +505,20 @@ describe("generatePrompt", () => {
         isPR: false,
         issueNumber: "123",
         baseBranch: "main",
-        claudeBranch: "claude/issue-123-20240101-1200",
+        agentBranch: "claude/issue-123-20240101-1200",
       },
     };
 
     const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
 
-    expect(prompt).toContain("You are Claude, an AI assistant");
+    expect(prompt).toContain("You are an AI coding agent");
     expect(prompt).toContain("<event_type>ISSUE_CREATED</event_type>");
   });
 
   test("should include trigger username when provided", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       triggerUsername: "johndoe",
       eventData: {
@@ -525,7 +527,7 @@ describe("generatePrompt", () => {
         isPR: false,
         issueNumber: "123",
         baseBranch: "main",
-        claudeBranch: "claude/issue-67890-20240101-1200",
+        agentBranch: "claude/issue-67890-20240101-1200",
         commentBody: "@claude please fix this",
       },
     };
@@ -542,7 +544,7 @@ describe("generatePrompt", () => {
   test("should use numeric GitHub noreply address when trigger user id is provided", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       triggerUsername: "johndoe",
       triggerUserId: 123456,
@@ -552,7 +554,7 @@ describe("generatePrompt", () => {
         isPR: false,
         issueNumber: "123",
         baseBranch: "main",
-        claudeBranch: "claude/issue-67890-20240101-1200",
+        agentBranch: "claude/issue-67890-20240101-1200",
         commentBody: "@claude please fix this",
       },
     };
@@ -568,7 +570,7 @@ describe("generatePrompt", () => {
   test("should include PR-specific instructions only for PR events", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "pull_request_review",
@@ -597,7 +599,7 @@ describe("generatePrompt", () => {
   test("should include Issue-specific instructions only for Issue events", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issues",
@@ -605,7 +607,7 @@ describe("generatePrompt", () => {
         isPR: false,
         issueNumber: "789",
         baseBranch: "main",
-        claudeBranch: "claude/issue-789-20240101-1200",
+        agentBranch: "claude/issue-789-20240101-1200",
       },
     };
 
@@ -635,7 +637,7 @@ describe("generatePrompt", () => {
   test("should use actual branch name for issue comments", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issue_comment",
@@ -643,7 +645,7 @@ describe("generatePrompt", () => {
         isPR: false,
         issueNumber: "123",
         baseBranch: "main",
-        claudeBranch: "claude/issue-123-20240101-1200",
+        agentBranch: "claude/issue-123-20240101-1200",
         commentBody: "@claude please fix this",
       },
     };
@@ -665,7 +667,7 @@ describe("generatePrompt", () => {
   test("should handle closed PR with new branch", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issue_comment",
@@ -673,7 +675,7 @@ describe("generatePrompt", () => {
         isPR: true,
         prNumber: "456",
         commentBody: "@claude please fix this",
-        claudeBranch: "claude/pr-456-20240101-1200",
+        agentBranch: "claude/pr-456-20240101-1200",
         baseBranch: "main",
       },
     };
@@ -704,7 +706,7 @@ describe("generatePrompt", () => {
   test("should handle open PR without new branch", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issue_comment",
@@ -712,7 +714,7 @@ describe("generatePrompt", () => {
         isPR: true,
         prNumber: "456",
         commentBody: "@claude please fix this",
-        // No claudeBranch or baseBranch for open PRs
+        // No agentBranch or baseBranch for open PRs
       },
     };
 
@@ -735,14 +737,14 @@ describe("generatePrompt", () => {
   test("should handle PR review on closed PR with new branch", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "pull_request_review",
         isPR: true,
         prNumber: "789",
         commentBody: "@claude please update this",
-        claudeBranch: "claude/pr-789-20240101-1230",
+        agentBranch: "claude/pr-789-20240101-1230",
         baseBranch: "develop",
       },
     };
@@ -762,7 +764,7 @@ describe("generatePrompt", () => {
   test("should handle PR review comment on closed PR with new branch", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "pull_request_review_comment",
@@ -770,7 +772,7 @@ describe("generatePrompt", () => {
         prNumber: "999",
         commentId: "review-comment-123",
         commentBody: "@claude fix this issue",
-        claudeBranch: "claude/pr-999-20240101-1400",
+        agentBranch: "claude/pr-999-20240101-1400",
         baseBranch: "main",
       },
     };
@@ -791,14 +793,14 @@ describe("generatePrompt", () => {
   test("should handle pull_request event on closed PR with new branch", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "pull_request",
         eventAction: "closed",
         isPR: true,
         prNumber: "555",
-        claudeBranch: "claude/pr-555-20240101-1500",
+        agentBranch: "claude/pr-555-20240101-1500",
         baseBranch: "main",
       },
     };
@@ -816,7 +818,7 @@ describe("generatePrompt", () => {
   test("should include git commands when useCommitSigning is false", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issue_comment",
@@ -847,7 +849,7 @@ describe("generatePrompt", () => {
   test("should include commit signing tools when useCommitSigning is true", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issue_comment",
@@ -886,7 +888,7 @@ describe("generatePrompt", () => {
   test("does not mention allowed_tools when commit signing is off", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issue_comment",
@@ -924,14 +926,14 @@ describe("generatePrompt", () => {
       await withSimplePrompt(async () => {
         const envVars: PreparedContext = {
           repository: "owner/repo",
-          claudeCommentId: "12345",
+          trackingCommentId: "12345",
           triggerPhrase: "@claude",
           eventData: {
             eventName: "pull_request_review_comment",
             isPR: true,
             prNumber: "456",
             commentBody: "@claude please review this",
-            claudeBranch: "feature-branch",
+            agentBranch: "feature-branch",
             baseBranch: "develop",
           },
         };
@@ -945,7 +947,7 @@ describe("generatePrompt", () => {
 
         // Simplified prompt, not the default
         expect(prompt).toContain("You were tagged on a GitHub pull request");
-        expect(prompt).not.toContain("You are Claude, an AI assistant");
+        expect(prompt).not.toContain("You are an AI coding agent");
 
         // 1. Scoping clarification (neutral, no untrusted/secrets language)
         expect(prompt).toContain(
@@ -971,7 +973,7 @@ describe("generatePrompt", () => {
           "You cannot submit formal GitHub PR reviews, approve, or merge PRs",
         );
         expect(prompt).toContain(
-          "https://github.com/anthropics/claude-code-action/blob/main/docs/faq.md",
+          "https://github.com/lw396/pi-agent-action/blob/main/docs/faq.md",
         );
       });
     });
@@ -980,7 +982,7 @@ describe("generatePrompt", () => {
       await withSimplePrompt(async () => {
         const envVars: PreparedContext = {
           repository: "owner/repo",
-          claudeCommentId: "12345",
+          trackingCommentId: "12345",
           triggerPhrase: "@claude",
           eventData: {
             eventName: "issues",
@@ -988,7 +990,7 @@ describe("generatePrompt", () => {
             isPR: false,
             issueNumber: "789",
             baseBranch: "main",
-            claudeBranch: "claude/issue-789-20240101-1200",
+            agentBranch: "claude/issue-789-20240101-1200",
           },
         };
 
@@ -1028,7 +1030,7 @@ describe("getEventTypeAndContext", () => {
   test("should return correct type and context for pull_request_review_comment", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "pull_request_review_comment",
@@ -1047,7 +1049,7 @@ describe("getEventTypeAndContext", () => {
   test("should return correct type and context for issue assigned", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issues",
@@ -1055,7 +1057,7 @@ describe("getEventTypeAndContext", () => {
         isPR: false,
         issueNumber: "999",
         baseBranch: "main",
-        claudeBranch: "claude/issue-999-20240101-1200",
+        agentBranch: "claude/issue-999-20240101-1200",
         assigneeTrigger: "claude-bot",
       },
     };
@@ -1069,7 +1071,7 @@ describe("getEventTypeAndContext", () => {
   test("should return correct type and context for issue labeled", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       eventData: {
         eventName: "issues",
@@ -1077,7 +1079,7 @@ describe("getEventTypeAndContext", () => {
         isPR: false,
         issueNumber: "888",
         baseBranch: "main",
-        claudeBranch: "claude/issue-888-20240101-1200",
+        agentBranch: "claude/issue-888-20240101-1200",
         labelTrigger: "claude-task",
       },
     };
@@ -1091,7 +1093,7 @@ describe("getEventTypeAndContext", () => {
   test("should return correct type and context for issue assigned without assigneeTrigger", async () => {
     const envVars: PreparedContext = {
       repository: "owner/repo",
-      claudeCommentId: "12345",
+      trackingCommentId: "12345",
       triggerPhrase: "@claude",
       prompt: "Please assess this issue",
       eventData: {
@@ -1100,7 +1102,7 @@ describe("getEventTypeAndContext", () => {
         isPR: false,
         issueNumber: "999",
         baseBranch: "main",
-        claudeBranch: "claude/issue-999-20240101-1200",
+        agentBranch: "claude/issue-999-20240101-1200",
         // No assigneeTrigger when using prompt
       },
     };
@@ -1427,7 +1429,7 @@ describe("prepareContext validation errors", () => {
     });
 
     expect(() => prepareContext(context, commentId)).toThrow(
-      "CLAUDE_BRANCH is required for issue_comment event",
+      "AGENT_BRANCH is required for issue_comment event",
     );
   });
 });

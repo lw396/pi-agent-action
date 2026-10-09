@@ -53,7 +53,7 @@ describe("comments/common", () => {
       const body = createCommentBody(jobRunLink);
 
       expect(body).toContain(SPINNER_HTML);
-      expect(body).toContain("Claude Code is working…");
+      expect(body).toContain("pi is working…");
       expect(body).toContain(jobRunLink);
     });
 

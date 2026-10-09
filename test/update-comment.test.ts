@@ -1,11 +1,11 @@
 import { describe, test, expect, jest, beforeEach } from "bun:test";
 import { Octokit } from "@octokit/rest";
 import {
-  updateClaudeComment,
-  type UpdateClaudeCommentParams,
-} from "../src/github/operations/comments/update-claude-comment";
+  updateComment,
+  type UpdateCommentParams,
+} from "../src/github/operations/comments/update-comment";
 
-describe("updateClaudeComment", () => {
+describe("updateComment", () => {
   let mockOctokit: Octokit;
 
   beforeEach(() => {
@@ -36,7 +36,7 @@ describe("updateClaudeComment", () => {
       .fn()
       .mockResolvedValue(mockResponse);
 
-    const params: UpdateClaudeCommentParams = {
+    const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
       commentId: 123456,
@@ -44,7 +44,7 @@ describe("updateClaudeComment", () => {
       isPullRequestReviewComment: false,
     };
 
-    const result = await updateClaudeComment(mockOctokit, params);
+    const result = await updateComment(mockOctokit, params);
 
     expect(mockOctokit.rest.issues.updateComment).toHaveBeenCalledWith({
       owner: "testowner",
@@ -75,7 +75,7 @@ describe("updateClaudeComment", () => {
       .fn()
       .mockResolvedValue(mockResponse);
 
-    const params: UpdateClaudeCommentParams = {
+    const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
       commentId: 789012,
@@ -83,7 +83,7 @@ describe("updateClaudeComment", () => {
       isPullRequestReviewComment: false,
     };
 
-    const result = await updateClaudeComment(mockOctokit, params);
+    const result = await updateComment(mockOctokit, params);
 
     expect(mockOctokit.rest.issues.updateComment).toHaveBeenCalledWith({
       owner: "testowner",
@@ -114,7 +114,7 @@ describe("updateClaudeComment", () => {
       .fn()
       .mockResolvedValue(mockResponse);
 
-    const params: UpdateClaudeCommentParams = {
+    const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
       commentId: 345678,
@@ -122,7 +122,7 @@ describe("updateClaudeComment", () => {
       isPullRequestReviewComment: true,
     };
 
-    const result = await updateClaudeComment(mockOctokit, params);
+    const result = await updateComment(mockOctokit, params);
 
     expect(mockOctokit.rest.pulls.updateReviewComment).toHaveBeenCalledWith({
       owner: "testowner",
@@ -160,7 +160,7 @@ describe("updateClaudeComment", () => {
       .fn()
       .mockResolvedValue(mockResponse);
 
-    const params: UpdateClaudeCommentParams = {
+    const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
       commentId: 456789,
@@ -168,7 +168,7 @@ describe("updateClaudeComment", () => {
       isPullRequestReviewComment: true,
     };
 
-    const result = await updateClaudeComment(mockOctokit, params);
+    const result = await updateComment(mockOctokit, params);
 
     expect(mockOctokit.rest.pulls.updateReviewComment).toHaveBeenCalledWith({
       owner: "testowner",
@@ -200,7 +200,7 @@ describe("updateClaudeComment", () => {
       .fn()
       .mockRejectedValue(mockError);
 
-    const params: UpdateClaudeCommentParams = {
+    const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
       commentId: 567890,
@@ -208,9 +208,7 @@ describe("updateClaudeComment", () => {
       isPullRequestReviewComment: true,
     };
 
-    await expect(updateClaudeComment(mockOctokit, params)).rejects.toEqual(
-      mockError,
-    );
+    await expect(updateComment(mockOctokit, params)).rejects.toEqual(mockError);
 
     expect(mockOctokit.rest.pulls.updateReviewComment).toHaveBeenCalledWith({
       owner: "testowner",
@@ -231,7 +229,7 @@ describe("updateClaudeComment", () => {
       .fn()
       .mockRejectedValue(mockError);
 
-    const params: UpdateClaudeCommentParams = {
+    const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
       commentId: 678901,
@@ -239,9 +237,7 @@ describe("updateClaudeComment", () => {
       isPullRequestReviewComment: false,
     };
 
-    await expect(updateClaudeComment(mockOctokit, params)).rejects.toEqual(
-      mockError,
-    );
+    await expect(updateComment(mockOctokit, params)).rejects.toEqual(mockError);
 
     expect(mockOctokit.rest.issues.updateComment).toHaveBeenCalledWith({
       owner: "testowner",
@@ -266,7 +262,7 @@ describe("updateClaudeComment", () => {
       .fn()
       .mockResolvedValue(mockResponse);
 
-    const params: UpdateClaudeCommentParams = {
+    const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
       commentId: 111222,
@@ -274,7 +270,7 @@ describe("updateClaudeComment", () => {
       isPullRequestReviewComment: false,
     };
 
-    const result = await updateClaudeComment(mockOctokit, params);
+    const result = await updateComment(mockOctokit, params);
 
     expect(result).toEqual({
       id: 111222,
@@ -299,7 +295,7 @@ describe("updateClaudeComment", () => {
       .fn()
       .mockResolvedValue(mockResponse);
 
-    const params: UpdateClaudeCommentParams = {
+    const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
       commentId: 333444,
@@ -307,7 +303,7 @@ describe("updateClaudeComment", () => {
       isPullRequestReviewComment: false,
     };
 
-    const result = await updateClaudeComment(mockOctokit, params);
+    const result = await updateComment(mockOctokit, params);
 
     expect(mockOctokit.rest.issues.updateComment).toHaveBeenCalledWith({
       owner: "testowner",
@@ -350,7 +346,7 @@ const code = "example";
       .fn()
       .mockResolvedValue(mockResponse);
 
-    const params: UpdateClaudeCommentParams = {
+    const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
       commentId: 555666,
@@ -358,7 +354,7 @@ const code = "example";
       isPullRequestReviewComment: false,
     };
 
-    const result = await updateClaudeComment(mockOctokit, params);
+    const result = await updateComment(mockOctokit, params);
 
     expect(mockOctokit.rest.issues.updateComment).toHaveBeenCalledWith({
       owner: "testowner",
@@ -393,7 +389,7 @@ const code = "example";
       .fn()
       .mockResolvedValue(mockResponse);
 
-    const params: UpdateClaudeCommentParams = {
+    const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
       commentId: 777888,
@@ -401,7 +397,7 @@ const code = "example";
       isPullRequestReviewComment: true,
     };
 
-    const result = await updateClaudeComment(mockOctokit, params);
+    const result = await updateComment(mockOctokit, params);
 
     // Should only return the specific fields we care about
     expect(result).toEqual({

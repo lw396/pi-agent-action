@@ -23,7 +23,7 @@ describe("execution file output", () => {
     const setOutputSpy = spyOn(core, "setOutput").mockImplementation(() => {});
     tempDir = await mkdtemp(join(tmpdir(), "claude-execution-file-"));
     process.env.RUNNER_TEMP = tempDir;
-    const executionFile = join(tempDir, "claude-execution-output.json");
+    const executionFile = join(tempDir, "pi-execution-output.json");
     await writeFile(executionFile, "[]");
 
     try {

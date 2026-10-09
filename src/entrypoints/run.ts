@@ -77,10 +77,10 @@ async function run() {
 
   let githubToken: string | undefined;
   let commentId: number | undefined;
-  let claudeBranch: string | undefined;
+  let agentBranch: string | undefined;
   let baseBranch: string | undefined;
   let executionFile: string | undefined;
-  let claudeSuccess = false;
+  let agentSuccess = false;
   let prepareSuccess = true;
   let prepareError: string | undefined;
   let context: GitHubContext | undefined;
@@ -159,7 +159,7 @@ async function run() {
         : await prepareAgentMode({ context, octokit, githubToken });
 
     commentId = prepareResult.commentId;
-    claudeBranch = prepareResult.branchInfo.claudeBranch;
+    agentBranch = prepareResult.branchInfo.agentBranch;
     baseBranch = prepareResult.branchInfo.baseBranch;
     prepareCompleted = true;
 
@@ -192,13 +192,13 @@ async function run() {
 
     const promptFile =
       process.env.INPUT_PROMPT_FILE ||
-      `${process.env.RUNNER_TEMP}/claude-prompts/claude-prompt.txt`;
+      `${process.env.RUNNER_TEMP}/pi-prompts/prompt.txt`;
     const promptConfig = await preparePrompt({
       prompt: "",
       promptFile,
     });
 
-    const claudeResult = await runPi(promptConfig.path, {
+    const runResult = await runPi(promptConfig.path, {
       model: process.env.MODEL,
       apiKey: process.env.API_KEY,
       piArgs: process.env.PI_ARGS,
@@ -222,20 +222,20 @@ async function run() {
       mcpServers: parseMcpConfig(prepareResult.mcpConfig),
     });
 
-    claudeSuccess = claudeResult.conclusion === "success";
-    executionFile = claudeResult.executionFile;
+    agentSuccess = runResult.conclusion === "success";
+    executionFile = runResult.executionFile;
 
     // Set action-level outputs
-    if (claudeResult.executionFile) {
-      core.setOutput("execution_file", claudeResult.executionFile);
+    if (runResult.executionFile) {
+      core.setOutput("execution_file", runResult.executionFile);
     }
-    if (claudeResult.sessionId) {
-      core.setOutput("session_id", claudeResult.sessionId);
+    if (runResult.sessionId) {
+      core.setOutput("session_id", runResult.sessionId);
     }
-    if (claudeResult.structuredOutput) {
-      core.setOutput("structured_output", claudeResult.structuredOutput);
+    if (runResult.structuredOutput) {
+      core.setOutput("structured_output", runResult.structuredOutput);
     }
-    core.setOutput("conclusion", claudeResult.conclusion);
+    core.setOutput("conclusion", runResult.conclusion);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     executionFile ??= setExecutionFileOutputIfPresent();
@@ -260,12 +260,12 @@ async function run() {
         await updateCommentLink({
           commentId,
           githubToken,
-          claudeBranch,
+          agentBranch,
           baseBranch: baseBranch || context.repository.default_branch || "main",
           triggerUsername: context.actor,
           context,
           octokit,
-          claudeSuccess,
+          agentSuccess,
           outputFile: executionFile,
           prepareSuccess,
           prepareError,
@@ -287,7 +287,7 @@ async function run() {
     }
 
     // Set remaining action-level outputs
-    core.setOutput("branch_name", claudeBranch);
+    core.setOutput("branch_name", agentBranch);
     core.setOutput("github_token", githubToken);
   }
 }

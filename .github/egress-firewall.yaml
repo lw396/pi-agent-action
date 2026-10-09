@@ -3,7 +3,7 @@
 # by default. Add a host only when a workflow step needs it, name it in full (no '*'), and say what uses it.
 mode: enforce
 allow:
-  # OpenCode Zen API: model requests from the pi Runner in test-base-action.yml,
+  # OpenCode Zen API: model requests from the pi Runner in test-runner.yml,
   # test-custom-executables.yml, test-mcp-servers.yml and
   # test-structured-output.yml (model opencode/..., key OPENCODE_API_KEY)
   - opencode.ai

@@ -4,7 +4,7 @@ import { findShellSyntax } from "./shell-syntax";
 /**
  * git commands tag mode runs without a rule. Upstream's tag mode prompt tells
  * the model to run `git status` and `git diff`, which Claude Code allows as
- * read-only commands; pi has no such set (docs/upstream-divergence.md).
+ * read-only commands; pi has no such set (docs/development/upstream-divergence.md).
  */
 const READ_ONLY_SUBCOMMANDS = new Set(["status", "diff", "log", "show"]);
 

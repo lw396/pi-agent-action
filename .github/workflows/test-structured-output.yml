@@ -4,10 +4,10 @@ name: Test Structured Outputs
 # input: the model submits its result through the submit_result tool, and the
 # result comes back in the structured_output output.
 #
-# Manual dispatch only for now, like test-base-action.yml. Restore the
+# Manual dispatch only for now, like test-runner.yml. Restore the
 # pull_request trigger (same-repository PRs only, since fork PRs get no
 # secrets) and call this workflow from ci-all.yml once a manual run has
-# passed. See docs/pi-port-proposal.md, "CI 与集成测试".
+# passed. See docs/development/pi-port-proposal.md, "CI 与集成测试".
 on:
   workflow_dispatch:
     inputs:

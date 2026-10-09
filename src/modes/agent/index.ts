@@ -14,8 +14,8 @@ import type { Octokits } from "../../github/api/client";
  * Prepares the agent mode execution context.
  *
  * Agent mode runs whenever an explicit prompt is provided in the workflow configuration.
- * It bypasses the standard @claude mention checking and comment tracking used by tag mode,
- * providing direct access to Claude Code for automation workflows.
+ * It bypasses the standard @pi mention checking and comment tracking used by tag mode,
+ * running the agent directly for automation workflows.
  */
 export async function prepareAgentMode({
   context,
@@ -78,7 +78,7 @@ export async function prepareAgentMode({
   // Create prompt directory. Clear any stale files from a prior invocation first —
   // see src/create-prompt/index.ts for context (non-ephemeral self-hosted runners
   // do not reliably honor the RUNNER_TEMP cleanup contract).
-  const promptDir = `${process.env.RUNNER_TEMP || "/tmp"}/claude-prompts`;
+  const promptDir = `${process.env.RUNNER_TEMP || "/tmp"}/pi-prompts`;
   await rm(promptDir, { recursive: true, force: true });
   await mkdir(promptDir, { recursive: true });
 
@@ -87,19 +87,19 @@ export async function prepareAgentMode({
     context.inputs.prompt ||
     `Repository: ${context.repository.owner}/${context.repository.repo}`;
 
-  await writeFile(`${promptDir}/claude-prompt.txt`, promptContent);
+  await writeFile(`${promptDir}/prompt.txt`, promptContent);
 
   // The allowed_tools input decides which of the action's MCP servers start
   const allowedTools = ruleToolNames(process.env.INPUT_ALLOWED_TOOLS);
 
   // Check for branch info from environment variables (useful for auto-fix workflows)
-  const claudeBranch = process.env.CLAUDE_BRANCH || undefined;
+  const agentBranch = process.env.AGENT_BRANCH || undefined;
   const defaultBranch = context.repository.default_branch || "main";
   const baseBranch = context.inputs.baseBranch || defaultBranch;
 
   // Detect current branch from GitHub environment
   const currentBranch =
-    claudeBranch ||
+    agentBranch ||
     process.env.GITHUB_HEAD_REF ||
     process.env.GITHUB_REF_NAME ||
     defaultBranch;
@@ -111,7 +111,7 @@ export async function prepareAgentMode({
     repo: context.repository.repo,
     branch: currentBranch,
     baseBranch: baseBranch,
-    claudeCommentId: undefined, // No tracking comment in agent mode
+    trackingCommentId: undefined, // No tracking comment in agent mode
     allowedTools,
     mode: "agent",
     context,
@@ -122,7 +122,7 @@ export async function prepareAgentMode({
     branchInfo: {
       baseBranch: baseBranch,
       currentBranch: baseBranch, // Use base branch as current when creating new branch
-      claudeBranch: claudeBranch,
+      agentBranch: agentBranch,
     },
     mcpConfig: ourMcpConfig,
     // Agent mode adds no rules of its own: allowed_tools alone decides.

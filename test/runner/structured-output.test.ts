@@ -123,7 +123,7 @@ describe("structured output", () => {
     );
     expect(faux.state.callCount).toBe(3);
     const records = readExecutionFile(
-      join(process.env.RUNNER_TEMP!, "claude-execution-output.json"),
+      join(process.env.RUNNER_TEMP!, "pi-execution-output.json"),
     );
     expect(records.at(-1)?.type).toBe("session_stats");
   });

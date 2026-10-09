@@ -41,7 +41,7 @@ const mockGitHubData = {
 
 const signingContext: PreparedContext = {
   repository: "owner/repo",
-  claudeCommentId: "12345",
+  trackingCommentId: "12345",
   triggerPhrase: "@claude",
   eventData: {
     eventName: "issue_comment",

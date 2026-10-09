@@ -14,7 +14,7 @@ import {
 import { dirname, isAbsolute, join } from "path";
 import { restoreConfigFromBase } from "../src/github/operations/restore-config";
 
-const CLAUDE_PR_EXCLUDE_PATTERN = "/.claude-pr/";
+const PR_SNAPSHOT_EXCLUDE_PATTERN = "/.pi-pr/";
 
 describe("restoreConfigFromBase", () => {
   let originalCwd: string;
@@ -65,7 +65,7 @@ describe("restoreConfigFromBase", () => {
     }
   });
 
-  test("preserves PR sensitive files while excluding .claude-pr from broad staging", () => {
+  test("preserves PR sensitive files while excluding .pi-pr from broad staging", () => {
     const gitignoreExistedBefore = existsRepoFile(".gitignore");
     const gitignoreContentsBefore = gitignoreExistedBefore
       ? readRepoFile(".gitignore")
@@ -73,24 +73,22 @@ describe("restoreConfigFromBase", () => {
 
     restoreConfigFromBase("main");
 
-    expect(readRepoFile(".claude-pr/CLAUDE.md")).toBe(
-      "pr claude instructions\n",
-    );
-    expect(readRepoFile(".claude-pr/.claude/settings.json")).toBe(
+    expect(readRepoFile(".pi-pr/CLAUDE.md")).toBe("pr claude instructions\n");
+    expect(readRepoFile(".pi-pr/.claude/settings.json")).toBe(
       `${JSON.stringify({ source: "pr" })}\n`,
     );
     expect(readRepoFile("CLAUDE.md")).toBe("base claude instructions\n");
     expect(readRepoFile(".claude/settings.json")).toBe(
       `${JSON.stringify({ source: "base" })}\n`,
     );
-    expect(git(["check-ignore", ".claude-pr/CLAUDE.md"]).trim()).toBe(
-      ".claude-pr/CLAUDE.md",
+    expect(git(["check-ignore", ".pi-pr/CLAUDE.md"]).trim()).toBe(
+      ".pi-pr/CLAUDE.md",
     );
-    expect(countClaudePrExcludeEntries()).toBe(1);
+    expect(countPrSnapshotExcludeEntries()).toBe(1);
 
     restoreConfigFromBase("main");
 
-    expect(countClaudePrExcludeEntries()).toBe(1);
+    expect(countPrSnapshotExcludeEntries()).toBe(1);
     expect(existsRepoFile(".gitignore")).toBe(gitignoreExistedBefore);
     if (gitignoreExistedBefore) {
       expect(readRepoFile(".gitignore")).toBe(gitignoreContentsBefore);
@@ -104,9 +102,7 @@ describe("restoreConfigFromBase", () => {
       .split(/\r?\n/)
       .filter(Boolean);
     expect(stagedFiles).toContain("src/fix.ts");
-    expect(stagedFiles.some((file) => file.startsWith(".claude-pr/"))).toBe(
-      false,
-    );
+    expect(stagedFiles.some((file) => file.startsWith(".pi-pr/"))).toBe(false);
 
     git(["commit", "-m", "apply fix"]);
 
@@ -115,7 +111,7 @@ describe("restoreConfigFromBase", () => {
       .split(/\r?\n/)
       .filter(Boolean);
     expect(committedFiles).toContain("src/fix.ts");
-    expect(committedFiles.some((file) => file.startsWith(".claude-pr/"))).toBe(
+    expect(committedFiles.some((file) => file.startsWith(".pi-pr/"))).toBe(
       false,
     );
     expect(existsRepoFile(".gitignore")).toBe(gitignoreExistedBefore);
@@ -158,8 +154,8 @@ describe("restoreConfigFromBase", () => {
 
     restoreConfigFromBase("main");
 
-    expectPlaceholder(".claude-pr/CLAUDE.md");
-    expectPlaceholder(".claude-pr/.claude/CLAUDE.md");
+    expectPlaceholder(".pi-pr/CLAUDE.md");
+    expectPlaceholder(".pi-pr/.claude/CLAUDE.md");
     expectNoLinksInSnapshot();
     expect(readRepoFile(".claude/settings.json")).toBe(
       `${JSON.stringify({ source: "base" })}\n`,
@@ -173,12 +169,12 @@ describe("restoreConfigFromBase", () => {
 
     restoreConfigFromBase("main");
 
-    expect(lstatRepoFile(".claude-pr/CLAUDE.md").isFile()).toBe(true);
-    expect(lstatRepoFile(".claude-pr/.claude/CLAUDE.md").isFile()).toBe(true);
-    expect(readRepoFile(".claude-pr/CLAUDE.md")).toBe(
+    expect(lstatRepoFile(".pi-pr/CLAUDE.md").isFile()).toBe(true);
+    expect(lstatRepoFile(".pi-pr/.claude/CLAUDE.md").isFile()).toBe(true);
+    expect(readRepoFile(".pi-pr/CLAUDE.md")).toBe(
       "shared agent instructions\n",
     );
-    expect(readRepoFile(".claude-pr/.claude/CLAUDE.md")).toBe(
+    expect(readRepoFile(".pi-pr/.claude/CLAUDE.md")).toBe(
       "shared agent instructions\n",
     );
     expectNoLinksInSnapshot();
@@ -194,8 +190,8 @@ describe("restoreConfigFromBase", () => {
 
     restoreConfigFromBase("main");
 
-    expectPlaceholder(".claude-pr/CLAUDE.md");
-    expect(readRepoFile(".claude-pr/CLAUDE.md")).not.toBe("outside notes\n");
+    expectPlaceholder(".pi-pr/CLAUDE.md");
+    expect(readRepoFile(".pi-pr/CLAUDE.md")).not.toBe("outside notes\n");
     expect(snapshotRegularFileContents()).not.toContain("outside notes\n");
     expectNoLinksInSnapshot();
     expect(readRepoFile("CLAUDE.md")).toBe("base claude instructions\n");
@@ -216,11 +212,11 @@ describe("restoreConfigFromBase", () => {
 
     restoreConfigFromBase("main");
 
-    expect(readRepoFile(".claude-pr/.claude/settings.json")).toBe(
+    expect(readRepoFile(".pi-pr/.claude/settings.json")).toBe(
       `${JSON.stringify({ source: "pr" })}\n`,
     );
-    expectPlaceholder(".claude-pr/.claude/linked-file.md");
-    expectPlaceholder(".claude-pr/.claude/linked-dir");
+    expectPlaceholder(".pi-pr/.claude/linked-file.md");
+    expectPlaceholder(".pi-pr/.claude/linked-dir");
     const contents = snapshotRegularFileContents();
     expect(contents).not.toContain("outside file content\n");
     expect(contents).not.toContain("outside dir content\n");
@@ -237,7 +233,7 @@ describe("restoreConfigFromBase", () => {
 
     restoreConfigFromBase("main");
 
-    expectPlaceholder(".claude-pr/.claude/git-config");
+    expectPlaceholder(".pi-pr/.claude/git-config");
     expect(snapshotRegularFileContents()).not.toContain(
       readRepoFile(".git/config"),
     );
@@ -256,7 +252,7 @@ describe("restoreConfigFromBase", () => {
     restoreConfigFromBase("main");
 
     const gitConfig = readRepoFile(".git/config");
-    for (const path of [".claude-pr/.claude/x", ".claude-pr/CLAUDE.md"]) {
+    for (const path of [".pi-pr/.claude/x", ".pi-pr/CLAUDE.md"]) {
       expectPlaceholder(path);
       expect(readRepoFile(path)).not.toBe(gitConfig);
     }
@@ -270,7 +266,7 @@ describe("restoreConfigFromBase", () => {
 
     restoreConfigFromBase("main");
 
-    expectPlaceholder(".claude-pr/.claude/x");
+    expectPlaceholder(".pi-pr/.claude/x");
     expect(snapshotRegularFileContents()).not.toContain(
       "nested checkout config\n",
     );
@@ -285,11 +281,11 @@ describe("restoreConfigFromBase", () => {
 
     restoreConfigFromBase("main");
 
-    expectPlaceholder(".claude-pr/.claude/env");
+    expectPlaceholder(".pi-pr/.claude/env");
     expect(snapshotRegularFileContents()).not.toContain(
       "untracked env contents\n",
     );
-    expect(readRepoFile(".claude-pr/.claude/settings.json")).toBe(
+    expect(readRepoFile(".pi-pr/.claude/settings.json")).toBe(
       `${JSON.stringify({ source: "pr" })}\n`,
     );
     expectNoLinksInSnapshot();
@@ -304,7 +300,7 @@ describe("restoreConfigFromBase", () => {
 
     restoreConfigFromBase("main");
 
-    expectPlaceholder(".claude-pr/.claude/env");
+    expectPlaceholder(".pi-pr/.claude/env");
     expect(snapshotRegularFileContents()).not.toContain(
       "written after checkout\n",
     );
@@ -328,18 +324,18 @@ describe("restoreConfigFromBase", () => {
 
     restoreConfigFromBase("main");
 
-    expect(lstatRepoFile(".claude-pr/.claude").isDirectory()).toBe(true);
-    expect(readRepoFile(".claude-pr/.claude/settings.json")).toBe(
+    expect(lstatRepoFile(".pi-pr/.claude").isDirectory()).toBe(true);
+    expect(readRepoFile(".pi-pr/.claude/settings.json")).toBe(
       `${JSON.stringify({ source: "linked-dir" })}\n`,
     );
-    expect(readRepoFile(".claude-pr/.claude/agents/reviewer.md")).toBe(
+    expect(readRepoFile(".pi-pr/.claude/agents/reviewer.md")).toBe(
       "reviewer agent\n",
     );
-    expect(readRepoFile(".claude-pr/.claude/more-agents/writer.md")).toBe(
+    expect(readRepoFile(".pi-pr/.claude/more-agents/writer.md")).toBe(
       "writer agent\n",
     );
-    expectPlaceholder(".claude-pr/.claude/local.txt");
-    expectPlaceholder(".claude-pr/.claude/cache");
+    expectPlaceholder(".pi-pr/.claude/local.txt");
+    expectPlaceholder(".pi-pr/.claude/cache");
     const contents = snapshotRegularFileContents();
     expect(contents).not.toContain("untracked file\n");
     expect(contents).not.toContain("untracked dir entry\n");
@@ -359,7 +355,7 @@ describe("restoreConfigFromBase", () => {
 
     restoreConfigFromBase("main");
 
-    expectPlaceholder(".claude-pr/.claude/build");
+    expectPlaceholder(".pi-pr/.claude/build");
     const contents = snapshotRegularFileContents();
     expect(contents).not.toContain("generated a\n");
     expect(contents).not.toContain("generated b\n");
@@ -373,9 +369,9 @@ describe("restoreConfigFromBase", () => {
 
     restoreConfigFromBase("main");
 
-    expectPlaceholder(".claude-pr/.claude/parent-dir");
-    expect(existsRepoFile(".claude-pr/.claude/parent-dir/src")).toBe(false);
-    expect(readRepoFile(".claude-pr/.claude/settings.json")).toBe(
+    expectPlaceholder(".pi-pr/.claude/parent-dir");
+    expect(existsRepoFile(".pi-pr/.claude/parent-dir/src")).toBe(false);
+    expect(readRepoFile(".pi-pr/.claude/settings.json")).toBe(
       `${JSON.stringify({ source: "pr" })}\n`,
     );
     expectNoLinksInSnapshot();
@@ -445,19 +441,15 @@ describe("restoreConfigFromBase", () => {
       expect(readRepoFile("AGENTS.md")).toBe("base agents\n");
       expect(readRepoFile("AGENTS.override.md")).toBe("base override\n");
 
-      expect(readRepoFile(".claude-pr/.pi/settings.json")).toBe(
-        "pr settings\n",
-      );
-      expect(readRepoFile(".claude-pr/.pi/extensions/evil.ts")).toBe(
+      expect(readRepoFile(".pi-pr/.pi/settings.json")).toBe("pr settings\n");
+      expect(readRepoFile(".pi-pr/.pi/extensions/evil.ts")).toBe(
         "pr extension\n",
       );
-      expect(readRepoFile(".claude-pr/.agents/skills/review/SKILL.md")).toBe(
+      expect(readRepoFile(".pi-pr/.agents/skills/review/SKILL.md")).toBe(
         "pr skill\n",
       );
-      expect(readRepoFile(".claude-pr/AGENTS.md")).toBe("pr agents\n");
-      expect(readRepoFile(".claude-pr/AGENTS.override.md")).toBe(
-        "pr override\n",
-      );
+      expect(readRepoFile(".pi-pr/AGENTS.md")).toBe("pr agents\n");
+      expect(readRepoFile(".pi-pr/AGENTS.override.md")).toBe("pr override\n");
     });
 
     test.each(PI_PATHS_WITH_SAMPLE_FILE)(
@@ -468,7 +460,7 @@ describe("restoreConfigFromBase", () => {
         restoreConfigFromBase("main");
 
         expect(existsRepoFile(sensitivePath)).toBe(false);
-        expect(readRepoFile(`.claude-pr/${file}`)).toBe("pr content\n");
+        expect(readRepoFile(`.pi-pr/${file}`)).toBe("pr content\n");
       },
     );
   });
@@ -483,7 +475,7 @@ describe("restoreConfigFromBase", () => {
     restoreConfigFromBase("main");
 
     expect(readRepoFile(".gitignore")).toBe(gitignoreBefore);
-    expect(countClaudePrExcludeEntries()).toBe(1);
+    expect(countPrSnapshotExcludeEntries()).toBe(1);
   });
 
   test("leaves a full checkout unshallow so base..HEAD stays scoped to the PR", () => {
@@ -557,7 +549,7 @@ describe("restoreConfigFromBase", () => {
         }
       }
     };
-    visit(join(repoDir, ".claude-pr"));
+    visit(join(repoDir, ".pi-pr"));
     return contents;
   }
 
@@ -574,7 +566,7 @@ describe("restoreConfigFromBase", () => {
         }
       }
     };
-    visit(join(repoDir, ".claude-pr"));
+    visit(join(repoDir, ".pi-pr"));
   }
 
   function expectPlaceholder(path: string): void {
@@ -611,10 +603,10 @@ describe("restoreConfigFromBase", () => {
     git(["checkout", "-b", "pr"]);
   }
 
-  function countClaudePrExcludeEntries(): number {
+  function countPrSnapshotExcludeEntries(): number {
     return readFileSync(getExcludePath(), "utf8")
       .split(/\r?\n/)
-      .filter((line) => line === CLAUDE_PR_EXCLUDE_PATTERN).length;
+      .filter((line) => line === PR_SNAPSHOT_EXCLUDE_PATTERN).length;
   }
 
   function getExcludePath(): string {

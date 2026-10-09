@@ -148,7 +148,7 @@ function execGit(args: string[]): void {
 
 export type BranchInfo = {
   baseBranch: string;
-  claudeBranch?: string;
+  agentBranch?: string;
   currentBranch: string;
 };
 
@@ -317,7 +317,7 @@ export async function setupBranch(
 
       return {
         baseBranch: sourceBranch,
-        claudeBranch: newBranch,
+        agentBranch: newBranch,
         currentBranch: sourceBranch, // Stay on source branch for now
       };
     }
@@ -342,7 +342,7 @@ export async function setupBranch(
 
     return {
       baseBranch: sourceBranch,
-      claudeBranch: newBranch,
+      agentBranch: newBranch,
       currentBranch: newBranch,
     };
   } catch (error) {

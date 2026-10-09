@@ -1,11 +1,11 @@
 /**
  * Extracts the user's request from a trigger comment.
  *
- * Given a comment like "@claude /review-pr please check the auth module",
+ * Given a comment like "@pi /review-pr please check the auth module",
  * this extracts "/review-pr please check the auth module".
  *
  * @param commentBody - The full comment body containing the trigger phrase
- * @param triggerPhrase - The trigger phrase (e.g., "@claude")
+ * @param triggerPhrase - The trigger phrase (e.g., "@pi")
  * @returns The user's request (text after the trigger phrase), or null if not found
  */
 export function extractUserRequest(

@@ -22,7 +22,7 @@ import { ruleToolNames } from "../../runner/tool-rules";
 /**
  * Prepares the tag mode execution context.
  *
- * Tag mode responds to @claude mentions, issue assignments, or labels.
+ * Tag mode responds to @pi mentions, issue assignments, or labels.
  * Creates tracking comments showing progress and has full implementation capabilities.
  */
 export async function prepareTagMode({
@@ -115,7 +115,7 @@ export async function prepareTagMode({
   await createPrompt(
     commentId,
     branchInfo.baseBranch,
-    branchInfo.claudeBranch,
+    branchInfo.agentBranch,
     githubData,
     context,
   );
@@ -168,9 +168,9 @@ export async function prepareTagMode({
     githubToken,
     owner: context.repository.owner,
     repo: context.repository.repo,
-    branch: branchInfo.claudeBranch || branchInfo.currentBranch,
+    branch: branchInfo.agentBranch || branchInfo.currentBranch,
     baseBranch: branchInfo.baseBranch,
-    claudeCommentId: commentId.toString(),
+    trackingCommentId: commentId.toString(),
     allowedTools,
     mode: "tag",
     context,

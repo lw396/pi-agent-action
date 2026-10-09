@@ -41,7 +41,7 @@ export function detectMode(context: GitHubContext): AutoDetectedMode {
       if (context.inputs.prompt) {
         return "agent";
       }
-      // Default to tag mode if @claude mention found
+      // Default to tag mode if @pi mention found
       if (checkContainsTrigger(context)) {
         return "tag";
       }
@@ -54,7 +54,7 @@ export function detectMode(context: GitHubContext): AutoDetectedMode {
     if (context.inputs.prompt) {
       return "agent";
     }
-    // Check for @claude mentions or labels/assignees
+    // Check for @pi mentions or labels/assignees
     if (checkContainsTrigger(context)) {
       return "tag";
     }

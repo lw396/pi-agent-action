@@ -35,7 +35,7 @@ describe("runPi", () => {
     expect(result.sessionId).toBeString();
     expect(result.sessionId!.length).toBeGreaterThan(0);
     expect(result.executionFile).toBe(
-      join(process.env.RUNNER_TEMP!, "claude-execution-output.json"),
+      join(process.env.RUNNER_TEMP!, "pi-execution-output.json"),
     );
 
     const records = readExecutionFile(result.executionFile!);
@@ -111,7 +111,7 @@ describe("runPi", () => {
     ).rejects.toThrow("400 invalid request: unsupported parameter");
 
     const records = readExecutionFile(
-      join(process.env.RUNNER_TEMP!, "claude-execution-output.json"),
+      join(process.env.RUNNER_TEMP!, "pi-execution-output.json"),
     );
     const assistantEnd = records.find(
       (r) => r.type === "message_end" && r.message.role === "assistant",

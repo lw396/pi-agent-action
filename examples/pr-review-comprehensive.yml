@@ -1,7 +1,7 @@
 name: PR Review with Progress Tracking
 
 # This example demonstrates how to use the track_progress feature to get
-# visual progress tracking for PR reviews, similar to v0.x agent mode.
+# a tracking comment that shows the review's progress.
 
 on:
   pull_request:

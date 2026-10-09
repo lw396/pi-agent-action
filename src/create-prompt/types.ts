@@ -2,12 +2,12 @@ import type { GitHubContext } from "../github/context";
 
 export type CommonFields = {
   repository: string;
-  claudeCommentId: string;
+  trackingCommentId: string;
   triggerPhrase: string;
   triggerUsername?: string;
   triggerUserId?: number;
   prompt?: string;
-  claudeBranch?: string;
+  agentBranch?: string;
 };
 
 type PullRequestReviewCommentEvent = {
@@ -16,7 +16,7 @@ type PullRequestReviewCommentEvent = {
   prNumber: string;
   commentId?: string; // May be present for review comments
   commentBody: string;
-  claudeBranch?: string;
+  agentBranch?: string;
   baseBranch?: string;
 };
 
@@ -25,7 +25,7 @@ type PullRequestReviewEvent = {
   isPR: true;
   prNumber: string;
   commentBody?: string; // May be absent for approvals without comments
-  claudeBranch?: string;
+  agentBranch?: string;
   baseBranch?: string;
 };
 
@@ -35,7 +35,7 @@ type IssueCommentEvent = {
   issueNumber: string;
   isPR: false;
   baseBranch: string;
-  claudeBranch: string;
+  agentBranch: string;
   commentBody: string;
 };
 
@@ -46,7 +46,7 @@ type PullRequestCommentEvent = {
   prNumber: string;
   isPR: true;
   commentBody: string;
-  claudeBranch?: string;
+  agentBranch?: string;
   baseBranch?: string;
 };
 
@@ -56,7 +56,7 @@ type IssueOpenedEvent = {
   isPR: false;
   issueNumber: string;
   baseBranch: string;
-  claudeBranch: string;
+  agentBranch: string;
 };
 
 type IssueAssignedEvent = {
@@ -65,7 +65,7 @@ type IssueAssignedEvent = {
   isPR: false;
   issueNumber: string;
   baseBranch: string;
-  claudeBranch: string;
+  agentBranch: string;
   assigneeTrigger?: string;
 };
 
@@ -75,7 +75,7 @@ type IssueLabeledEvent = {
   isPR: false;
   issueNumber: string;
   baseBranch: string;
-  claudeBranch: string;
+  agentBranch: string;
   labelTrigger: string;
 };
 
@@ -83,7 +83,7 @@ type PullRequestBaseEvent = {
   eventAction?: string; // opened, synchronize, etc.
   isPR: true;
   prNumber: string;
-  claudeBranch?: string;
+  agentBranch?: string;
   baseBranch?: string;
 };
 

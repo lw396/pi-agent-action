@@ -9,9 +9,9 @@ name: Test MCP Servers
 # has no tracking comment, so the server answers with its own error instead of
 # updating a comment. That proves the round trip without touching GitHub.
 #
-# Manual dispatch only for now, like test-base-action.yml. Restore the
+# Manual dispatch only for now, like test-runner.yml. Restore the
 # pull_request trigger (same-repository PRs only) and call this workflow from
-# ci-all.yml once a manual run has passed. See docs/pi-port-proposal.md,
+# ci-all.yml once a manual run has passed. See docs/development/pi-port-proposal.md,
 # "CI 与集成测试".
 on:
   workflow_dispatch:
@@ -77,7 +77,7 @@ jobs:
           # The server's own answer: there is no tracking comment in agent mode.
           jq -e --arg tool "$TOOL" '
             any(.[]; .type == "tool_execution_end" and .toolName == $tool
-              and (.result | tostring | contains("CLAUDE_COMMENT_ID environment variable is required")))
+              and (.result | tostring | contains("TRACKING_COMMENT_ID environment variable is required")))
           ' "$EXECUTION_FILE" > /dev/null ||
             { echo "❌ $TOOL did not return the server's response"; exit 1; }
 

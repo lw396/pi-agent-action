@@ -77,7 +77,7 @@ export function applyBranchTemplate(
  * an empty string. For example, an issue title with no alphanumeric characters
  * (emoji-only, CJK-only, or punctuation-only) makes `{{description}}` empty, so
  * a template like `{{prefix}}{{description}}/{{entityNumber}}` yields
- * `claude//123`. Consecutive slashes — and a leading or trailing slash — are
+ * `pi//123`. Consecutive slashes — and a leading or trailing slash — are
  * rejected by `validateBranchName`, which aborts the whole run, so normalize
  * them into a valid branch name instead of crashing.
  */

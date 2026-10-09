@@ -12,7 +12,7 @@ import { homedir } from "os";
 import type { GitHubContext } from "../context";
 import { GITHUB_SERVER_URL } from "../api/config";
 
-const SSH_SIGNING_KEY_PATH = join(homedir(), ".ssh", "claude_signing_key");
+const SSH_SIGNING_KEY_PATH = join(homedir(), ".ssh", "pi_signing_key");
 
 type GitUser = {
   login: string;
@@ -51,7 +51,7 @@ export async function configureGitAuth(
  * Replace the credential that actions/checkout persisted in the working tree.
  *
  * actions/checkout stores its token as an `http.<server>/.extraheader` entry
- * in .git/config for the duration of the job. Claude and the tools it invokes
+ * in .git/config for the duration of the job. The agent and the tools it invokes
  * run inside this working tree, so remove that entry and back git with the
  * action's own token instead (a credential helper when non-write users are
  * allowed, otherwise the origin URL). This applies to every mode, including API
@@ -65,7 +65,7 @@ export async function configureGitAuth(
  * was a silent no-op and the checkout credential (typically the workflow
  * GITHUB_TOKEN) stayed usable by git for the rest of the job. Clear the
  * header from the local config AND from every included file so it can no
- * longer authenticate while Claude runs.
+ * longer authenticate while the agent runs.
  */
 export async function replaceCheckoutCredentials(
   githubToken: string,

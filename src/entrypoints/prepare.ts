@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 /**
- * Prepare the Claude action by checking trigger conditions, verifying human actor,
+ * Prepare the action by checking trigger conditions, verifying human actor,
  * and creating the initial tracking comment
  */
 

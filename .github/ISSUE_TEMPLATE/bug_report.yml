@@ -1,0 +1,61 @@
+name: Bug report
+description: The action failed or did something it shouldn't have
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Check the [FAQ](https://github.com/lw396/pi-agent-action/blob/main/docs/faq.md) first; many failures are permission or `allowed_tools` settings.
+        **Security problems:** do not file them here, see [SECURITY.md](https://github.com/lw396/pi-agent-action/blob/main/SECURITY.md).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow
+      description: The workflow file, or the step that uses the action. Remove secrets and anything private.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Job log
+      description: The relevant part of the job log. A re-run with debug logging shows more.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Action version
+      description: The tag, branch or commit SHA in `uses:`.
+      placeholder: lw396/pi-agent-action@main
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: The `model` input.
+      placeholder: anthropic/<model-id>
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Tag mode (@pi mention, label or assignee)
+        - Agent mode (prompt input)
+        - Not sure
+  - type: dropdown
+    id: auth
+    attributes:
+      label: GitHub authentication
+      options:
+        - pi-agent-action app (no github_token)
+        - GITHUB_TOKEN
+        - My own GitHub App
+        - Personal access token

@@ -5,7 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { GITHUB_API_URL } from "../github/api/config";
 import { Octokit } from "@octokit/rest";
-import { updateClaudeComment } from "../github/operations/comments/update-claude-comment";
+import { updateComment } from "../github/operations/comments/update-comment";
 import { redactSecrets, sanitizeContent } from "../github/utils/sanitizer";
 
 // Get repository information from environment variables
@@ -33,19 +33,19 @@ server.tool(
   async ({ body }) => {
     try {
       const githubToken = process.env.GITHUB_TOKEN;
-      const claudeCommentId = process.env.CLAUDE_COMMENT_ID;
+      const trackingCommentId = process.env.TRACKING_COMMENT_ID;
       const eventName = process.env.GITHUB_EVENT_NAME;
 
       if (!githubToken) {
         throw new Error("GITHUB_TOKEN environment variable is required");
       }
-      if (!claudeCommentId) {
-        throw new Error("CLAUDE_COMMENT_ID environment variable is required");
+      if (!trackingCommentId) {
+        throw new Error("TRACKING_COMMENT_ID environment variable is required");
       }
 
       const owner = REPO_OWNER;
       const repo = REPO_NAME;
-      const commentId = parseInt(claudeCommentId, 10);
+      const commentId = parseInt(trackingCommentId, 10);
 
       const octokit = new Octokit({
         auth: githubToken,
@@ -57,7 +57,7 @@ server.tool(
 
       const sanitizedBody = redactSecrets(sanitizeContent(body));
 
-      const result = await updateClaudeComment(octokit, {
+      const result = await updateComment(octokit, {
         owner,
         repo,
         commentId,

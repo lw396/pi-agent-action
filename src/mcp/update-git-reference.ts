@@ -68,7 +68,7 @@ export async function updateGitReference({
         throw new GitReferenceUpdateError(
           response.status,
           `Permission denied: Unable to push commits to branch '${branch}'. ` +
-            `Please rebase your branch from the main/master branch to allow Claude to commit.\n\n` +
+            `Please rebase your branch from the main/master branch to allow pi to commit.\n\n` +
             `Original error: ${errorText}`,
         );
       }

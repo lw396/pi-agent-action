@@ -5,10 +5,10 @@ name: Test Custom Executables
 # swap: it runs inside the action's process, so path_to_claude_code_executable
 # was removed rather than ported.
 #
-# Manual dispatch only for now, like test-base-action.yml. Restore the
+# Manual dispatch only for now, like test-runner.yml. Restore the
 # pull_request trigger (same-repository PRs only, since fork PRs get no
 # secrets) and call this workflow from ci-all.yml once a manual run has
-# passed. See docs/pi-port-proposal.md, "CI 与集成测试".
+# passed. See docs/development/pi-port-proposal.md, "CI 与集成测试".
 on:
   workflow_dispatch:
 

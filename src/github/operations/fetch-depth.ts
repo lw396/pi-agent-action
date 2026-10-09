@@ -9,7 +9,7 @@ import { execFileSync } from "child_process";
  * is already there and marks the repository shallow, which drops the merge base
  * with the base branch: `git log origin/<base>..HEAD` then quietly lists
  * commits that are already merged, and `git diff origin/<base>...HEAD` fails
- * with "no merge base". Those are the commands the prompt tells Claude to run
+ * with "no merge base". Those are the commands the prompt tells the agent to run
  * to scope its work to the PR.
  *
  * A shallow checkout (the `fetch-depth: 1` default) has no history left to

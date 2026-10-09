@@ -4,7 +4,7 @@
 # pi-coding-agent depends on pi-ai and the two must stay on the same version.
 #
 # Dependabot PRs do not receive Actions secrets. For the Runner integration test
-# (test-base-action.yml) to run on them, add OPENCODE_API_KEY as a Dependabot
+# (test-runner.yml) to run on them, add OPENCODE_API_KEY as a Dependabot
 # secret too.
 version: 2
 updates:

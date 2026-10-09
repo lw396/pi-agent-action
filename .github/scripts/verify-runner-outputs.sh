@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks the outputs of one agent-mode run of the action (test-base-action.yml).
+# Checks the outputs of one agent-mode run of the action (test-runner.yml).
 # Reads CONCLUSION, EXECUTION_FILE and SESSION_ID from the environment.
 set -euo pipefail
 

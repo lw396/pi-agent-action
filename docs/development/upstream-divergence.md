@@ -256,6 +256,14 @@
 
 ### 输出与报告
 
+#### 跟踪评论与提示词中的品牌
+
+`branding` · 用户可见：是（匹配跟踪评论文字的脚本或过滤规则）
+
+- **上游**：跟踪评论显示 `Claude Code is working…`，结束时标题为 `**Claude finished @user's task**` 或 `**Claude encountered an error**`；系统提示词以 `You are Claude` 开头，并让模型把用户引向上游的 FAQ；自动提交信息为 `Save uncommitted changes from Claude`
+- **本仓库**：分别改为 `pi is working…`、`**pi finished @user's task**`、`**pi encountered an error**`；系统提示词改为 `You are an AI coding agent`（模型不一定是 Claude），FAQ 链接指向本仓库的 `docs/faq.md`；提交信息改为 `from pi`
+- **说明**：README 的"Changed behaviour"表中有对应条目
+
 #### 结构化输出
 
 `pi-capability` · 用户可见：是
@@ -304,6 +312,14 @@
 - **说明**：不把会话写进 `~/.pi/agent/`；另外 `pi_args` 也不接受 `--session`、`--continue` 等会话参数
 
 ### 仓库与 CI
+
+#### 源码标识符与临时文件名
+
+`branding` · 用户可见：否
+
+- **上游**：`claudeBranch`、`claudeCommentId`、`updateClaudeComment()`（`update-claude-comment.ts`）、环境变量 `CLAUDE_BRANCH` / `CLAUDE_COMMENT_ID` / `CLAUDE_SUCCESS`、prompt 中的 `<claude_comment_id>`、临时文件 `claude-prompts/claude-prompt.txt`、`claude-user-request.txt`、`claude-execution-output.json`、SSH key `claude_signing_key`，以及存放 PR 版敏感文件的 `.claude-pr/`
+- **本仓库**：依次改为 `agentBranch`、`trackingCommentId`、`updateComment()`（`update-comment.ts`）、`AGENT_BRANCH` / `TRACKING_COMMENT_ID` / `AGENT_SUCCESS`、`<tracking_comment_id>`、`pi-prompts/prompt.txt`、`user-request.txt`、`pi-execution-output.json`、`pi_signing_key`、`.pi-pr/`
+- **说明**：从上游 cherry-pick 涉及这些名字的补丁时，需要手工改名。`CLAUDE.md`、`.claude/` 等 pi 也会读取的配置路径不在此列，保持原名
 
 #### `base-action/` 目录
 

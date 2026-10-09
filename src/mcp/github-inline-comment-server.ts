@@ -28,7 +28,7 @@ if (!REPO_OWNER || !REPO_NAME || !PR_NUMBER) {
 
 // GitHub Inline Comment MCP Server - Provides inline PR comment functionality
 // Provides an inline comment tool without exposing full PR review capabilities, so that
-// Claude can't accidentally approve a PR
+// The agent cannot accidentally approve a PR
 const server = new McpServer({
   name: "GitHub Inline Comment Server",
   version: "0.0.1",

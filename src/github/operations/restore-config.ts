@@ -44,7 +44,7 @@ export const SENSITIVE_PATHS = [
   "CLAUDE.MD",
 ];
 
-const CLAUDE_PR_EXCLUDE_PATTERN = "/.claude-pr/";
+const PR_SNAPSHOT_EXCLUDE_PATTERN = "/.pi-pr/";
 
 function isSameOrInside(child: string, parent: string): boolean {
   return child === parent || child.startsWith(`${parent}${sep}`);
@@ -120,7 +120,7 @@ function shouldSnapshotContent(
       return false;
     }
     const targetParts = relative(workTreeRealPath, targetRealPath).split(sep);
-    if (targetParts.includes(".git") || targetParts[0] === ".claude-pr") {
+    if (targetParts.includes(".git") || targetParts[0] === ".pi-pr") {
       return false;
     }
     for (let dir = dirname(entryPath); ; dir = dirname(dir)) {
@@ -216,7 +216,7 @@ function snapshotSensitivePath(
   }
 }
 
-function ensureClaudePrExcludedFromGit(): void {
+function ensurePrSnapshotExcludedFromGit(): void {
   const excludePath = execFileSync(
     "git",
     ["rev-parse", "--git-path", "info/exclude"],
@@ -227,7 +227,7 @@ function ensureClaudePrExcludedFromGit(): void {
     ? readFileSync(excludePath, "utf8")
     : "";
 
-  if (excludeContents.split(/\r?\n/).includes(CLAUDE_PR_EXCLUDE_PATTERN)) {
+  if (excludeContents.split(/\r?\n/).includes(PR_SNAPSHOT_EXCLUDE_PATTERN)) {
     return;
   }
 
@@ -235,7 +235,7 @@ function ensureClaudePrExcludedFromGit(): void {
 
   const prefix =
     excludeContents.length === 0 || excludeContents.endsWith("\n") ? "" : "\n";
-  appendFileSync(excludePath, `${prefix}${CLAUDE_PR_EXCLUDE_PATTERN}\n`);
+  appendFileSync(excludePath, `${prefix}${PR_SNAPSHOT_EXCLUDE_PATTERN}\n`);
 }
 
 /**
@@ -281,25 +281,25 @@ export function restoreConfigFromBase(baseBranch: string): string[] {
     `Restoring ${SENSITIVE_PATHS.join(", ")} from origin/${baseBranch} (PR head is untrusted)`,
   );
 
-  // Snapshot every PR-authored sensitive path into .claude-pr/ before deletion
+  // Snapshot every PR-authored sensitive path into .pi-pr/ before deletion
   // so review agents can inspect what the PR changes without those files ever
   // being executed. Captured before the security delete so it reflects the
   // PR-authored version. Links are followed only to tracked, unmodified content
   // inside the working tree; anything else is recorded as a placeholder file,
   // so the snapshot itself never contains links.
-  rmSync(".claude-pr", { recursive: true, force: true });
+  rmSync(".pi-pr", { recursive: true, force: true });
   const workTreeRealPath = realpathSync(process.cwd());
   const tracked = listTrackedPaths();
   for (const p of SENSITIVE_PATHS) {
     if (lstatSync(p, { throwIfNoEntry: false })) {
-      snapshotSensitivePath(p, `.claude-pr/${p}`, workTreeRealPath, tracked);
+      snapshotSensitivePath(p, `.pi-pr/${p}`, workTreeRealPath, tracked);
     }
   }
-  if (existsSync(".claude-pr")) {
+  if (existsSync(".pi-pr")) {
     console.log(
-      "Preserved PR's sensitive paths -> .claude-pr/ for review agents (not executed)",
+      "Preserved PR's sensitive paths -> .pi-pr/ for review agents (not executed)",
     );
-    ensureClaudePrExcludedFromGit();
+    ensurePrSnapshotExcludedFromGit();
   }
 
   // Delete PR-controlled versions BEFORE fetching so the attacker-controlled

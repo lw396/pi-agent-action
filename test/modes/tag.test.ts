@@ -53,7 +53,7 @@ describe("Tag Mode", () => {
           async () =>
             ({
               baseBranch: "main",
-              claudeBranch: "claude/test",
+              agentBranch: "claude/test",
               currentBranch: "claude/test",
             }) as any,
         ),

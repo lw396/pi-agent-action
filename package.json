@@ -1,6 +1,13 @@
 {
   "name": "pi-agent-action",
   "version": "1.0.0",
+  "description": "GitHub Action that runs the pi coding agent on issues and pull requests, with any model provider",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lw396/pi-agent-action.git"
+  },
+  "homepage": "https://github.com/lw396/pi-agent-action#readme",
   "private": true,
   "scripts": {
     "format": "prettier --write .",

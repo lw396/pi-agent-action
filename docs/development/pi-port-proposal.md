@@ -1,6 +1,6 @@
 # 提案：将 claude-code-action 改造为 pi-agent-action
 
-> 状态：讨论中 · 创建于 2026-10-06 · 2026-10-07 完成第一轮 grilling，结论已写入各节、[`upstream-divergence.md`](upstream-divergence.md) 和 [`adr/`](adr/)
+> 状态：M0–M4 已完成，M5（GitHub App 与 Token exchange service）进行中 · 创建于 2026-10-06。本文保留为移植的计划与决策记录；当前行为以代码、[`upstream-divergence.md`](upstream-divergence.md) 和 [`adr/`](adr/) 为准
 
 ## 目的
 

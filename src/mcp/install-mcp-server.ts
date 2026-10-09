@@ -12,7 +12,7 @@ type PrepareConfigParams = {
   repo: string;
   branch: string;
   baseBranch: string;
-  claudeCommentId?: string;
+  trackingCommentId?: string;
   allowedTools: string[];
   mode: AutoDetectedMode;
   context: GitHubContext;
@@ -73,7 +73,7 @@ export async function prepareMcpConfig(
     repo,
     branch,
     baseBranch,
-    claudeCommentId,
+    trackingCommentId,
     allowedTools,
     context,
     mode,
@@ -110,7 +110,7 @@ export async function prepareMcpConfig(
     };
 
     // Include comment server:
-    // - Always in tag mode (for updating Claude comments)
+    // - Always in tag mode (for updating the tracking comment)
     // - Only with explicit tools in agent mode
     const shouldIncludeCommentServer = !isAgentMode || hasGitHubCommentTools;
 
@@ -122,7 +122,7 @@ export async function prepareMcpConfig(
           GITHUB_TOKEN: githubToken,
           REPO_OWNER: owner,
           REPO_NAME: repo,
-          ...(claudeCommentId && { CLAUDE_COMMENT_ID: claudeCommentId }),
+          ...(trackingCommentId && { TRACKING_COMMENT_ID: trackingCommentId }),
           GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME || "",
           GITHUB_API_URL: GITHUB_API_URL,
         },

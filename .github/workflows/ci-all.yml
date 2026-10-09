@@ -1,10 +1,10 @@
 # Orchestrates all CI workflows - runs on PRs, pushes to main, and manual dispatch
 # Individual test workflows are called as reusable workflows
 #
-# The integration test workflows (test-*.yml) still run the Claude-based
-# executor and authenticate through Anthropic workload identity federation, so
-# they are not called here until they are ported to pi. See
-# docs/pi-port-proposal.md.
+# The integration test workflows (test-*.yml) call a real model with the
+# OPENCODE_API_KEY secret. They are manual dispatch only, and are added here
+# once a manual run has passed on the egress-firewall runner. See
+# docs/development/pi-port-proposal.md, "CI 与集成测试".
 name: CI All
 
 on:

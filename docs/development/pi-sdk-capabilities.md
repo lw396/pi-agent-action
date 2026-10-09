@@ -137,4 +137,4 @@ await session.prompt(promptText);
 - `DefaultResourceLoader` 在 SDK 中如何处理项目信任，即仓库的 `.pi/extensions`、skills、`AGENTS.md` 默认是否加载（M2，配合 restore-config）。
 - 真实 provider 的 cost 计算（M1 集成测试）。Execution file 的形状已在 #7 确定：`message_end` 中助手消息的 `usage` 含 `totalTokens` 和 `cost.total`，`AgentSession.getSessionStats()` 给出整次运行的合计；`test/runner/run-pi.test.ts` 用 faux provider 覆盖。
 
-`enableInstallTelemetry`（默认 `true`）按 pi 的 `settings.md`，控制安装和更新上报，以及部分 provider 的归属请求头。Runner 不走 pi 的安装和更新流程，所以 egress 白名单暂时只加了模型 provider 的主机（`opencode.ai`）；第一次在 firewall runner 上运行 `test-base-action.yml` 时，要确认没有其他请求被拦下。
+`enableInstallTelemetry`（默认 `true`）按 pi 的 `settings.md`，控制安装和更新上报，以及部分 provider 的归属请求头。Runner 不走 pi 的安装和更新流程，所以 egress 白名单暂时只加了模型 provider 的主机（`opencode.ai`）；第一次在 firewall runner 上运行 `test-runner.yml` 时，要确认没有其他请求被拦下。

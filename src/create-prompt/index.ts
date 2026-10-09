@@ -26,7 +26,7 @@ export type { CommonFields, PreparedContext } from "./types";
 const GIT_PUSH_WRAPPER = `${process.env.GITHUB_ACTION_PATH}/scripts/git-push.sh`;
 
 /** Filename for the user request file, read by the SDK runner */
-const USER_REQUEST_FILENAME = "claude-user-request.txt";
+const USER_REQUEST_FILENAME = "user-request.txt";
 
 // Tag mode defaults - these tools are needed for tag mode to function.
 // Edit/MultiEdit/Write are intentionally omitted: acceptEdits permission mode
@@ -103,9 +103,9 @@ export function buildDisallowedToolsString(
 
 export function prepareContext(
   context: ParsedGitHubContext,
-  claudeCommentId: string,
+  trackingCommentId: string,
   baseBranch?: string,
-  claudeBranch?: string,
+  agentBranch?: string,
 ): PreparedContext {
   const repository = context.repository.full_name;
   const eventName = context.eventName;
@@ -148,12 +148,12 @@ export function prepareContext(
   // Create infrastructure fields object
   const commonFields: CommonFields = {
     repository,
-    claudeCommentId,
+    trackingCommentId,
     triggerPhrase,
     ...(triggerUsername && { triggerUsername }),
     ...(triggerUserId && { triggerUserId }),
     ...(prompt && { prompt }),
-    ...(claudeBranch && { claudeBranch }),
+    ...(agentBranch && { agentBranch }),
   };
 
   // Parse event-specific data based on event type
@@ -182,7 +182,7 @@ export function prepareContext(
         prNumber,
         ...(commentId && { commentId }),
         commentBody,
-        ...(claudeBranch && { claudeBranch }),
+        ...(agentBranch && { agentBranch }),
         ...(baseBranch && { baseBranch }),
       };
       break;
@@ -199,7 +199,7 @@ export function prepareContext(
         isPR: true,
         prNumber,
         commentBody,
-        ...(claudeBranch && { claudeBranch }),
+        ...(agentBranch && { agentBranch }),
         ...(baseBranch && { baseBranch }),
       };
       break;
@@ -224,12 +224,12 @@ export function prepareContext(
           isPR: true,
           prNumber,
           commentBody,
-          ...(claudeBranch && { claudeBranch }),
+          ...(agentBranch && { agentBranch }),
           ...(baseBranch && { baseBranch }),
         };
         break;
-      } else if (!claudeBranch) {
-        throw new Error("CLAUDE_BRANCH is required for issue_comment event");
+      } else if (!agentBranch) {
+        throw new Error("AGENT_BRANCH is required for issue_comment event");
       } else if (!baseBranch) {
         throw new Error("BASE_BRANCH is required for issue_comment event");
       } else if (!issueNumber) {
@@ -242,7 +242,7 @@ export function prepareContext(
         eventName: "issue_comment",
         commentId,
         isPR: false,
-        claudeBranch: claudeBranch,
+        agentBranch: agentBranch,
         baseBranch,
         issueNumber,
         commentBody,
@@ -262,8 +262,8 @@ export function prepareContext(
       if (!baseBranch) {
         throw new Error("BASE_BRANCH is required for issues event");
       }
-      if (!claudeBranch) {
-        throw new Error("CLAUDE_BRANCH is required for issues event");
+      if (!agentBranch) {
+        throw new Error("AGENT_BRANCH is required for issues event");
       }
 
       if (eventAction === "assigned") {
@@ -278,7 +278,7 @@ export function prepareContext(
           isPR: false,
           issueNumber,
           baseBranch,
-          claudeBranch,
+          agentBranch,
           ...(assigneeTrigger && { assigneeTrigger }),
         };
       } else if (eventAction === "labeled") {
@@ -291,7 +291,7 @@ export function prepareContext(
           isPR: false,
           issueNumber,
           baseBranch,
-          claudeBranch,
+          agentBranch,
           labelTrigger,
         };
       } else if (eventAction === "opened") {
@@ -301,7 +301,7 @@ export function prepareContext(
           isPR: false,
           issueNumber,
           baseBranch,
-          claudeBranch,
+          agentBranch,
         };
       } else {
         throw new Error(`Unsupported issue action: ${eventAction}`);
@@ -320,7 +320,7 @@ export function prepareContext(
         eventAction: eventAction,
         isPR: true,
         prNumber,
-        ...(claudeBranch && { claudeBranch }),
+        ...(agentBranch && { agentBranch }),
         ...(baseBranch && { baseBranch }),
       };
       break;
@@ -413,7 +413,7 @@ function getCommitInstructions(
       : "";
 
   if (useCommitSigning) {
-    if (eventData.isPR && !eventData.claudeBranch) {
+    if (eventData.isPR && !eventData.agentBranch) {
       return `
       - Push directly using mcp__github_file_ops__commit_files to the existing branch (works for both new and existing files).
       - Use mcp__github_file_ops__commit_files to commit files atomically in a single commit (supports single or multiple files).
@@ -421,7 +421,7 @@ function getCommitInstructions(
       - Use: "${coAuthorLine}"`;
     } else {
       return `
-      - You are already on the correct branch (${eventData.claudeBranch || "the PR branch"}). Do not create a new branch.
+      - You are already on the correct branch (${eventData.agentBranch || "the PR branch"}). Do not create a new branch.
       - Push changes directly to the current branch using mcp__github_file_ops__commit_files (works for both new and existing files)
       - Use mcp__github_file_ops__commit_files to commit files atomically in a single commit (supports single or multiple files).
       - When pushing changes and the trigger user is not "Unknown", include a Co-authored-by trailer in the commit message.
@@ -429,7 +429,7 @@ function getCommitInstructions(
     }
   } else {
     // Non-signing instructions
-    if (eventData.isPR && !eventData.claudeBranch) {
+    if (eventData.isPR && !eventData.agentBranch) {
       return `
       - Use git commands via the Bash tool to commit and push your changes:
         - Stage files: Bash(git add <files>)
@@ -442,9 +442,9 @@ function getCommitInstructions(
         }
         - Push to the remote: Bash(${GIT_PUSH_WRAPPER} origin HEAD)`;
     } else {
-      const branchName = eventData.claudeBranch || eventData.baseBranch;
+      const branchName = eventData.agentBranch || eventData.baseBranch;
       return `
-      - You are already on the correct branch (${eventData.claudeBranch || "the PR branch"}). Do not create a new branch.
+      - You are already on the correct branch (${eventData.agentBranch || "the PR branch"}). Do not create a new branch.
       - Use git commands via the Bash tool to commit and push your changes:
         - Stage files: Bash(git add <files>)
         - Commit with a descriptive message: Bash(git commit -m "<message>")
@@ -565,7 +565,7 @@ ${eventData.isPR && eventData.prNumber ? `pr_number: ${eventData.prNumber}` : ""
 ${!eventData.isPR && eventData.issueNumber ? `issue_number: ${eventData.issueNumber}` : ""}
 trigger: ${triggerContext}
 triggered_by: ${context.triggerUsername ?? "Unknown"}
-claude_comment_id: ${context.claudeCommentId}
+tracking_comment_id: ${context.trackingCommentId}
 </metadata>
 ${
   (eventData.eventName === "issue_comment" ||
@@ -590,7 +590,7 @@ ${
 To review or diff PR changes, compare against \`origin/${eventData.baseBranch}\` (NOT main/master), e.g. \`git diff origin/${eventData.baseBranch}...HEAD\`.`
     : ""
 }
-You cannot submit formal GitHub PR reviews, approve, or merge PRs (security reasons). If asked, politely decline and point to the FAQ: https://github.com/anthropics/claude-code-action/blob/main/docs/faq.md
+You cannot submit formal GitHub PR reviews, approve, or merge PRs (security reasons). If asked, politely decline and point to the FAQ: https://github.com/lw396/pi-agent-action/blob/main/docs/faq.md
 
 Communication:
 - Your ONLY visible output is your GitHub comment - update it with progress and results
@@ -599,10 +599,10 @@ Communication:
 - Use ### headers (not #)
 ${getCommitInstructions(eventData, githubData, context, useCommitSigning)}
 ${
-  eventData.claudeBranch
+  eventData.agentBranch
     ? `
 When done with changes, provide a PR link:
-[Create a PR](${GITHUB_SERVER_URL}/${context.repository}/compare/${eventData.baseBranch}...${eventData.claudeBranch}?quick_pull=1&title=<url-encoded-title>&body=<url-encoded-body>)
+[Create a PR](${GITHUB_SERVER_URL}/${context.repository}/compare/${eventData.baseBranch}...${eventData.agentBranch}?quick_pull=1&title=<url-encoded-title>&body=<url-encoded-body>)
 Use THREE dots (...) between branches. URL-encode all parameters.`
     : ""
 }
@@ -661,7 +661,7 @@ Images have been downloaded from GitHub comments and saved to disk. Their file p
     ? formatBody(contextData.body, imageUrlMap)
     : "No description provided";
 
-  let promptContent = `You are Claude, an AI assistant designed to help with GitHub issues and pull requests. Think carefully as you analyze the context and respond appropriately. Here's the context for your current task:
+  let promptContent = `You are an AI coding agent designed to help with GitHub issues and pull requests. Think carefully as you analyze the context and respond appropriately. Here's the context for your current task:
 
 <formatted_context>
 ${formattedContext}
@@ -697,7 +697,7 @@ ${formattedChangedFiles || "No files changed"}
 <repository>${context.repository}</repository>
 ${eventData.isPR && eventData.prNumber ? `<pr_number>${eventData.prNumber}</pr_number>` : ""}
 ${!eventData.isPR && eventData.issueNumber ? `<issue_number>${eventData.issueNumber}</issue_number>` : ""}
-<claude_comment_id>${context.claudeCommentId}</claude_comment_id>
+<tracking_comment_id>${context.trackingCommentId}</tracking_comment_id>
 <trigger_username>${context.triggerUsername ?? "Unknown"}</trigger_username>
 <trigger_display_name>${githubData.triggerDisplayName ?? context.triggerUsername ?? "Unknown"}</trigger_display_name>
 <trigger_phrase>${context.triggerPhrase}</trigger_phrase>
@@ -772,7 +772,7 @@ ${eventData.eventName === "issue_comment" || eventData.eventName === "pull_reque
       - If you discover related tasks (e.g., updating tests), add them to the todo list.
       - Mark each subtask as completed as you progress.${getCommitInstructions(eventData, githubData, context, useCommitSigning)}
       ${
-        eventData.claudeBranch
+        eventData.agentBranch
           ? `- Provide a URL to create a PR manually in this format:
         [Create a PR](${GITHUB_SERVER_URL}/${context.repository}/compare/${eventData.baseBranch}...<branch-name>?quick_pull=1&title=<url-encoded-title>&body=<url-encoded-body>)
         - IMPORTANT: Use THREE dots (...) between branch names, not two (..)
@@ -781,7 +781,7 @@ ${eventData.eventName === "issue_comment" || eventData.eventName === "pull_reque
         - IMPORTANT: Ensure all URL parameters are properly encoded - spaces should be encoded as %20, not left as spaces
           Example: Instead of "fix: update welcome message", use "fix%3A%20update%20welcome%20message"
         - The target-branch should be '${eventData.baseBranch}'.
-        - The branch-name is the current branch: ${eventData.claudeBranch}
+        - The branch-name is the current branch: ${eventData.agentBranch}
         - The body should include:
           - A clear description of the changes
           - Reference to the original ${eventData.isPR ? "PR" : "issue"}
@@ -801,9 +801,9 @@ ${eventData.eventName === "issue_comment" || eventData.eventName === "pull_reque
 5. Final Update:
    - Always update the GitHub comment to reflect the current todo state.
    - When all todos are completed, remove the spinner and add a brief summary of what was accomplished, and what was not done.
-   - Note: If you see previous Claude comments with headers like "**Claude finished @user's task**" followed by "---", do not include this in your comment. The system adds this automatically.
+   - Note: If you see your previous comments with headers like "**pi finished @user's task**" followed by "---", do not include this in your comment. The system adds this automatically.
    - If you changed any files locally, you must update them in the remote branch via ${useCommitSigning ? "mcp__github_file_ops__commit_files" : "git commands (add, commit, push)"} before saying that you're done.
-   ${eventData.claudeBranch ? `- If you created anything in your branch, your comment must include the PR URL with prefilled title and body mentioned above.` : ""}
+   ${eventData.agentBranch ? `- If you created anything in your branch, your comment must include the PR URL with prefilled title and body mentioned above.` : ""}
 
 Important Notes:
 - All communication must happen through GitHub PR comments.
@@ -811,7 +811,7 @@ Important Notes:
 - This includes ALL responses: code reviews, answers to questions, progress updates, and final results.${eventData.isPR ? `\n- PR CRITICAL: After reading files and forming your response, you MUST post it by calling mcp__github_comment__update_comment. Do NOT just respond with a normal response, the user will not see it.` : ""}
 - You communicate exclusively by editing your single comment - not through any other means.
 - Use this spinner HTML when work is in progress: <img src="https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f" width="14px" height="14px" style="vertical-align: middle; margin-left: 4px;" />
-${eventData.isPR && !eventData.claudeBranch ? `- Always push to the existing branch when triggered on a PR.` : `- IMPORTANT: You are already on the correct branch (${eventData.claudeBranch || "the created branch"}). Never create new branches when triggered on issues or closed/merged PRs.`}
+${eventData.isPR && !eventData.agentBranch ? `- Always push to the existing branch when triggered on a PR.` : `- IMPORTANT: You are already on the correct branch (${eventData.agentBranch || "the created branch"}). Never create new branches when triggered on issues or closed/merged PRs.`}
 ${
   useCommitSigning
     ? `- Use mcp__github_file_ops__commit_files for making commits (works for both new and existing files, single or multiple). Use mcp__github_file_ops__delete_files for deleting files (supports deleting single or multiple files atomically), or mcp__github__delete_file for deleting a single file. Edit files locally, and the tool will read the content from the same path on disk.
@@ -854,7 +854,7 @@ What You CANNOT Do:
 - Modify files in the .github/workflows directory (GitHub App permissions do not allow workflow modifications)
 
 When users ask you to perform actions you cannot do, politely explain the limitation and, when applicable, direct them to the FAQ for more information and workarounds:
-"I'm unable to [specific action] due to [reason]. You can find more information and potential workarounds in the [FAQ](https://github.com/anthropics/claude-code-action/blob/main/docs/faq.md)."
+"I'm unable to [specific action] due to [reason]. You can find more information and potential workarounds in the [FAQ](https://github.com/lw396/pi-agent-action/blob/main/docs/faq.md)."
 
 If a user asks for something outside these capabilities (and you have no other tools provided), politely explain that you cannot perform that action and suggest an alternative approach if possible.
 
@@ -882,9 +882,9 @@ f. If you are unable to complete certain steps, such as running a linter or test
  *          or null for assigned/labeled events without an explicit trigger in the body
  *
  * @example
- * // Comment event: "@claude /review-pr" -> returns "/review-pr"
- * // Issue body with "@claude fix this" -> returns "fix this"
- * // Issue assigned without @claude in body -> returns null
+ * // Comment event: "@pi /review-pr" -> returns "/review-pr"
+ * // Issue body with "@pi fix this" -> returns "fix this"
+ * // Issue assigned without @pi in body -> returns null
  */
 function extractUserRequestFromContext(
   context: PreparedContext,
@@ -922,26 +922,26 @@ function extractUserRequestFromContext(
 export async function createPrompt(
   commentId: number,
   baseBranch: string | undefined,
-  claudeBranch: string | undefined,
+  agentBranch: string | undefined,
   githubData: FetchDataResult,
   context: ParsedGitHubContext,
 ) {
   try {
-    const claudeCommentId = commentId.toString();
+    const trackingCommentId = commentId.toString();
 
     const preparedContext = prepareContext(
       context,
-      claudeCommentId,
+      trackingCommentId,
       baseBranch,
-      claudeBranch,
+      agentBranch,
     );
 
     // Clear any stale prompt files from a prior invocation. RUNNER_TEMP is documented
     // to be emptied between jobs, but on non-ephemeral self-hosted runners this is
-    // not reliably honored — a stale claude-user-request.txt left behind by a prior
+    // not reliably honored — a stale user-request.txt left behind by a prior
     // mention-mode invocation would not be overwritten by a subsequent agent-mode
     // invocation, and would leak into the model's context.
-    const promptDir = `${process.env.RUNNER_TEMP || "/tmp"}/claude-prompts`;
+    const promptDir = `${process.env.RUNNER_TEMP || "/tmp"}/pi-prompts`;
     await rm(promptDir, { recursive: true, force: true });
     await mkdir(promptDir, { recursive: true });
 
@@ -959,10 +959,10 @@ export async function createPrompt(
     console.log("=======================");
 
     // Write the prompt file
-    await writeFile(`${promptDir}/claude-prompt.txt`, promptContent);
+    await writeFile(`${promptDir}/prompt.txt`, promptContent);
 
     // Extract and write the user request separately for SDK multi-block messaging
-    // This allows the CLI to process slash commands (e.g., "@claude /review-pr")
+    // This allows the CLI to process slash commands (e.g., "@pi /review-pr")
     const userRequest = extractUserRequestFromContext(
       preparedContext,
       githubData,
@@ -975,7 +975,7 @@ export async function createPrompt(
     }
 
     // NOTE: these env var exports are dead — nothing reads ALLOWED_TOOLS / DISALLOWED_TOOLS.
-    // The live path is modes/tag/index.ts which builds --allowedTools into claudeArgs directly.
+    // The live path is modes/tag/index.ts which passes the allowed tools to the Runner directly.
     // Kept only so the H1 report's pointed-to file stays in sync with the live fix.
     const hasActionsReadPermission = false;
 

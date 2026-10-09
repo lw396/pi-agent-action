@@ -14,7 +14,7 @@ import {
 } from "./mockContext";
 
 const BASE_ENV = {
-  CLAUDE_COMMENT_ID: "12345",
+  TRACKING_COMMENT_ID: "12345",
   GITHUB_TOKEN: "test-token",
 };
 
@@ -36,7 +36,7 @@ describe("parseEnvVarsWithContext", () => {
         process.env = {
           ...BASE_ENV,
           BASE_BRANCH: "main",
-          CLAUDE_BRANCH: "claude/issue-67890-20240101-1200",
+          AGENT_BRANCH: "claude/issue-67890-20240101-1200",
         };
       });
 
@@ -49,7 +49,7 @@ describe("parseEnvVarsWithContext", () => {
         );
 
         expect(result.repository).toBe("test-owner/test-repo");
-        expect(result.claudeCommentId).toBe("12345");
+        expect(result.trackingCommentId).toBe("12345");
         expect(result.triggerPhrase).toBe("@claude");
         expect(result.triggerUsername).toBe("contributor-user");
         expect(result.eventData.eventName).toBe("issue_comment");
@@ -60,7 +60,7 @@ describe("parseEnvVarsWithContext", () => {
         ) {
           expect(result.eventData.issueNumber).toBe("55");
           expect(result.eventData.commentId).toBe("12345678");
-          expect(result.eventData.claudeBranch).toBe(
+          expect(result.eventData.agentBranch).toBe(
             "claude/issue-67890-20240101-1200",
           );
           expect(result.eventData.baseBranch).toBe("main");
@@ -70,10 +70,10 @@ describe("parseEnvVarsWithContext", () => {
         }
       });
 
-      test("should throw error when CLAUDE_BRANCH is missing", () => {
+      test("should throw error when AGENT_BRANCH is missing", () => {
         expect(() =>
           prepareContext(mockIssueCommentContext, "12345", "main"),
-        ).toThrow("CLAUDE_BRANCH is required for issue_comment event");
+        ).toThrow("AGENT_BRANCH is required for issue_comment event");
       });
 
       test("should throw error when BASE_BRANCH is missing", () => {
@@ -171,7 +171,7 @@ describe("parseEnvVarsWithContext", () => {
       process.env = {
         ...BASE_ENV,
         BASE_BRANCH: "main",
-        CLAUDE_BRANCH: "claude/issue-42-20240101-1200",
+        AGENT_BRANCH: "claude/issue-42-20240101-1200",
       };
     });
 
@@ -192,7 +192,7 @@ describe("parseEnvVarsWithContext", () => {
       ) {
         expect(result.eventData.issueNumber).toBe("42");
         expect(result.eventData.baseBranch).toBe("main");
-        expect(result.eventData.claudeBranch).toBe(
+        expect(result.eventData.agentBranch).toBe(
           "claude/issue-42-20240101-1200",
         );
       }
@@ -215,17 +215,17 @@ describe("parseEnvVarsWithContext", () => {
       ) {
         expect(result.eventData.issueNumber).toBe("123");
         expect(result.eventData.baseBranch).toBe("main");
-        expect(result.eventData.claudeBranch).toBe(
+        expect(result.eventData.agentBranch).toBe(
           "claude/issue-123-20240101-1200",
         );
         expect(result.eventData.assigneeTrigger).toBe("@claude-bot");
       }
     });
 
-    test("should throw error when CLAUDE_BRANCH is missing for issues", () => {
+    test("should throw error when AGENT_BRANCH is missing for issues", () => {
       expect(() =>
         prepareContext(mockIssueOpenedContext, "12345", "main"),
-      ).toThrow("CLAUDE_BRANCH is required for issues event");
+      ).toThrow("AGENT_BRANCH is required for issues event");
     });
 
     test("should throw error when BASE_BRANCH is missing for issues", () => {
@@ -302,7 +302,7 @@ describe("parseEnvVarsWithContext", () => {
 
       // Verify context is created without legacy fields
       expect(result.repository).toBe("test-owner/test-repo");
-      expect(result.claudeCommentId).toBe("12345");
+      expect(result.trackingCommentId).toBe("12345");
       expect(result.triggerPhrase).toBe("/claude");
       expect((result as any).customInstructions).toBeUndefined();
       expect((result as any).allowedTools).toBeUndefined();

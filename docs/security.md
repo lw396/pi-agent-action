@@ -126,7 +126,7 @@ This is general guidance for these event types — see [GitHub's documentation](
 
 ### Which files come from the base branch on pull requests
 
-When the action runs against a pull request, it restores a fixed list of agent configuration paths from the PR base branch before starting the agent: `.pi/`, `.agents/`, `AGENTS.md`, `AGENTS.MD`, `AGENTS.override.md`, `CLAUDE.md`, `CLAUDE.MD`, `CLAUDE.local.md`, `.claude/`, `.mcp.json`, `.claude.json`, `.gitmodules`, `.ripgreprc`, and `.husky/`. pi reads its settings, extensions, skills and context files from these paths. Paths in that list that do not exist on the base branch are removed, and the PR-authored versions are kept under `.claude-pr/` for reference only.
+When the action runs against a pull request, it restores a fixed list of agent configuration paths from the PR base branch before starting the agent: `.pi/`, `.agents/`, `AGENTS.md`, `AGENTS.MD`, `AGENTS.override.md`, `CLAUDE.md`, `CLAUDE.MD`, `CLAUDE.local.md`, `.claude/`, `.mcp.json`, `.claude.json`, `.gitmodules`, `.ripgreprc`, and `.husky/`. pi reads its settings, extensions, skills and context files from these paths. Paths in that list that do not exist on the base branch are removed, and the PR-authored versions are kept under `.pi-pr/` for reference only.
 
 Everything else in the working tree — including `package.json`, lockfiles, `Makefile`, `node_modules/`, and formatter/linter config files — stays at the PR head. If an extension or skill on the base branch runs a package-manager script (`bun run …`, `npm run …`, `yarn …`, `pnpm run …`), a `make` target, a repo-relative script, or a tool that loads executable project config, that command resolves through files the pull request supplies. Keep such commands self-contained: invoke the tool directly with a pinned version and pass its configuration on the command line (for example `bunx prettier@3.5.3 --no-config --write .` rather than `bun run format`).
 
@@ -142,7 +142,7 @@ In its default configuration, **the agent does not create pull requests automati
 
 This design ensures that users retain full control over what pull requests are created and can review the changes before initiating the PR workflow.
 
-## ⚠️ Prompt Injection Risks
+## Prompt Injection Risks
 
 **Beware of potential hidden markdown when tagging the agent on untrusted content.** External contributors may include hidden instructions through HTML comments, invisible characters, hidden attributes, or other techniques. The action sanitizes content by stripping HTML comments, invisible characters, markdown image alt text, hidden HTML attributes, and HTML entities, but new bypass techniques may emerge. We recommend reviewing the raw content of all input coming from external contributors before allowing the agent to process it.
 
@@ -150,7 +150,7 @@ On public repos, you can also use `include_comments_by_actor` to allowlist which
 
 ## GitHub App Permissions
 
-Without a `github_token` input, the action exchanges the workflow's GitHub OIDC token (the job needs `id-token: write`) at this project's token exchange service for a token of the [pi-agent-action app](https://github.com/apps/pi-agent-action). The service issues a token only for the repository the workflow runs in, and only when the workflow file matches the version on the default branch; see [ADR-0003](./adr/0003-own-github-app-token-exchange.md). The app has these permissions:
+Without a `github_token` input, the action exchanges the workflow's GitHub OIDC token (the job needs `id-token: write`) at this project's token exchange service for a token of the [pi-agent-action app](https://github.com/apps/pi-agent-action). The service issues a token only for the repository the workflow runs in, and only when the workflow file matches the version on the default branch; see [ADR-0003](./development/adr/0003-own-github-app-token-exchange.md). The app has these permissions:
 
 - **Contents** (Read & Write): For reading repository files and creating branches
 - **Pull Requests** (Read & Write): For reading PR data and creating/updating pull requests
@@ -222,7 +222,7 @@ Commits will show as verified and attributed to the GitHub account that owns the
 
 **Note:** If both `ssh_signing_key` and `use_commit_signing` are provided, `ssh_signing_key` takes precedence.
 
-## ⚠️ Authentication Protection
+## Authentication Protection
 
 **CRITICAL: Never hardcode your provider API key in workflow files!**
 
@@ -241,7 +241,7 @@ env:
   OPENAI_API_KEY: "sk-..." # Exposed and vulnerable!
 ```
 
-## ⚠️ Full Output Security Warning
+## Full Output Security Warning
 
 The `show_full_output` option is **disabled by default** for security reasons. When enabled, it logs every pi event — model responses, tool calls and tool results — including:
 

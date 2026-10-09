@@ -403,7 +403,7 @@ runs:
         ALLOWED_BASH_ENV: ${{ inputs.allowed_bash_env }}
 
         # Prompt file written by the mode's prepare step, and report settings
-        INPUT_PROMPT_FILE: ${{ runner.temp }}/claude-prompts/claude-prompt.txt
+        INPUT_PROMPT_FILE: ${{ runner.temp }}/pi-prompts/prompt.txt
         INPUT_SHOW_FULL_OUTPUT: ${{ inputs.show_full_output }}
         DISPLAY_REPORT: ${{ inputs.display_report }}
 
