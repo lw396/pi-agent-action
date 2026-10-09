@@ -1,3 +1,4 @@
+import * as core from "@actions/core";
 import type {
   Api,
   ClassifierApi,
@@ -66,7 +67,7 @@ type Choice =
 
 /** Log why comments cannot be classified; every comment is then posted. */
 function postAll(reason: string): null {
-  console.log(`${reason} — posting all unconfirmed comments`);
+  core.info(`${reason} — posting all unconfirmed comments`);
   return null;
 }
 
@@ -98,8 +99,8 @@ function chooseModel(
     if (classifier) return { kind: "classifier", model: classifier };
     const chat = resolveCliModel({ cliModel: classifyModel, modelRuntime });
     if (chat.model) return { kind: "chat", model: chat.model };
-    postAll(
-      `::warning::classify_model '${classifyModel}' is not a model pi knows (${chat.error})`,
+    core.warning(
+      `classify_model '${classifyModel}' is not a model pi knows (${chat.error}) — posting all unconfirmed comments`,
     );
     return undefined;
   }
@@ -112,7 +113,7 @@ function logUsage(model: { provider: string; id: string }, usage?: Usage) {
   const spend = usage
     ? `${usage.totalTokens} tokens, cost $${usage.cost.total.toFixed(4)}`
     : "usage not reported";
-  console.log(
+  core.info(
     `Classified inline comments with ${model.provider}/${model.id}: ${spend}`,
   );
 }

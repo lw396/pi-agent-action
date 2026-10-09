@@ -13,7 +13,7 @@ export function getExecutionFilePath(): string | undefined {
 }
 
 export async function writeExecutionFile(
-  messages: unknown[],
+  records: unknown[],
 ): Promise<string | undefined> {
   const executionFile = getExecutionFilePath();
   if (!executionFile) {
@@ -22,8 +22,8 @@ export async function writeExecutionFile(
   }
 
   try {
-    await writeFile(executionFile, JSON.stringify(messages, null, 2));
-    console.log(`Log saved to ${executionFile}`);
+    await writeFile(executionFile, JSON.stringify(records, null, 2));
+    core.info(`Log saved to ${executionFile}`);
     return executionFile;
   } catch (error) {
     core.warning(`Failed to write execution file: ${error}`);

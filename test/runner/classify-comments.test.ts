@@ -1,6 +1,7 @@
 // classifyComments(): the classification of buffered inline comments, run
 // through pi's ModelRuntime with a scripted provider instead of a real model.
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import * as core from "@actions/core";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import {
   envApiKeyAuth,
   fauxAssistantMessage,
@@ -109,16 +110,26 @@ async function harness(setup: Setup): Promise<Harness> {
 
 let savedKey: string | undefined;
 let logs: string[];
-let originalLog: typeof console.log;
+let warnings: string[];
+let restoreLogs: () => void;
 beforeEach(() => {
   savedKey = process.env.FAUX_TEST_API_KEY;
   process.env.FAUX_TEST_API_KEY = "key-from-the-environment";
   logs = [];
-  originalLog = console.log;
-  console.log = (...args: unknown[]) => logs.push(args.join(" "));
+  warnings = [];
+  const info = spyOn(core, "info").mockImplementation((m) => {
+    logs.push(m);
+  });
+  const warning = spyOn(core, "warning").mockImplementation((m) => {
+    warnings.push(String(m));
+  });
+  restoreLogs = () => {
+    info.mockRestore();
+    warning.mockRestore();
+  };
 });
 afterEach(() => {
-  console.log = originalLog;
+  restoreLogs();
   if (savedKey === undefined) delete process.env.FAUX_TEST_API_KEY;
   else process.env.FAUX_TEST_API_KEY = savedKey;
 });
@@ -226,7 +237,9 @@ describe("classifyComments", () => {
           modelRuntime: h.modelRuntime,
         }),
       ).toBeNull();
-      expect(logs.join("\n")).toContain("::warning::");
+      expect(warnings.join("\n")).toContain(
+        "classify_model 'no-such-provider/model' is not a model pi knows",
+      );
       expect(h.classifyCalls).toHaveLength(0);
       expect(h.chatCalls()).toBe(0);
     });

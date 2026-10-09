@@ -1,5 +1,6 @@
 // Runner seam (issue #7): runPi() driven end to end by pi's faux provider.
 // See ./harness.ts for the scratch setup.
+import * as core from "@actions/core";
 import { describe, expect, spyOn, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -373,7 +374,7 @@ describe("runPi", () => {
         fauxAssistantMessage("Printed it."),
       ]);
       await writePrompt("Print the token.");
-      const log = spyOn(console, "log").mockImplementation(() => {});
+      const log = spyOn(core, "info").mockImplementation(() => {});
       try {
         await runPi(getScratch().promptPath, {
           model,

@@ -95,7 +95,11 @@ export type RunnerOptions = {
 };
 
 export type RunnerResult = {
-  conclusion: "success" | "failure";
+  /**
+   * Always "success": a failed run throws instead. Kept so run.ts reads the
+   * result as Upstream's does.
+   */
+  conclusion: "success";
   executionFile?: string;
   sessionId?: string;
   structuredOutput?: string;
@@ -225,7 +229,7 @@ export async function runPi(
     structuredOutput,
   );
   records.push({ type: "session_stats", ...stats });
-  console.log(
+  core.info(
     `pi used ${stats.tokens.total} tokens in ${stats.assistantMessages} responses, cost $${stats.cost.toFixed(4)}`,
   );
 
@@ -327,11 +331,11 @@ function recordEvents(
     if (OMITTED_EVENTS.has(event.type)) return;
     records.push(event);
     if (showFullOutput) {
-      console.log(redactSecrets(JSON.stringify(event, null, 2)));
+      core.info(redactSecrets(JSON.stringify(event, null, 2)));
     }
   });
   if (!showFullOutput) {
-    console.log(
+    core.info(
       "Running pi (full output hidden for security). Rerun in debug mode or set show_full_output: true for every event in the log.",
     );
   }
@@ -401,7 +405,7 @@ async function expandRequestedCommand(
   }
   const expanded = expandSlashCommand(request, sources);
   if (expanded) {
-    console.log(`Expanded ${request.trim().split(/\s/)[0]} from the request`);
+    core.info(`Expanded ${request.trim().split(/\s/)[0]} from the request`);
   }
   return expanded;
 }

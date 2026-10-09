@@ -64,42 +64,42 @@ const UPSTREAM_ONLY_TOOLS = new Set([
  * shell-quoted --allowedTools value, are removed.
  */
 function splitRules(text: string, inputName: string): string[] {
-  const source = stripCommentLines(text);
   const rules: string[] = [];
   let current = "";
+  // Open parentheses. Inside a pattern every character is kept, quotes and
+  // separators included: `Bash(echo "a, b")` is one rule.
   let depth = 0;
+  // The quote a rule is wrapped in. Separators inside it are kept; the quote
+  // characters themselves are dropped.
   let quote: string | undefined;
-  const flush = () => {
-    if (current) rules.push(current);
-    current = "";
-  };
-  for (const char of source) {
+
+  for (const char of stripCommentLines(text)) {
     if (depth > 0) {
       if (char === "(") depth++;
-      if (char === ")") depth--;
+      else if (char === ")") depth--;
+      current += char;
+    } else if (char === "(") {
+      depth++;
       current += char;
     } else if (quote) {
       if (char === quote) quote = undefined;
-      else if (char === "(") {
-        depth++;
-        current += char;
-      } else current += char;
+      else current += char;
     } else if (char === '"' || char === "'") {
       quote = char;
     } else if (char === "," || /\s/.test(char)) {
-      flush();
+      if (current) rules.push(current);
+      current = "";
+    } else if (char === ")") {
+      throw new Error(`Invalid ${inputName}: unmatched ')' in '${current})'`);
     } else {
-      if (char === "(") depth++;
-      if (char === ")") {
-        throw new Error(`Invalid ${inputName}: unmatched ')' in '${current})'`);
-      }
       current += char;
     }
   }
+
   if (depth > 0) {
     throw new Error(`Invalid ${inputName}: unmatched '(' in '${current}'`);
   }
-  flush();
+  if (current) rules.push(current);
   return rules;
 }
 

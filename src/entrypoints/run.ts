@@ -233,6 +233,7 @@ async function run() {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     executionFile ??= setExecutionFileOutputIfPresent();
+    core.setOutput("conclusion", "failure");
     // Only mark as prepare failure if we haven't completed the prepare phase
     if (!prepareCompleted) {
       prepareSuccess = false;

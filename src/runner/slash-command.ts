@@ -11,6 +11,8 @@ import {
  */
 export const USER_REQUEST_FILENAME = "user-request.txt";
 
+const SKILL_PREFIX = "/skill:";
+
 /** The skills and prompt templates pi loaded for the session. */
 export type SlashCommandSources = {
   getSkills(): { skills: Skill[] };
@@ -35,7 +37,7 @@ export function expandSlashCommand(
   sources: SlashCommandSources,
 ): string | undefined {
   const text = request.trim();
-  if (text.startsWith("/skill:")) return expandSkill(text, sources);
+  if (text.startsWith(SKILL_PREFIX)) return expandSkill(text, sources);
   if (text.startsWith("/")) return expandTemplate(text, sources);
   return undefined;
 }
@@ -46,7 +48,8 @@ function expandSkill(
   sources: SlashCommandSources,
 ): string | undefined {
   const spaceIndex = text.indexOf(" ");
-  const name = spaceIndex === -1 ? text.slice(7) : text.slice(7, spaceIndex);
+  const nameEnd = spaceIndex === -1 ? undefined : spaceIndex;
+  const name = text.slice(SKILL_PREFIX.length, nameEnd);
   const args = spaceIndex === -1 ? "" : text.slice(spaceIndex + 1).trim();
   const skill = sources.getSkills().skills.find((s) => s.name === name);
   if (!skill) return undefined;
