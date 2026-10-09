@@ -7,8 +7,7 @@ import {
   setupSshSigning,
 } from "../../github/operations/git-config";
 import { checkHumanActor } from "../../github/validation/actor";
-import type { GitHubContext } from "../../github/context";
-import type { Octokits } from "../../github/api/client";
+import type { PrepareOptions, PrepareResult } from "../types";
 
 /**
  * Prepares the agent mode execution context.
@@ -21,11 +20,8 @@ export async function prepareAgentMode({
   context,
   octokit,
   githubToken,
-}: {
-  context: GitHubContext;
-  octokit: Octokits;
-  githubToken: string;
-}) {
+  allowedToolsInput,
+}: PrepareOptions): Promise<PrepareResult> {
   // Check if actor is human (prevents bot-triggered loops)
   await checkHumanActor(octokit.rest, context);
 
@@ -90,7 +86,7 @@ export async function prepareAgentMode({
   await writeFile(`${promptDir}/prompt.txt`, promptContent);
 
   // The allowed_tools input decides which of the action's MCP servers start
-  const allowedTools = ruleToolNames(process.env.INPUT_ALLOWED_TOOLS);
+  const allowedTools = ruleToolNames(allowedToolsInput);
 
   // Check for branch info from environment variables (useful for auto-fix workflows)
   const agentBranch = process.env.AGENT_BRANCH || undefined;
@@ -126,7 +122,7 @@ export async function prepareAgentMode({
     },
     mcpConfig: ourMcpConfig,
     // Agent mode adds no rules of its own: allowed_tools alone decides.
-    allowedTools: [] as string[],
+    allowedTools: [],
     acceptEdits: false,
     readOnlyGit: false,
   };

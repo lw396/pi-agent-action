@@ -17,6 +17,7 @@ import {
 import { detectMode } from "../modes/detector";
 import { prepareTagMode } from "../modes/tag";
 import { prepareAgentMode } from "../modes/agent";
+import { readRunnerInputs } from "../runner/run-plan";
 import { checkContainsTrigger } from "../github/validation/trigger";
 import { collectActionInputsPresence } from "./collect-inputs";
 
@@ -79,10 +80,16 @@ async function run() {
     console.log(
       `Preparing with mode: ${modeName} for event: ${context.eventName}`,
     );
+    const prepareOptions = {
+      context,
+      octokit,
+      githubToken,
+      allowedToolsInput: readRunnerInputs(process.env).allowedTools,
+    };
     if (modeName === "tag") {
-      await prepareTagMode({ context, octokit, githubToken });
+      await prepareTagMode(prepareOptions);
     } else {
-      await prepareAgentMode({ context, octokit, githubToken });
+      await prepareAgentMode(prepareOptions);
     }
 
     // MCP config is handled by individual modes (tag/agent) and included in their claude_args output

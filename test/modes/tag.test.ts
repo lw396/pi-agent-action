@@ -11,6 +11,7 @@ import * as mcp from "../../src/mcp/install-mcp-server";
 import * as gitConfig from "../../src/github/operations/git-config";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { runPi } from "../../src/runner/run-pi";
+import { readRunnerInputs, runnerOptions } from "../../src/runner/run-plan";
 import { fauxRuntime, readExecutionFile, useScratch } from "../runner/harness";
 
 describe("Tag Mode", () => {
@@ -78,6 +79,7 @@ describe("Tag Mode", () => {
         context,
         octokit: {} as any,
         githubToken: "test-token",
+        allowedToolsInput: undefined,
       });
 
       expect(configureGitAuthSpy).toHaveBeenCalledTimes(1);
@@ -100,6 +102,7 @@ describe("Tag Mode", () => {
         context,
         octokit: {} as any,
         githubToken: "test-token",
+        allowedToolsInput: undefined,
       });
 
       expect(configureGitAuthSpy).not.toHaveBeenCalled();
@@ -116,6 +119,7 @@ describe("Tag Mode", () => {
         context: { ...mockIssueCommentContext },
         octokit: {} as any,
         githubToken: "test-token",
+        allowedToolsInput: undefined,
       });
 
       expect(result.allowedTools).toEqual(
@@ -143,6 +147,7 @@ describe("Tag Mode", () => {
         },
         octokit: {} as any,
         githubToken: "test-token",
+        allowedToolsInput: undefined,
       });
 
       expect(result.allowedTools).toEqual(
@@ -155,17 +160,13 @@ describe("Tag Mode", () => {
     });
 
     test("starts the MCP servers for the action's tools that allowed_tools names", async () => {
-      process.env.INPUT_ALLOWED_TOOLS =
-        "Bash(npm test), mcp__github_inline_comment__create_inline_comment";
-      try {
-        await prepareTagMode({
-          context: { ...mockIssueCommentContext },
-          octokit: {} as any,
-          githubToken: "test-token",
-        });
-      } finally {
-        delete process.env.INPUT_ALLOWED_TOOLS;
-      }
+      await prepareTagMode({
+        context: { ...mockIssueCommentContext },
+        octokit: {} as any,
+        githubToken: "test-token",
+        allowedToolsInput:
+          "Bash(npm test), mcp__github_inline_comment__create_inline_comment",
+      });
 
       const { allowedTools } = prepareMcpConfigSpy.mock.calls[0][0];
       expect(allowedTools).toContain(
@@ -229,18 +230,17 @@ describe("Tag Mode", () => {
           context: { ...mockIssueCommentContext },
           octokit: {} as any,
           githubToken: "test-token",
+          allowedToolsInput: undefined,
         });
       } finally {
         for (const spy of spies) spy.mockRestore();
       }
 
       const result = await runPi(promptPath, {
+        ...runnerOptions(readRunnerInputs({}), prepared),
         model,
         cwd,
         modelRuntime,
-        allowedTools: prepared.allowedTools.join("\n"),
-        acceptEdits: prepared.acceptEdits,
-        readOnlyGit: prepared.readOnlyGit,
       });
 
       // Calls run in parallel: match each result to its command.

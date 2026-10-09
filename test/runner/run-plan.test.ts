@@ -1,0 +1,115 @@
+// The Runner's options, built from the env vars action.yml sets from the
+// inputs and from what the mode adds.
+import { describe, expect, test } from "bun:test";
+import {
+  readRunnerInputs,
+  runnerOptions,
+  type ModeRunSettings,
+} from "../../src/runner/run-plan";
+
+const NO_MODE_SETTINGS: ModeRunSettings = {
+  allowedTools: [],
+  acceptEdits: false,
+  readOnlyGit: false,
+  mcpConfig: "{}",
+};
+
+describe("readRunnerInputs", () => {
+  test("reads each input from its env var", () => {
+    const inputs = readRunnerInputs({
+      INPUT_PROMPT_FILE: "/prompts/custom.txt",
+      MODEL: "openai/gpt-5",
+      API_KEY: "key",
+      PI_ARGS: "--thinking high",
+      INPUT_ALLOWED_TOOLS: "Bash(npm test)",
+      INPUT_DISALLOWED_TOOLS: "WebFetch",
+      JSON_SCHEMA: '{"type":"object"}',
+      ALLOWED_BASH_ENV: "NPM_TOKEN",
+    });
+
+    expect(inputs).toEqual({
+      promptFile: "/prompts/custom.txt",
+      model: "openai/gpt-5",
+      apiKey: "key",
+      piArgs: "--thinking high",
+      allowedTools: "Bash(npm test)",
+      disallowedTools: "WebFetch",
+      jsonSchema: '{"type":"object"}',
+      isolateBash: false,
+      allowedBashEnv: "NPM_TOKEN",
+      showFullOutput: false,
+    });
+  });
+
+  test("defaults to the prompt file the modes write under RUNNER_TEMP", () => {
+    expect(readRunnerInputs({ RUNNER_TEMP: "/runner/temp" }).promptFile).toBe(
+      "/runner/temp/pi-prompts/prompt.txt",
+    );
+  });
+
+  test.each([
+    [{}, false],
+    [{ ALLOWED_NON_WRITE_USERS: "*" }, true],
+    [{ ALLOWED_NON_WRITE_USERS: "alice", SUBPROCESS_ISOLATION: "true" }, true],
+    [{ ALLOWED_NON_WRITE_USERS: "*", SUBPROCESS_ISOLATION: "false" }, false],
+    [{ SUBPROCESS_ISOLATION: "true" }, false],
+  ])("isolates bash only for untrusted input: %p", (env, isolated) => {
+    expect(readRunnerInputs(env).isolateBash).toBe(isolated);
+  });
+
+  test.each([
+    [{}, false],
+    [{ INPUT_SHOW_FULL_OUTPUT: "true" }, true],
+    [{ INPUT_SHOW_FULL_OUTPUT: "false" }, false],
+    [{ RUNNER_DEBUG: "1" }, true],
+  ])(
+    "shows full output with show_full_output or a debug rerun: %p",
+    (env, shown) => {
+      expect(readRunnerInputs(env).showFullOutput).toBe(shown);
+    },
+  );
+});
+
+describe("runnerOptions", () => {
+  test("puts the mode's rules before the allowed_tools input", () => {
+    const options = runnerOptions(
+      readRunnerInputs({ INPUT_ALLOWED_TOOLS: "Bash(npm test)" }),
+      { ...NO_MODE_SETTINGS, allowedTools: ["Read", "Bash(git add:*)"] },
+    );
+
+    expect(options.allowedTools).toBe("Read\nBash(git add:*)\nBash(npm test)");
+  });
+
+  test("passes the mode's settings and the action's MCP servers", () => {
+    const server = { command: "bun", args: ["server.ts"] };
+    const options = runnerOptions(readRunnerInputs({}), {
+      allowedTools: [],
+      acceptEdits: true,
+      readOnlyGit: true,
+      mcpConfig: JSON.stringify({ mcpServers: { github_comment: server } }),
+    });
+
+    expect(options.acceptEdits).toBe(true);
+    expect(options.readOnlyGit).toBe(true);
+    expect(options.mcpServers).toEqual({ github_comment: server });
+  });
+
+  test("passes the inputs through", () => {
+    const options = runnerOptions(
+      readRunnerInputs({
+        MODEL: "openai/gpt-5",
+        INPUT_DISALLOWED_TOOLS: "WebFetch",
+        ALLOWED_NON_WRITE_USERS: "*",
+        INPUT_SHOW_FULL_OUTPUT: "true",
+      }),
+      NO_MODE_SETTINGS,
+    );
+
+    expect(options).toMatchObject({
+      model: "openai/gpt-5",
+      disallowedTools: "WebFetch",
+      isolateBash: true,
+      showFullOutput: true,
+    });
+  });
+});

@@ -75,18 +75,18 @@ describe("Agent Mode", () => {
     } as any;
 
     try {
-      process.env.INPUT_ALLOWED_TOOLS =
-        "Bash(git status), mcp__github_comment__update_comment";
       const withTools = await prepareAgentMode({
         context,
         octokit: mockOctokit,
         githubToken: "test-token",
+        allowedToolsInput:
+          "Bash(git status), mcp__github_comment__update_comment",
       });
-      delete process.env.INPUT_ALLOWED_TOOLS;
       const withoutTools = await prepareAgentMode({
         context,
         octokit: mockOctokit,
         githubToken: "test-token",
+        allowedToolsInput: undefined,
       });
 
       expect(Object.keys(JSON.parse(withTools.mcpConfig).mcpServers)).toEqual([
@@ -108,7 +108,6 @@ describe("Agent Mode", () => {
         readOnlyGit: false,
       });
     } finally {
-      delete process.env.INPUT_ALLOWED_TOOLS;
       if (originalHeadRef !== undefined)
         process.env.GITHUB_HEAD_REF = originalHeadRef;
       if (originalRefName !== undefined)
@@ -156,6 +155,7 @@ describe("Agent Mode", () => {
       context: contextWithDevelop,
       octokit: mockOctokit,
       githubToken: "test-token",
+      allowedToolsInput: undefined,
     });
 
     expect(result.branchInfo.baseBranch).toBe("develop");
@@ -194,6 +194,7 @@ describe("Agent Mode", () => {
         context: contextWithPrompts,
         octokit: mockOctokit,
         githubToken: "test-token",
+        allowedToolsInput: undefined,
       }),
     ).rejects.toThrow(
       "Workflow initiated by non-human actor: claude (type: Bot)",
@@ -225,6 +226,7 @@ describe("Agent Mode", () => {
         context: contextWithPrompts,
         octokit: mockOctokit,
         githubToken: "test-token",
+        allowedToolsInput: undefined,
       }),
     ).resolves.toBeDefined();
   });
@@ -256,6 +258,7 @@ describe("Agent Mode", () => {
       context: contextWithPrompts,
       octokit: mockOctokit,
       githubToken: "test-token",
+      allowedToolsInput: undefined,
     });
 
     // Note: We can't easily test file creation in this unit test,
@@ -287,6 +290,7 @@ describe("Agent Mode", () => {
         context,
         octokit: mockOctokit,
         githubToken: "test-token",
+        allowedToolsInput: undefined,
       });
 
       expect(configureGitAuthSpy).toHaveBeenCalledTimes(1);
@@ -309,6 +313,7 @@ describe("Agent Mode", () => {
         context,
         octokit: mockOctokit,
         githubToken: "test-token",
+        allowedToolsInput: undefined,
       });
 
       expect(configureGitAuthSpy).not.toHaveBeenCalled();

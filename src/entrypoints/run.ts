@@ -36,7 +36,7 @@ import type { ExecutionRecord } from "./format-turns";
 import { redactSecrets } from "../github/utils/sanitizer";
 import { collectSecretValues } from "../github/utils/secret-values";
 import { runPi } from "../runner/run-pi";
-import { parseMcpConfig } from "../runner/mcp-servers";
+import { readRunnerInputs, runnerOptions } from "../runner/run-plan";
 import { setExecutionFileOutputIfPresent } from "../runner/execution-file";
 
 /**
@@ -73,6 +73,7 @@ async function run() {
   // Before anything changes the environment: every redactSecrets() call in
   // this process, the Runner's included, redacts these values.
   collectSecretValues(process.env);
+  const runnerInputs = readRunnerInputs(process.env);
 
   let githubToken: string | undefined;
   let commentId: number | undefined;
@@ -152,10 +153,16 @@ async function run() {
     console.log(
       `Preparing with mode: ${modeName} for event: ${context.eventName}`,
     );
+    const prepareOptions = {
+      context,
+      octokit,
+      githubToken,
+      allowedToolsInput: runnerInputs.allowedTools,
+    };
     const prepareResult =
       modeName === "tag"
-        ? await prepareTagMode({ context, octokit, githubToken })
-        : await prepareAgentMode({ context, octokit, githubToken });
+        ? await prepareTagMode(prepareOptions)
+        : await prepareAgentMode(prepareOptions);
 
     commentId = prepareResult.commentId;
     agentBranch = prepareResult.branchInfo.agentBranch;
@@ -189,32 +196,10 @@ async function run() {
       }
     }
 
-    const promptFile =
-      process.env.INPUT_PROMPT_FILE ||
-      `${process.env.RUNNER_TEMP}/pi-prompts/prompt.txt`;
-    const runResult = await runPi(promptFile, {
-      model: process.env.MODEL,
-      apiKey: process.env.API_KEY,
-      piArgs: process.env.PI_ARGS,
-      // The mode's own rules come first, then the workflow's allowed_tools.
-      allowedTools: [
-        ...prepareResult.allowedTools,
-        process.env.INPUT_ALLOWED_TOOLS ?? "",
-      ].join("\n"),
-      disallowedTools: process.env.INPUT_DISALLOWED_TOOLS,
-      acceptEdits: prepareResult.acceptEdits,
-      readOnlyGit: prepareResult.readOnlyGit,
-      jsonSchema: process.env.JSON_SCHEMA,
-      // Untrusted input: keep secrets out of bash, unless the workflow opts out.
-      isolateBash:
-        !!process.env.ALLOWED_NON_WRITE_USERS &&
-        process.env.SUBPROCESS_ISOLATION !== "false",
-      allowedBashEnv: process.env.ALLOWED_BASH_ENV,
-      // A debug rerun shows everything, as in Upstream.
-      showFullOutput:
-        process.env.INPUT_SHOW_FULL_OUTPUT === "true" || core.isDebug(),
-      mcpServers: parseMcpConfig(prepareResult.mcpConfig),
-    });
+    const runResult = await runPi(
+      runnerInputs.promptFile,
+      runnerOptions(runnerInputs, prepareResult),
+    );
 
     agentSuccess = runResult.conclusion === "success";
     executionFile = runResult.executionFile;

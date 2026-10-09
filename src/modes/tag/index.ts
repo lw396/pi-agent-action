@@ -15,9 +15,8 @@ import {
 } from "../../github/data/fetcher";
 import { createPrompt } from "../../create-prompt";
 import { isEntityContext } from "../../github/context";
-import type { GitHubContext } from "../../github/context";
-import type { Octokits } from "../../github/api/client";
 import { ruleToolNames } from "../../runner/tool-rules";
+import type { PrepareOptions, PrepareResult } from "../types";
 
 /**
  * Prepares the tag mode execution context.
@@ -29,11 +28,8 @@ export async function prepareTagMode({
   context,
   octokit,
   githubToken,
-}: {
-  context: GitHubContext;
-  octokit: Octokits;
-  githubToken: string;
-}) {
+  allowedToolsInput,
+}: PrepareOptions): Promise<PrepareResult> {
   // Tag mode only handles entity-based events
   if (!isEntityContext(context)) {
     throw new Error("Tag mode requires entity context");
@@ -122,9 +118,9 @@ export async function prepareTagMode({
 
   // The action's own MCP tools the workflow allows, which decide the extra
   // MCP servers to start (the inline comment server, for example).
-  const userAllowedMCPTools = ruleToolNames(
-    process.env.INPUT_ALLOWED_TOOLS,
-  ).filter((tool) => tool.startsWith("mcp__github_"));
+  const userAllowedMCPTools = ruleToolNames(allowedToolsInput).filter((tool) =>
+    tool.startsWith("mcp__github_"),
+  );
 
   const gitPushWrapper = `${process.env.GITHUB_ACTION_PATH}/scripts/git-push.sh`;
 

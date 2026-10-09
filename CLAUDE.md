@@ -30,7 +30,7 @@ This project is ported from [anthropics/claude-code-action](https://github.com/a
 
 Single entrypoint: `src/entrypoints/run.ts` orchestrates everything — prepare (removed-input check, auth, permissions, trigger check, branch/comment creation), run pi in-process through the Runner (`src/runner/run-pi.ts`), then cleanup (update tracking comment, write step summary). SSH signing cleanup, inline comment classification and token revocation are separate `always()` steps in `action.yml`.
 
-The Runner reads its config from env vars that `action.yml` sets from the inputs (`MODEL`, `PI_ARGS`, `INPUT_ALLOWED_TOOLS`, ...), not from action inputs directly. Upstream-only inputs that were removed stay declared in `action.yml` as deprecated stubs so `src/entrypoints/removed-inputs.ts` can fail the run when a workflow still sets one; keep that list and the stubs in sync.
+The Runner's config comes from env vars that `action.yml` sets from the inputs (`MODEL`, `PI_ARGS`, `INPUT_ALLOWED_TOOLS`, ...), not from action inputs directly. `readRunnerInputs()` in `src/runner/run-plan.ts` is the only place that reads them, and `runnerOptions()` merges them with what the mode adds; add a new Runner input there, not as another `process.env` read. Upstream-only inputs that were removed stay declared in `action.yml` as deprecated stubs so `src/entrypoints/removed-inputs.ts` can fail the run when a workflow still sets one; keep that list and the stubs in sync.
 
 ## Key Concepts
 
