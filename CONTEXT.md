@@ -5,7 +5,7 @@ A GitHub Action that runs the pi coding agent in response to GitHub events, as a
 ## Language
 
 **Upstream**:
-The anthropics/claude-code-action repository that this project is ported from and stays aligned with.
+The anthropics/claude-code-action repository that this project is ported from, and whose behaviour towards workflows it stays compatible with. The code is maintained independently of it.
 _Avoid_: Original, Claude version
 
 **Divergence**:

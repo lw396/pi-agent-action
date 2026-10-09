@@ -1,6 +1,6 @@
 # 与上游的偏离
 
-本仓库尽量与 [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action)（下称"上游"）保持一致。下面登记每一项偏离和原因；从上游 cherry-pick 之前，先在这里查涉及的区域。
+本仓库在 workflow 能看到的行为上尽量与 [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action)（下称"上游"）保持一致。代码独立维护，不再从上游 cherry-pick。下面登记每一项行为偏离和原因。
 
 ## 规则
 
@@ -111,4 +111,4 @@
 | 自建 App 的创建工具    | `github-app-manifest.json` 和 `docs/create-app.html` → 删除，`docs/setup.md` 用文字说明                                                                                                                                | `scope`         | 否       |
 | workflow 加固检查      | 检查 `--permission-mode auto` → 检查 `allowed_tools` 中的 `*` 只用于 `mcp__` 工具（`.github/scripts/check_workflow_hardening.py`）                                                                                     | `pi-capability` | 否       |
 
-- cherry-pick 涉及改名标识符的补丁时，要手工改名。`CLAUDE.md`、`.claude/` 等 pi 也会读取的配置路径不改名。
+- `CLAUDE.md`、`.claude/` 等 pi 也会读取的配置路径不改名。
