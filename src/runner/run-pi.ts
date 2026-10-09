@@ -1,7 +1,7 @@
 import * as core from "@actions/core";
 import { mkdtemp, readFile } from "fs/promises";
 import { tmpdir } from "os";
-import { join } from "path";
+import { dirname, join } from "path";
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -17,6 +17,7 @@ import { createModelRuntime } from "./model-runtime";
 import { isolatedBashTool } from "./bash-isolation";
 import { commentRedactionExtension } from "./comment-redaction";
 import { parsePiArgs } from "./pi-args";
+import { expandSlashCommand, USER_REQUEST_FILENAME } from "./slash-command";
 import { writeExecutionFile } from "./execution-file";
 import { mcpServerExtensions, type McpServers } from "./mcp-servers";
 import {
@@ -217,6 +218,7 @@ export async function runPi(
     ...piArgs.resources,
   });
   await resourceLoader.reload();
+  const command = await expandRequestedCommand(promptPath, resourceLoader);
 
   const sessionManager = SessionManager.inMemory(cwd);
   const { session } = await createAgentSession({
@@ -263,7 +265,7 @@ export async function runPi(
   const startedAt = Date.now();
   try {
     await session.bindExtensions({});
-    await session.prompt(prompt);
+    await session.prompt(command ? `${prompt}\n\n${command}` : prompt);
     failure = sessionFailure(session.messages);
     if (
       failure === undefined &&
@@ -337,4 +339,29 @@ function sessionFailure(
     return last.errorMessage ?? `the model stopped with ${last.stopReason}`;
   }
   return undefined;
+}
+
+/**
+ * The expansion of a slash command in the trigger comment (/skill:<name> or
+ * /<template>), read from the user request file tag mode writes next to the
+ * prompt. Undefined when there is no request, or it is not a known command.
+ */
+async function expandRequestedCommand(
+  promptPath: string,
+  sources: Parameters<typeof expandSlashCommand>[1],
+): Promise<string | undefined> {
+  let request: string;
+  try {
+    request = await readFile(
+      join(dirname(promptPath), USER_REQUEST_FILENAME),
+      "utf-8",
+    );
+  } catch {
+    return undefined;
+  }
+  const expanded = expandSlashCommand(request, sources);
+  if (expanded) {
+    console.log(`Expanded ${request.trim().split(/\s/)[0]} from the request`);
+  }
+  return expanded;
 }

@@ -21,12 +21,10 @@ import type { ParsedGitHubContext } from "../github/context";
 import type { CommonFields, PreparedContext, EventData } from "./types";
 import { GITHUB_SERVER_URL } from "../github/api/config";
 import { extractUserRequest } from "../utils/extract-user-request";
+import { USER_REQUEST_FILENAME } from "../runner/slash-command";
 export type { CommonFields, PreparedContext } from "./types";
 
 const GIT_PUSH_WRAPPER = `${process.env.GITHUB_ACTION_PATH}/scripts/git-push.sh`;
-
-/** Filename for the user request file, read by the SDK runner */
-const USER_REQUEST_FILENAME = "user-request.txt";
 
 // Tag mode defaults - these tools are needed for tag mode to function.
 // Edit/MultiEdit/Write are intentionally omitted: acceptEdits permission mode
@@ -961,8 +959,8 @@ export async function createPrompt(
     // Write the prompt file
     await writeFile(`${promptDir}/prompt.txt`, promptContent);
 
-    // Extract and write the user request separately for SDK multi-block messaging
-    // This allows the CLI to process slash commands (e.g., "@pi /review-pr")
+    // Write the user request separately so the Runner can expand a slash
+    // command in it (e.g., "@pi /skill:review-pr"); see src/runner/slash-command.ts
     const userRequest = extractUserRequestFromContext(
       preparedContext,
       githubData,

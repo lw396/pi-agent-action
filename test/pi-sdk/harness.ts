@@ -53,6 +53,8 @@ export type FauxSession = {
   agentDir: string;
   /** Every session event, in order. */
   events: AgentSessionEvent[];
+  /** The loader the session was created with. */
+  resourceLoader: DefaultResourceLoader;
   dispose: () => void;
 };
 
@@ -68,6 +70,10 @@ export type FauxSessionOptions = {
   /** Extra settings passed to SettingsManager.inMemory(). */
   settings?: Record<string, unknown>;
   sessionOptions?: Partial<CreateAgentSessionOptions>;
+  /** Files to write under the session's cwd before resources load. */
+  files?: Record<string, string>;
+  /** Load the cwd's skills and prompt templates, which are off by default. */
+  loadSkillsAndPrompts?: boolean;
 };
 
 export async function createFauxSession(
@@ -77,6 +83,9 @@ export async function createFauxSession(
   const cwd = join(root, "work");
   const agentDir = join(root, "agent");
   await Bun.write(join(cwd, ".keep"), "");
+  for (const [path, content] of Object.entries(options.files ?? {})) {
+    await Bun.write(join(cwd, path), content);
+  }
 
   const faux = fauxProvider();
   faux.setResponses(options.responses);
@@ -99,8 +108,8 @@ export async function createFauxSession(
     agentDir,
     settingsManager,
     extensionFactories: options.extensionFactories ?? [],
-    noSkills: true,
-    noPromptTemplates: true,
+    noSkills: !options.loadSkillsAndPrompts,
+    noPromptTemplates: !options.loadSkillsAndPrompts,
     noThemes: true,
     noContextFiles: true,
   });
@@ -129,6 +138,7 @@ export async function createFauxSession(
     cwd,
     agentDir,
     events,
+    resourceLoader,
     dispose: () => {
       session.dispose();
       rmSync(root, { recursive: true, force: true });

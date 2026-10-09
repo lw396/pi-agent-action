@@ -2,7 +2,7 @@
 // See ./harness.ts for the scratch setup.
 import { describe, expect, spyOn, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { runPi } from "../../src/runner/run-pi";
 import {
@@ -19,6 +19,71 @@ async function writePrompt(text: string) {
 }
 
 describe("runPi", () => {
+  test("appends the expansion of a slash command in the user request", async () => {
+    const seen: string[] = [];
+    const { modelRuntime, model } = await fauxRuntime([
+      (context) => {
+        for (const message of context.messages) {
+          if (message.role !== "user") continue;
+          const content = message.content;
+          seen.push(
+            typeof content === "string"
+              ? content
+              : content.map((p) => ("text" in p ? p.text : "")).join(""),
+          );
+        }
+        return fauxAssistantMessage("Reviewed.");
+      },
+    ]);
+    const { cwd, promptPath } = getScratch();
+    await Bun.write(
+      join(cwd, ".pi/skills/review-pr/SKILL.md"),
+      "---\nname: review-pr\ndescription: Review a pull request.\n---\n\nCheck the tests.\n",
+    );
+    await writePrompt(
+      "<trigger_comment>@pi /skill:review-pr auth</trigger_comment>",
+    );
+    await Bun.write(
+      join(dirname(promptPath), "user-request.txt"),
+      "/skill:review-pr auth",
+    );
+
+    const result = await runPi(promptPath, { model, cwd, modelRuntime });
+
+    expect(result.conclusion).toBe("success");
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toStartWith(
+      '<trigger_comment>@pi /skill:review-pr auth</trigger_comment>\n\n<skill name="review-pr"',
+    );
+    expect(seen[0]).toContain("Check the tests.\n</skill>\n\nauth");
+  });
+
+  test("sends the prompt unchanged when the request is not a known command", async () => {
+    const seen: string[] = [];
+    const { modelRuntime, model } = await fauxRuntime([
+      (context) => {
+        const user = context.messages.find((m) => m.role === "user");
+        const content = user?.content ?? "";
+        seen.push(
+          typeof content === "string"
+            ? content
+            : content.map((p) => ("text" in p ? p.text : "")).join(""),
+        );
+        return fauxAssistantMessage("Done.");
+      },
+    ]);
+    const { cwd, promptPath } = getScratch();
+    await writePrompt("Fix the bug.");
+    await Bun.write(
+      join(dirname(promptPath), "user-request.txt"),
+      "/skill:missing",
+    );
+
+    await runPi(promptPath, { model, cwd, modelRuntime });
+
+    expect(seen).toEqual(["Fix the bug."]);
+  });
+
   test("runs the prompt and reports success, the session id and the execution file", async () => {
     const { modelRuntime, model } = await fauxRuntime([
       fauxAssistantMessage("All done."),

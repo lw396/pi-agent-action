@@ -61,16 +61,16 @@
 
 ## MCP 与提示词
 
-| 偏离             | 上游 → 本仓库                                                                                                                                                            | 类别            | 用户可见 |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- | -------- |
-| MCP server 注册  | `--mcp-config`，并读取用户和项目的 MCP 配置 → 通过 SDK 以 `direct` 模式注册，不读任何 `mcp.json`；用户暂时不能添加自己的 server（`src/runner/mcp-servers.ts`，ADR-0001） | `pi-capability` | 是       |
-| 评论工具名       | `update_claude_comment` → `update_comment`                                                                                                                               | `branding`      | 是       |
-| tag mode 提示词  | 让模型先用 ToolSearch 加载工具 → 不提 ToolSearch                                                                                                                         | `pi-capability` | 否       |
-| 评论中的斜杠命令 | `@claude /cmd` 作为单独的消息块交给 Claude Code，展开 `.claude/commands/` → `user-request.txt` 仍会写出，但 Runner 不读，`/cmd` 不展开                                   | `pi-capability` | 是       |
+| 偏离             | 上游 → 本仓库                                                                                                                                                                                                                         | 类别            | 用户可见 |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | -------- |
+| MCP server 注册  | `--mcp-config`，并读取用户和项目的 MCP 配置 → 通过 SDK 以 `direct` 模式注册，不读任何 `mcp.json`；用户暂时不能添加自己的 server（`src/runner/mcp-servers.ts`，ADR-0001）                                                              | `pi-capability` | 是       |
+| 评论工具名       | `update_claude_comment` → `update_comment`                                                                                                                                                                                            | `branding`      | 是       |
+| tag mode 提示词  | 让模型先用 ToolSearch 加载工具 → 不提 ToolSearch                                                                                                                                                                                      | `pi-capability` | 否       |
+| 评论中的斜杠命令 | `@claude /cmd` 作为单独的消息块交给 Claude Code，展开 `.claude/commands/cmd.md` → Runner 自己展开 `/skill:<name>` 和 `/<模板>`（`.pi/skills/`、`.agents/skills/`、`.pi/prompts/`），追加在提示词末尾（`src/runner/slash-command.ts`） | `pi-capability` | 是       |
 
 - 不读仓库的 `.pi/mcp.json`：pi 中配置文件里的同名 server 优先于 SDK 注册的 server，被检出的代码可以借此换掉本项目的 server，拿到 GitHub token。server 的 `env` 值一律转义，因为 pi 会展开 `$NAME`、执行以 `!` 开头的值，而分支名等值来自仓库。
 - 用 `direct` 模式：pi 默认的 `codemode` 不直接向模型声明工具，和提示词中"调用某工具"的指令对不上。pi 没有 ToolSearch，工具直接声明，所以提示词不提它。
-- 斜杠命令待定：用 pi 的 prompt template（`.pi/prompts/`）和 skill 实现，还是明确不支持并删掉写 `user-request.txt` 的代码，尚未决定。
+- 斜杠命令由 Runner 展开：pi 只展开以 `/` 开头的消息，而 tag mode 的提示词以 GitHub 上下文开头。展开格式与 pi 自己的一致，`test/pi-sdk/slash-command.test.ts` 用真实的 pi 会话核对；上游的 `.claude/commands/` 要搬到 `.pi/prompts/`。
 
 ## 隔离与脱敏
 

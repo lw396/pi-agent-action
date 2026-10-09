@@ -52,7 +52,20 @@ env:
 
 ## Instructions for the agent
 
-pi reads `AGENTS.md` (or `CLAUDE.md`) and skills from the repository, as it does locally, so project conventions you already keep there apply in the action too. On pull requests these files come from the base branch, not from the pull request; see [Which files come from the base branch](./security.md#which-files-come-from-the-base-branch-on-pull-requests).
+pi reads these files from the checked-out repository, as it does locally, so project conventions you already keep there apply in the action too:
+
+| Path                             | Effect                                                          |
+| -------------------------------- | --------------------------------------------------------------- |
+| `AGENTS.md` (or `CLAUDE.md`)     | Project instructions, added to the context                      |
+| `.pi/APPEND_SYSTEM.md`           | Appended to pi's system prompt                                  |
+| `.pi/SYSTEM.md`                  | Replaces pi's system prompt                                     |
+| `.pi/skills/`, `.agents/skills/` | Skills the agent loads when a request matches their description |
+| `.pi/prompts/`                   | Prompt templates you run from a comment with `@pi /<name>`      |
+| `.pi/extensions/`                | pi extensions, **run as code inside the action**                |
+
+Extensions run with the action's permissions: they can read the provider key and the GitHub token. Only commit extensions you would run in your CI.
+
+The repository's `.pi/settings.json` and `.pi/mcp.json` are not read; see [MCP servers](#mcp-servers). On pull requests, all of these files come from the base branch, not from the pull request; see [Which files come from the base branch](./security.md#which-files-come-from-the-base-branch-on-pull-requests).
 
 For instructions that only apply in CI, use `pi_args`:
 

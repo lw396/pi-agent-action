@@ -39,6 +39,20 @@ What the agent does with a request:
 - **On a closed pull request**, it creates a new branch, as for an issue.
 - **Reviews**: with `mcp__github_inline_comment__create_inline_comment` in `allowed_tools`, it can leave inline comments on the diff. It cannot submit, approve or merge a review.
 
+### Slash commands
+
+Start the request with a slash command to run instructions kept in the repository:
+
+```
+@pi /skill:review-pr focus on the auth changes
+@pi /triage 42 needs-info
+```
+
+- `/skill:<name> [text]` loads the skill `<name>` from `.pi/skills/` or `.agents/skills/` and adds your text after it.
+- `/<name> [args]` runs the prompt template `.pi/prompts/<name>.md`, with `$1`, `$@` and the like replaced by the arguments.
+
+The command must come right after the trigger phrase. An unknown name is left as text for the agent to read. Skills also load without a command when a request matches their description. On pull requests, these files come from the base branch.
+
 Running commands other than `git add`, `commit` and `push` needs `allowed_tools`; see [Tool permissions](./security.md#tool-permissions).
 
 ## Inputs
