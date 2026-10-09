@@ -94,6 +94,7 @@
 | 偏离               | 上游 → 本仓库                                                                                                                                              | 类别                        | 用户可见 |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | -------- |
 | 跟踪评论与提示词   | `Claude Code is working…`、`**Claude finished …**`、`You are Claude`、指向上游的 FAQ、提交信息 `from Claude` → pi 的文字，提示词不指名模型，FAQ 指向本仓库 | `branding`                  | 是       |
+| 跟踪评论的 spinner | Claude 标志的动画（GitHub user-attachments 上的图片）→ 本仓库的 `assets/spinner.gif`（`src/github/operations/comments/common.ts`）                         | `branding`                  | 是       |
 | "Create a PR" 链接 | 标题 `Changes from Claude`，正文带 Claude Code 签名 → `Changes from pi`，不带签名（`src/entrypoints/update-comment-link.ts`）                              | `branding`                  | 是       |
 | 结构化输出         | `claude_args` 中的 `--json-schema` → `json_schema` 输入，模型调用 `submit_result` 提交，最多提醒 2 次（`src/runner/structured-output.ts`）                 | `pi-capability`             | 是       |
 | Execution file     | Agent SDK 的消息 → pi 的会话头和事件，最后一条 `session_stats` 是合计（`src/runner/execution-file.ts`，ADR-0001）                                          | `pi-capability`             | 是       |
