@@ -395,14 +395,13 @@ runs:
         MODEL: ${{ inputs.model }}
         API_KEY: ${{ inputs.api_key }}
         PI_ARGS: ${{ inputs.pi_args }}
-        # INPUT_ prefix: tag mode's createPrompt exports ALLOWED_TOOLS itself.
         INPUT_ALLOWED_TOOLS: ${{ inputs.allowed_tools }}
         INPUT_DISALLOWED_TOOLS: ${{ inputs.disallowed_tools }}
         JSON_SCHEMA: ${{ inputs.json_schema }}
         SUBPROCESS_ISOLATION: ${{ inputs.subprocess_isolation }}
         ALLOWED_BASH_ENV: ${{ inputs.allowed_bash_env }}
 
-        # Prompt file written by the mode's prepare step, and report settings
+        # Report settings
         INPUT_SHOW_FULL_OUTPUT: ${{ inputs.show_full_output }}
         DISPLAY_REPORT: ${{ inputs.display_report }}
 

@@ -32,7 +32,7 @@ import { assertNoRemovedInputs } from "./removed-inputs";
 import { updateCommentLink } from "./update-comment-link";
 import { formatTurnsFromData } from "./format-turns";
 import { redactSecrets } from "../github/utils/sanitizer";
-import { collectSecretValues } from "../github/utils/secret-values";
+import { collectSecretValues } from "../runner/secret-values";
 import { runPi } from "../runner/run-pi";
 import { readRunnerInputs, runnerOptions } from "../runner/run-plan";
 import {

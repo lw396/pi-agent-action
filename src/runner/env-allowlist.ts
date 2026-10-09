@@ -3,7 +3,7 @@
  * else in the environment, including provider keys, GH_TOKEN and secrets the
  * workflow adds under its own names, is dropped; allowed_bash_env adds more.
  * Redaction by value treats every other value as a secret
- * (src/github/utils/secret-values.ts).
+ * (src/runner/secret-values.ts).
  *
  * Left out on purpose: GITHUB_ENV, GITHUB_PATH, GITHUB_OUTPUT, GITHUB_STATE
  * and GITHUB_STEP_SUMMARY, because writing to those files changes later steps

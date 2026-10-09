@@ -76,13 +76,13 @@
 
 前四项只在设置了 `allowed_non_write_users` 时生效。
 
-| 偏离               | 上游 → 本仓库                                                                                                                                                                                                           | 类别             | 用户可见 |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | -------- |
-| bash 的 env        | Claude Code 内置的黑名单 → 白名单（`src/runner/env-allowlist.ts`），`allowed_bash_env` 放行更多，`subprocess_isolation: false` 关闭（ADR-0002）                                                                         | `pi-capability`  | 是       |
-| bash 沙箱          | Claude Code 内置 → bwrap 可用时：新的 PID namespace 和 `/proc`、`no_new_privs`，只有工作目录和空的 `/tmp` 可写；不可用时只过滤 env 并警告（`src/runner/bash-isolation.ts`）                                             | `pi-capability`  | 是       |
-| 文件工具与 `/proc` | 无 → 文件工具拒绝访问 `/proc`（`src/runner/tool-permissions.ts`，ADR-0002）                                                                                                                                             | `pi-capability`  | 否       |
-| PR 场景的配置恢复  | `SENSITIVE_PATHS` 只有 Claude 的路径 → 补上 `.pi`、`.agents`、`AGENTS.md`、`AGENTS.MD`、`AGENTS.override.md`、`CLAUDE.MD`（`src/github/operations/restore-config.ts`）                                                  | `pi-capability`  | 否       |
-| 输出脱敏           | 按格式匹配 GitHub、Anthropic、AWS、Slack、JWT → 加上 OpenAI、OpenRouter、Gemini 的格式，以及按值匹配长度不少于 16 的非白名单 env 值（`src/github/utils/secret-values.ts`、`src/runner/comment-redaction.ts`，ADR-0002） | `multi-provider` | 是       |
+| 偏离               | 上游 → 本仓库                                                                                                                                                                                                     | 类别             | 用户可见 |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | -------- |
+| bash 的 env        | Claude Code 内置的黑名单 → 白名单（`src/runner/env-allowlist.ts`），`allowed_bash_env` 放行更多，`subprocess_isolation: false` 关闭（ADR-0002）                                                                   | `pi-capability`  | 是       |
+| bash 沙箱          | Claude Code 内置 → bwrap 可用时：新的 PID namespace 和 `/proc`、`no_new_privs`，只有工作目录和空的 `/tmp` 可写；不可用时只过滤 env 并警告（`src/runner/bash-isolation.ts`）                                       | `pi-capability`  | 是       |
+| 文件工具与 `/proc` | 无 → 文件工具拒绝访问 `/proc`（`src/runner/tool-permissions.ts`，ADR-0002）                                                                                                                                       | `pi-capability`  | 否       |
+| PR 场景的配置恢复  | `SENSITIVE_PATHS` 只有 Claude 的路径 → 补上 `.pi`、`.agents`、`AGENTS.md`、`AGENTS.MD`、`AGENTS.override.md`、`CLAUDE.MD`（`src/github/operations/restore-config.ts`）                                            | `pi-capability`  | 否       |
+| 输出脱敏           | 按格式匹配 GitHub、Anthropic、AWS、Slack、JWT → 加上 OpenAI、OpenRouter、Gemini 的格式，以及按值匹配长度不少于 16 的非白名单 env 值（`src/runner/secret-values.ts`、`src/runner/comment-redaction.ts`，ADR-0002） | `multi-provider` | 是       |
 
 - 用白名单而不是黑名单：上游的黑名单在 Claude Code 内部，拿不到；provider 太多，黑名单也列不全。`GH_TOKEN` 同样被去掉，所以 bash 中的 `git push` 和 `gh` 要显式放行它。
 - 文件工具在 pi 进程内执行，不经过 bwrap，能直接读 `/proc/self/environ`，所以要单独拦截。检查和执行之间被并行的 bash 换掉符号链接的竞争无法排除。

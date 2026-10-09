@@ -5,11 +5,13 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter } from "node:path";
+import { BASH_ENV_ALLOWLIST } from "../src/runner/env-allowlist";
 import {
+  ACTION_SECRET_ENV,
   ACTION_SETTINGS_ENV,
   collectSecretValues,
   redactSecretValues,
-} from "../src/github/utils/secret-values";
+} from "../src/runner/secret-values";
 import { redactSecrets } from "../src/github/utils/sanitizer";
 
 // No known format, so only redaction by value can catch it.
@@ -114,14 +116,52 @@ describe("redactSecretValues", () => {
     expect(redactSecretValues(value)).toBe("[REDACTED]");
   });
 
-  test("lists only settings the run step sets", () => {
-    const metadata = readFileSync(
-      new URL("../action.yml", import.meta.url),
-      "utf8",
-    );
-    for (const name of ACTION_SETTINGS_ENV) {
-      expect(metadata).toContain(`        ${name}: \${{`);
+  // The steps that collect secret values: the run step and the post-step.
+  describe("the variables of the steps that redact", () => {
+    /** The env names the action.yml step with this name sets. */
+    function stepEnv(name: string): string[] {
+      const metadata = readFileSync(
+        new URL("../action.yml", import.meta.url),
+        "utf8",
+      );
+      const step = metadata.slice(metadata.indexOf(`- name: ${name}\n`));
+      const env = step.slice(step.indexOf("\n      env:\n"));
+      const end = env.indexOf("\n    - name:");
+      return [...env.slice(0, end).matchAll(/^ {8}([A-Z][A-Z0-9_]*): /gm)].map(
+        (match) => match[1]!,
+      );
     }
+
+    const redactingStepsEnv = () => [
+      ...stepEnv("Run pi Agent Action"),
+      ...stepEnv("Post buffered inline comments"),
+    ];
+
+    test("are each classified as a setting, allowlisted or a secret", () => {
+      const classified = new Set([
+        ...ACTION_SETTINGS_ENV,
+        ...BASH_ENV_ALLOWLIST,
+        ...ACTION_SECRET_ENV,
+      ]);
+      const names = redactingStepsEnv();
+      expect(names).toContain("MODEL");
+      expect(names).toContain("CLASSIFY_MODEL");
+      expect(names.filter((name) => !classified.has(name))).toEqual([]);
+    });
+
+    test("include every listed setting and secret", () => {
+      const names = redactingStepsEnv();
+      for (const name of [...ACTION_SETTINGS_ENV, ...ACTION_SECRET_ENV]) {
+        expect(names).toContain(name);
+      }
+    });
+
+    test("are never both a setting and a secret", () => {
+      const settings = new Set(ACTION_SETTINGS_ENV);
+      expect(ACTION_SECRET_ENV.filter((name) => settings.has(name))).toEqual(
+        [],
+      );
+    });
   });
 
   test("redacts nothing until values are collected", () => {

@@ -1,4 +1,4 @@
-import { redactSecretValues } from "./secret-values";
+import { redactSecretValues } from "../../runner/secret-values";
 
 export function stripInvisibleCharacters(content: string): string {
   content = content.replace(/[\u200B\u200C\u200D\uFEFF]/g, "");

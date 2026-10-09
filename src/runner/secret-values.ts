@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { delimiter, isAbsolute } from "node:path";
-import { BASH_ENV_ALLOWLIST } from "../../runner/env-allowlist";
+import { BASH_ENV_ALLOWLIST } from "./env-allowlist";
 
 /**
  * Redaction by value (ADR-0002): keys of providers whose format is unknown
@@ -27,10 +27,9 @@ export const REDACTED = "[REDACTED]";
  * full became [REDACTED], while a secret written into the prompt was never
  * caught this way unless it is in the environment under its own name too.
  *
- * Left out, so they stay secrets: inputs that carry credentials (API_KEY,
- * OVERRIDE_GITHUB_TOKEN, SSH_SIGNING_KEY), free-form pass-through arguments
- * (PI_ARGS), ALL_INPUTS (every input, api_key included) and anything the run
- * step copies from the workflow env.
+ * Every variable the run step and the buffered inline comment post-step set
+ * is in this list, in BASH_ENV_ALLOWLIST, or in ACTION_SECRET_ENV;
+ * test/secret-values.test.ts checks that.
  */
 export const ACTION_SETTINGS_ENV: readonly string[] = [
   "MODE",
@@ -61,6 +60,27 @@ export const ACTION_SETTINGS_ENV: readonly string[] = [
   "ALLOWED_BASH_ENV",
   "INPUT_SHOW_FULL_OUTPUT",
   "DISPLAY_REPORT",
+  // The buffered inline comment post-step
+  "REPO_OWNER",
+  "REPO_NAME",
+  "PR_NUMBER",
+];
+
+/**
+ * Variables those steps set that stay secrets: inputs that carry
+ * credentials, free-form pass-through arguments (PI_ARGS) and ALL_INPUTS
+ * (every input, api_key included). Nothing reads this list but the test that
+ * keeps those steps' variables classified; anything they copy from the
+ * workflow env is a secret too.
+ */
+export const ACTION_SECRET_ENV: readonly string[] = [
+  "OVERRIDE_GITHUB_TOKEN",
+  "DEFAULT_WORKFLOW_TOKEN",
+  "GITHUB_TOKEN",
+  "SSH_SIGNING_KEY",
+  "API_KEY",
+  "PI_ARGS",
+  "ALL_INPUTS",
 ];
 
 const NOT_SECRET_NAMES = new Set([
@@ -103,6 +123,13 @@ function base64Forms(value: string): string[] {
 /**
  * Collect the secret values from the environment, replacing any collected
  * before. Called once at startup, before the action changes its environment.
+ *
+ * Until it is called, redactSecrets() matches known formats only. Every
+ * process that publishes text and has secrets in its environment must call
+ * it first: run.ts and the buffered inline comment post-step do. The MCP
+ * servers do not need to, since their env holds no provider keys and the
+ * Runner redacts MCP tool arguments by value before a call reaches them
+ * (src/runner/comment-redaction.ts).
  * A value that an allowlisted variable also holds (PWD and GITHUB_WORKSPACE,
  * for example) is not a secret.
  */

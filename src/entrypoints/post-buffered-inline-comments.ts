@@ -13,7 +13,7 @@
 import { rmSync } from "fs";
 import { createOctokit } from "../github/api/client";
 import { redactSecrets } from "../github/utils/sanitizer";
-import { collectSecretValues } from "../github/utils/secret-values";
+import { collectSecretValues } from "../runner/secret-values";
 import {
   inlineCommentBufferPath,
   readBufferedComments,

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { runPi } from "../../src/runner/run-pi";
-import { collectSecretValues } from "../../src/github/utils/secret-values";
+import { collectSecretValues } from "../../src/runner/secret-values";
 import { fauxRuntime, readExecutionFile, useScratch, rules } from "./harness";
 
 const getScratch = useScratch();
