@@ -82,14 +82,21 @@ export async function updateCommentLink(
     if (isPullRequestReviewCommentEvent(context)) {
       // For PR review comments, use the pulls API
       console.log(`Fetching PR review comment ${commentId}`);
-      const { data: prComment } = await octokit.rest.pulls.getReviewComment({
-        owner,
-        repo,
-        comment_id: commentId,
-      });
-      comment = prComment;
-      isPRReviewComment = true;
-      console.log("Successfully fetched as PR review comment");
+      try {
+        const { data: prComment } = await octokit.rest.pulls.getReviewComment({
+          owner,
+          repo,
+          comment_id: commentId,
+        });
+        comment = prComment;
+        isPRReviewComment = true;
+        console.log("Successfully fetched as PR review comment");
+      } catch (error: any) {
+        // createInitialComment falls back to an issue comment when the reply
+        // to the review comment fails; fetch that one below.
+        if (error.status !== 404) throw error;
+        console.log("Not a PR review comment, trying the issues API");
+      }
     }
 
     // For all other event types, use the issues API
