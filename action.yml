@@ -1,4 +1,4 @@
-name: "pi Agent Action"
+name: "Pi Agent Action"
 description: "Run the pi coding agent on GitHub issues and PRs with any model: answer @pi mentions, review code and run automations."
 branding:
   icon: "at-sign"
@@ -351,7 +351,7 @@ runs:
         echo "/usr/bin" >> "$GITHUB_PATH"
         echo "/bin" >> "$GITHUB_PATH"
 
-    - name: Run pi Agent Action
+    - name: Run Pi Agent Action
       id: run
       shell: bash
       run: |
@@ -437,7 +437,7 @@ runs:
       run: |
         BUN_BIN="${GITHUB_ACTION_PATH}/bin/bun"
         [ -x "$BUN_BIN" ] || BUN_BIN="bun"
-        # No --tsconfig-override: see the "Run pi Agent Action" step above.
+        # No --tsconfig-override: see the "Run Pi Agent Action" step above.
         "$BUN_BIN" --no-env-file \
           --config="${GITHUB_ACTION_PATH}/bunfig.toml" \
           run ${GITHUB_ACTION_PATH}/src/entrypoints/cleanup-ssh-signing.ts
@@ -457,7 +457,7 @@ runs:
       run: |
         BUN_BIN="${GITHUB_ACTION_PATH}/bin/bun"
         [ -x "$BUN_BIN" ] || BUN_BIN="bun"
-        # No --tsconfig-override: see the "Run pi Agent Action" step above.
+        # No --tsconfig-override: see the "Run Pi Agent Action" step above.
         "$BUN_BIN" --no-env-file \
           --config="${GITHUB_ACTION_PATH}/bunfig.toml" \
           run ${GITHUB_ACTION_PATH}/src/entrypoints/post-buffered-inline-comments.ts

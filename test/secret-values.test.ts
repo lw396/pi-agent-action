@@ -133,7 +133,7 @@ describe("redactSecretValues", () => {
     }
 
     const redactingStepsEnv = () => [
-      ...stepEnv("Run pi Agent Action"),
+      ...stepEnv("Run Pi Agent Action"),
       ...stepEnv("Post buffered inline comments"),
     ];
 
