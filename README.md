@@ -20,6 +20,14 @@ A GitHub Action that runs the [pi coding agent](https://github.com/earendil-work
 
 ## Quickstart
 
+To have a coding agent (pi, Claude Code, Codex, ...) set it up for you, paste this into it from your repository:
+
+```text
+Read https://raw.githubusercontent.com/lw396/pi-agent-action/main/install.md and follow it to set up pi-agent-action in this repository.
+```
+
+It walks you through authentication, the model and its secret, writes the workflow (or migrates an existing claude-code-action one) and opens a pull request. To set it up by hand:
+
 1. Add your provider's API key as a repository secret, e.g. `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` ([Model providers](#model-providers)).
 2. Add this workflow as `.github/workflows/pi.yml`:
 

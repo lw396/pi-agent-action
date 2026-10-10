@@ -1,5 +1,15 @@
 # Setup Guide
 
+## Agent-assisted Setup
+
+A coding agent can do the steps below for you: paste this into it from your repository.
+
+```text
+Read https://raw.githubusercontent.com/lw396/pi-agent-action/main/install.md and follow it to set up pi-agent-action in this repository.
+```
+
+It follows [install.md](../install.md): it asks you to install the app, lets you add the secret yourself or paste the key for it to add, writes the workflow and opens a pull request.
+
 ## Manual Setup
 
 **Requirements**: You must be a repository admin to complete these steps.
