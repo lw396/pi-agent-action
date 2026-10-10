@@ -126,7 +126,7 @@ export function updateCommentBody(input: CommentUpdateInput): string {
     const username =
       triggerUsername || (usernameMatch ? usernameMatch[1] : "user");
 
-    header = `**pi finished @${username}'s task`;
+    header = `**Pi finished @${username}'s task`;
     if (durationStr) {
       header += ` in ${durationStr}`;
     }

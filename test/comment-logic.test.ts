@@ -25,7 +25,7 @@ describe("updateCommentBody", () => {
 
       const result = updateCommentBody(input);
       expect(result).toContain(
-        "**pi finished @trigger-user's task in 1m 14s**",
+        "**Pi finished @trigger-user's task in 1m 14s**",
       );
       expect(result).not.toContain("pi is working");
     });
@@ -69,7 +69,7 @@ describe("updateCommentBody", () => {
       };
 
       const result = updateCommentBody(input);
-      expect(result).toContain("**pi finished @testuser's task**");
+      expect(result).toContain("**Pi finished @testuser's task**");
     });
   });
 
@@ -266,7 +266,7 @@ describe("updateCommentBody", () => {
       };
 
       const result = updateCommentBody(input);
-      expect(result).toContain("**pi finished @testuser's task in 31s**");
+      expect(result).toContain("**Pi finished @testuser's task in 31s**");
     });
 
     it("formats duration in minutes and seconds in header", () => {
@@ -279,7 +279,7 @@ describe("updateCommentBody", () => {
       };
 
       const result = updateCommentBody(input);
-      expect(result).toContain("**pi finished @testuser's task in 1m 15s**");
+      expect(result).toContain("**Pi finished @testuser's task in 1m 15s**");
     });
 
     it("includes duration in error header", () => {
@@ -305,7 +305,7 @@ describe("updateCommentBody", () => {
       };
 
       const result = updateCommentBody(input);
-      expect(result).toContain("**pi finished @testuser's task**");
+      expect(result).toContain("**Pi finished @testuser's task**");
       expect(result).not.toContain(" in ");
     });
   });
@@ -329,7 +329,7 @@ describe("updateCommentBody", () => {
       const result = updateCommentBody(input);
 
       // Check the header structure
-      expect(result).toContain("**pi finished @trigger-user's task in 1m 5s**");
+      expect(result).toContain("**Pi finished @trigger-user's task in 1m 5s**");
       expect(result).toContain("—— [View job]");
       expect(result).toContain(
         "• [`claude-branch-123`](https://github.com/owner/repo/tree/claude-branch-123)",
@@ -371,7 +371,7 @@ describe("updateCommentBody", () => {
       // Original link should be removed from body
       expect(result).not.toContain("[Create a PR]");
       // Username should come from argument, not extraction
-      expect(result).toContain("**pi finished @john-doe's task**");
+      expect(result).toContain("**Pi finished @john-doe's task**");
       // Content should be preserved
       expect(result).toContain("I've made changes.");
     });
@@ -392,7 +392,7 @@ describe("updateCommentBody", () => {
       expect(result).toContain(
         "• [Create PR ➔](https://github.com/owner/repo/compare/main...claude/pr-456-20240101-1200)",
       );
-      expect(result).toContain("**pi finished @jane-doe's task**");
+      expect(result).toContain("**Pi finished @jane-doe's task**");
     });
 
     it("includes both branch link and PR link for new branches", () => {
@@ -431,7 +431,7 @@ describe("updateCommentBody", () => {
 
       const result = updateCommentBody(input);
 
-      expect(result).toContain("pi finished @claude's task in 1m 30s");
+      expect(result).toContain("Pi finished @claude's task in 1m 30s");
       expect(result).toContain(
         "[View job](https://github.com/owner/repo/actions/runs/123)",
       );
