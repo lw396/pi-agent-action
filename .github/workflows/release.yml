@@ -1,0 +1,60 @@
+# Publishes a release when a version tag is pushed:
+#
+#   git tag v1.2.0 && git push origin v1.2.0
+#
+# After CI passes on the tagged commit, it creates the GitHub release with
+# generated notes and moves the major tag (v1), which workflows use as
+# lw396/pi-agent-action@v1, to the same commit. The tag must point to a commit
+# on main.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Check that the tag is on main
+        run: |
+          sha=$(gh api "repos/$REPO/commits/$TAG" --jq .sha)
+          status=$(gh api "repos/$REPO/compare/main...$sha" --jq .status)
+          if [ "$status" != identical ] && [ "$status" != behind ]; then
+            echo "::error::$TAG points to $sha, which is not on main."
+            exit 1
+          fi
+          echo "SHA=$sha" >> "$GITHUB_ENV"
+
+      - name: Create the release
+        run: gh release create "$TAG" --repo "$REPO" --verify-tag --generate-notes
+
+      - name: Move the major tag
+        run: |
+          major=${TAG%%.*}
+          if gh api "repos/$REPO/git/ref/tags/$major" --silent 2>/dev/null; then
+            gh api --method PATCH "repos/$REPO/git/refs/tags/$major" \
+              -f sha="$SHA" -F force=true --silent
+          else
+            gh api --method POST "repos/$REPO/git/refs" \
+              -f ref="refs/tags/$major" -f sha="$SHA" --silent
+          fi
+          echo "Moved $major to $TAG ($SHA)."

@@ -74,6 +74,16 @@ act pull_request -W .github/workflows/ci.yml -j test -v
 
 The `test-*.yml` workflows run on `ubuntu-24.04-firewall`, which act doesn't know: map it with `-P ubuntu-24.04-firewall=catthehacker/ubuntu:act-latest` (the egress firewall is not applied locally) and pass the model key with `--secret OPENCODE_API_KEY="$OPENCODE_API_KEY"`.
 
+## Releasing
+
+Tag a commit on main with the version and push the tag:
+
+```bash
+git tag v1.2.0 && git push origin v1.2.0
+```
+
+`.github/workflows/release.yml` runs CI on it, creates the GitHub release with generated notes, and moves the major tag (`v1`) that workflows use to the same commit. A tag that is not on main fails the release.
+
 ## Reporting bugs and security issues
 
 Open a [bug report](https://github.com/lw396/pi-agent-action/issues/new/choose) with your workflow file and the job log. Report vulnerabilities privately as described in [SECURITY.md](./SECURITY.md), not in a public issue.
