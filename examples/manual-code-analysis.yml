@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 2 # Need at least 2 commits to analyze the latest
 
       - name: Run pi Analysis
-        uses: lw396/pi-agent-action@main
+        uses: lw396/pi-agent-action@v1
         with:
           model: openrouter/<model-id>
           prompt: |

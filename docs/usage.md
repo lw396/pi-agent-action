@@ -141,7 +141,7 @@ With `json_schema`, the agent ends the run by submitting a result that must matc
 ```yaml
 - name: Detect flaky tests
   id: analyze
-  uses: lw396/pi-agent-action@main
+  uses: lw396/pi-agent-action@v1
   with:
     model: anthropic/<model-id>
     prompt: |

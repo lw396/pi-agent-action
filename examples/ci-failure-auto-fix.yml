@@ -100,7 +100,7 @@ jobs:
 
       - name: Fix CI failures with pi
         id: pi
-        uses: lw396/pi-agent-action@main
+        uses: lw396/pi-agent-action@v1
         with:
           model: anthropic/<model-id>
           prompt: |

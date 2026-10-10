@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: lw396/pi-agent-action@main
+      - uses: lw396/pi-agent-action@v1
         with:
           # Required: a pi model as provider/id
           model: anthropic/<model-id>
@@ -119,7 +119,7 @@ Most workflows need four changes:
       --allowedTools "Bash(npm test:*),Edit,Write"
 
 # After
-- uses: lw396/pi-agent-action@main
+- uses: lw396/pi-agent-action@v1
   with:
     model: anthropic/<model-id>
     allowed_tools: "Bash(npm test:*),Edit,Write"

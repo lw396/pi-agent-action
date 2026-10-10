@@ -58,7 +58,7 @@ Everything else is removed: provider keys, `GH_TOKEN`, and any secret your workf
 To give commands more variables, list them in `allowed_bash_env`, separated by commas, spaces or newlines:
 
 ```yaml
-- uses: lw396/pi-agent-action@main
+- uses: lw396/pi-agent-action@v1
   with:
     allowed_non_write_users: "*"
     github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -106,7 +106,7 @@ For `workflow_run` events, the action checks the repository access of the actor 
 ```yaml
 # Preferred — check out the base ref (default).
 - uses: actions/checkout@v6 # no `ref:` → base branch
-- uses: lw396/pi-agent-action@main
+- uses: lw396/pi-agent-action@v1
 ```
 
 ```yaml
@@ -119,7 +119,7 @@ For `workflow_run` events, the action checks the repository access of the actor 
     # For workflow_run use: ${{ github.event.workflow_run.head_sha }}
     ref: ${{ github.event.pull_request.head.sha }}
     path: pr-head
-- uses: lw396/pi-agent-action@main
+- uses: lw396/pi-agent-action@v1
 ```
 
 This is general guidance for these event types — see [GitHub's documentation](https://securitylab.github.com/research/github-actions-preventing-pwn-requests/).
@@ -170,7 +170,7 @@ By default, commits made by the agent are unsigned. You can enable commit signin
 This uses GitHub's API to create commits, which automatically signs them as verified from the GitHub App:
 
 ```yaml
-- uses: lw396/pi-agent-action@main
+- uses: lw396/pi-agent-action@v1
   with:
     use_commit_signing: true
 ```
@@ -182,7 +182,7 @@ This is the simplest option and requires no additional setup. However, because i
 This uses an SSH key to sign commits via git CLI. Use this option when you need both signed commits AND standard git operations (rebasing, cherry-picking, etc.):
 
 ```yaml
-- uses: lw396/pi-agent-action@main
+- uses: lw396/pi-agent-action@v1
   with:
     ssh_signing_key: ${{ secrets.SSH_SIGNING_KEY }}
     bot_id: "YOUR_GITHUB_USER_ID"

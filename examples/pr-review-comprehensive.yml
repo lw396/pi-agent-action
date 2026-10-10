@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 1
 
       - name: PR Review with Progress Tracking
-        uses: lw396/pi-agent-action@main
+        uses: lw396/pi-agent-action@v1
         with:
           model: google/<model-id>
 

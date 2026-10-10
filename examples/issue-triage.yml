@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run pi for Issue Triage
-        uses: lw396/pi-agent-action@main
+        uses: lw396/pi-agent-action@v1
         with:
           model: openai/<model-id>
           prompt: |

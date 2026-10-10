@@ -7,7 +7,7 @@ Recipes for the settings most workflows change. [Usage](./usage.md#inputs) lists
 Set `model` to `<provider>/<model-id>` and pass the provider's key in `env:` ([Model providers](./setup.md#model-providers)). Append `:<level>` for a thinking level:
 
 ```yaml
-- uses: lw396/pi-agent-action@main
+- uses: lw396/pi-agent-action@v1
   with:
     model: openai/<model-id>:high
   env:
@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: lw396/pi-agent-action@main
+      - uses: lw396/pi-agent-action@v1
         with:
           model: anthropic/<model-id>
           additional_permissions: |

@@ -33,7 +33,7 @@ body:
     attributes:
       label: Action version
       description: The tag, branch or commit SHA in `uses:`.
-      placeholder: lw396/pi-agent-action@main
+      placeholder: lw396/pi-agent-action@v1
     validations:
       required: true
   - type: input

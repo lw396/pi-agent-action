@@ -39,7 +39,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: lw396/pi-agent-action@main
+      - uses: lw396/pi-agent-action@v1
         with:
           model: anthropic/<model-id>
           track_progress: true
@@ -111,7 +111,7 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
-      - uses: lw396/pi-agent-action@main
+      - uses: lw396/pi-agent-action@v1
         with:
           model: openai/<model-id>
           prompt: |
@@ -148,7 +148,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: lw396/pi-agent-action@main
+      - uses: lw396/pi-agent-action@v1
         with:
           model: google/<model-id>
           prompt: |

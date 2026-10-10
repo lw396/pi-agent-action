@@ -32,7 +32,7 @@ jobs:
 
       - name: Run pi
         id: pi
-        uses: lw396/pi-agent-action@main
+        uses: lw396/pi-agent-action@v1
         with:
           # Any model pi supports, as provider/model-id
           model: anthropic/<model-id>

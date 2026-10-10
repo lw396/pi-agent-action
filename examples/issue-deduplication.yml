@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 1
 
       - name: Check for duplicate issues
-        uses: lw396/pi-agent-action@main
+        uses: lw396/pi-agent-action@v1
         with:
           model: anthropic/<model-id>
           prompt: |

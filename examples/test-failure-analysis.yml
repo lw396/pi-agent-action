@@ -25,7 +25,7 @@ jobs:
 
       - name: Detect flaky test failures
         id: detect
-        uses: lw396/pi-agent-action@main
+        uses: lw396/pi-agent-action@v1
         with:
           model: anthropic/<model-id>
           # The app token needs actions: read for gh run view

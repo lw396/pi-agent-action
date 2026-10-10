@@ -39,7 +39,7 @@ Other providers (DeepSeek, Mistral, xAI, Groq, Azure OpenAI, ...) follow the sam
 For example, with Claude:
 
 ```yaml
-- uses: lw396/pi-agent-action@main
+- uses: lw396/pi-agent-action@v1
   with:
     model: anthropic/<model-id>
   env:
@@ -147,7 +147,7 @@ If you prefer not to install the [pi-agent-action app](https://github.com/apps/p
          - uses: actions/checkout@v6
 
          # Use the action with your custom app's token
-         - uses: lw396/pi-agent-action@main
+         - uses: lw396/pi-agent-action@v1
            with:
              model: openai/<model-id>
              github_token: ${{ steps.app-token.outputs.token }}

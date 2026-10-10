@@ -23,7 +23,7 @@ jobs:
           fetch-depth: 1
 
       - name: Review PR from Specific Author
-        uses: lw396/pi-agent-action@main
+        uses: lw396/pi-agent-action@v1
         with:
           model: openai/<model-id>
 
