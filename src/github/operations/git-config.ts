@@ -6,6 +6,7 @@
  */
 
 import { $ } from "bun";
+import { existsSync } from "fs";
 import { mkdir, writeFile, rm } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
@@ -93,6 +94,9 @@ export async function replaceCheckoutCredentials(
     for (const entry of includeEntries.split("\n")) {
       const path = entry.slice(entry.indexOf(" ") + 1).trim();
       if (!entry.includes(" ") || !path) continue;
+      // actions/checkout also adds an entry for the container path
+      // (/github/runner_temp/...), which does not exist on a host runner.
+      if (!existsSync(path)) continue;
       try {
         await $`git config --file ${path} --unset-all ${extraheaderKey}`;
         removedHeader = true;

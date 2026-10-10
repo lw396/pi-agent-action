@@ -151,8 +151,9 @@ export async function updateCommentLink(
 
   // Check if we need to add PR URL when we have a new branch
   let prLink = "";
-  // If agentBranch is set, it means we created a new branch (for issues or closed/merged PRs)
-  if (agentBranch && !shouldDeleteBranch) {
+  // If agentBranch is set, it means we created a new branch (for issues or closed/merged PRs).
+  // branchLink is empty when that branch was never pushed or was deleted as empty.
+  if (agentBranch && branchLink) {
     // Check if comment already contains a PR URL
     const serverUrlPattern = serverUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const prUrlPattern = new RegExp(
