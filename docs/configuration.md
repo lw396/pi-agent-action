@@ -88,6 +88,25 @@ with:
 
 `--system-prompt` replaces pi's system prompt instead of appending to it. `--no-context-files` and `--no-skills` stop pi from reading the repository's files.
 
+### Skills from other repositories
+
+`skills` installs [agent skills](https://agentskills.io) from GitHub repositories with [`gh skill install`](https://cli.github.com/manual/gh_skill_install), one per line:
+
+```yaml
+with:
+  skills: |
+    github/awesome-copilot git-commit@v1.2.0
+    monalisa/skills-repo skills/monalisa/code-review --pin 3f2a9c1
+    my-org/agent-skills --all
+```
+
+- Each line is a repository in `OWNER/REPO` form, then a skill name or path (`@version` or `--pin` pins it to a tag or commit), or `--all` for every skill in the repository. `--allow-hidden-dirs` is also accepted.
+- Without a version, gh installs the latest release, or the default branch when there is none.
+- Skills are installed outside the checkout, so they are never committed with the agent's changes. They are loaded even with `--no-skills` in `pi_args`, which then only drops the repository's own skills.
+- gh must be on the runner; GitHub-hosted runners have it. It uses the action's GitHub token, so a private skills repository needs a `github_token` that can read it.
+
+A skill is instructions the agent follows and scripts it may run, written by someone else. Review it before you list it, and pin it so it cannot change under you. The scripts still need `allowed_tools` rules to run.
+
 ## Reading CI results
 
 With `actions: read`, the agent gets tools to read workflow runs and job logs on the pull request it works on (`mcp__github_ci__get_ci_status`, `mcp__github_ci__get_workflow_run_details`, `mcp__github_ci__download_job_log`), so `@pi why did CI fail?` works.

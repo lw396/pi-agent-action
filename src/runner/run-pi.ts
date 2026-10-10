@@ -60,6 +60,11 @@ export type RunnerOptions = {
   /** The disallowed_tools input: rules that block calls, before allowed_tools. */
   disallowedTools?: ToolRule[];
   /**
+   * Directory of the skills the skills input installed. Loaded like a
+   * `--skill` path in pi, so `--no-skills` in pi_args does not drop them.
+   */
+  skillsDir?: string;
+  /**
    * Let edit and write change files in the working directory without a rule,
    * like Claude Code's acceptEdits permission mode in Upstream's tag mode.
    */
@@ -210,6 +215,7 @@ export async function runPi(
         join(agentDir, "mcp.log"),
       ),
     ],
+    additionalSkillPaths: options.skillsDir ? [options.skillsDir] : [],
     ...piArgs.resources,
   });
   await resourceLoader.reload();

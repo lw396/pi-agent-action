@@ -86,6 +86,16 @@ inputs:
     description: "Additional pi command-line flags. Supported: --thinking, --system-prompt, --append-system-prompt, --tools, --exclude-tools, --no-tools, --no-builtin-tools, --no-skills, --no-prompt-templates, --no-context-files. Any other flag fails the run."
     required: false
     default: ""
+  skills:
+    description: >-
+      Agent skills to install with gh skill install, one per line:
+      OWNER/REPO followed by a skill name (skill@version to pin it), or
+      --all for every skill in the repository; --pin REF and
+      --allow-hidden-dirs are also accepted. They are installed outside the
+      checkout and loaded even with --no-skills in pi_args. Needs gh on the
+      runner; a private repository needs a github_token that can read it.
+    required: false
+    default: ""
   allowed_tools:
     description: >-
       Tools the agent may use, in Claude Code's rule syntax, separated by
@@ -395,6 +405,7 @@ runs:
         MODEL: ${{ inputs.model }}
         API_KEY: ${{ inputs.api_key }}
         PI_ARGS: ${{ inputs.pi_args }}
+        INPUT_SKILLS: ${{ inputs.skills }}
         INPUT_ALLOWED_TOOLS: ${{ inputs.allowed_tools }}
         INPUT_DISALLOWED_TOOLS: ${{ inputs.disallowed_tools }}
         JSON_SCHEMA: ${{ inputs.json_schema }}

@@ -23,6 +23,7 @@ describe("readRunnerInputs", () => {
       INPUT_ALLOWED_TOOLS: "Bash(npm test)",
       INPUT_DISALLOWED_TOOLS: "Write",
       JSON_SCHEMA: '{"type":"object"}',
+      INPUT_SKILLS: "github/awesome-copilot git-commit@v1.2.0",
       ALLOWED_BASH_ENV: "NPM_TOKEN",
     });
 
@@ -35,6 +36,7 @@ describe("readRunnerInputs", () => {
       ],
       disallowedTools: [{ text: "Write", tool: "write" }],
       jsonSchema: '{"type":"object"}',
+      skills: [["github/awesome-copilot", "git-commit@v1.2.0"]],
       untrustedInput: false,
       isolateBash: false,
       allowedBashEnv: "NPM_TOKEN",
@@ -46,6 +48,12 @@ describe("readRunnerInputs", () => {
     expect(() =>
       readRunnerInputs({ INPUT_DISALLOWED_TOOLS: "Edit(.env)" }),
     ).toThrow("Invalid disallowed_tools: 'Edit(.env)'");
+  });
+
+  test("fails on a skills line the action would not install as written", () => {
+    expect(() =>
+      readRunnerInputs({ INPUT_SKILLS: "github/awesome-copilot" }),
+    ).toThrow("names no skill");
   });
 
   test.each([

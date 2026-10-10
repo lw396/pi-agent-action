@@ -35,6 +35,7 @@ import { redactSecrets } from "../github/utils/sanitizer";
 import { collectSecretValues } from "../runner/secret-values";
 import { runPi } from "../runner/run-pi";
 import { readRunnerInputs, runnerOptions } from "../runner/run-plan";
+import { installSkills } from "../runner/skills";
 import {
   readExecutionFile,
   setExecutionFileOutputIfPresent,
@@ -167,6 +168,8 @@ async function run() {
     commentId = prepareResult.commentId;
     agentBranch = prepareResult.branchInfo.agentBranch;
     baseBranch = prepareResult.branchInfo.baseBranch;
+    // Outside the checkout, so they are never committed with the agent's changes.
+    const skillsDir = await installSkills(runnerInputs.skills);
     prepareCompleted = true;
 
     // Phase 2: Run pi through the Runner
@@ -195,10 +198,10 @@ async function run() {
       }
     }
 
-    const runResult = await runPi(
-      prepareResult.prompt,
-      runnerOptions(runnerInputs, prepareResult),
-    );
+    const runResult = await runPi(prepareResult.prompt, {
+      ...runnerOptions(runnerInputs, prepareResult),
+      skillsDir,
+    });
 
     agentSuccess = runResult.conclusion === "success";
     executionFile = runResult.executionFile;

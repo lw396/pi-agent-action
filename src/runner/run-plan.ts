@@ -1,5 +1,6 @@
 import type { McpServers } from "./mcp-servers";
 import type { RunnerOptions } from "./run-pi";
+import { parseSkills, type SkillInstall } from "./skills";
 import { parseToolRules, type ToolRule } from "./tool-rules";
 
 /**
@@ -14,6 +15,8 @@ export type RunnerInputs = {
   allowedTools: ToolRule[];
   disallowedTools: ToolRule[];
   jsonSchema?: string;
+  /** The skills input: the `gh skill install` calls prepare makes. */
+  skills: SkillInstall[];
   /**
    * allowed_non_write_users is set, so content from users without write
    * access can reach the model. Prepare then keeps the GitHub token out of
@@ -45,7 +48,8 @@ export type ModeRunSettings = {
 
 /**
  * Read the Runner's inputs. Throws on a tool rule the action cannot enforce
- * as written, so the run fails before anything is prepared.
+ * as written, or a skills line it would not install as written, so the run
+ * fails before anything is prepared.
  */
 export function readRunnerInputs(env: NodeJS.ProcessEnv): RunnerInputs {
   const untrustedInput = !!env.ALLOWED_NON_WRITE_USERS;
@@ -59,6 +63,7 @@ export function readRunnerInputs(env: NodeJS.ProcessEnv): RunnerInputs {
       "disallowed_tools",
     ),
     jsonSchema: env.JSON_SCHEMA,
+    skills: parseSkills(env.INPUT_SKILLS),
     untrustedInput,
     isolateBash: untrustedInput && env.SUBPROCESS_ISOLATION !== "false",
     allowedBashEnv: env.ALLOWED_BASH_ENV,
