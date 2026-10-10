@@ -1,0 +1,76 @@
+name: Explain PR Changes
+
+# When a pull request is opened, explain what it changes with diagrams, so a
+# reviewer can follow the change before reading the code.
+#
+# The explanation comes from the show-me skill (humanlayer/skills), installed
+# with the skills input. show-me sets disable-model-invocation, so the model
+# only uses it when the prompt starts with /skill:show-me.
+#
+# The agent cannot post anything itself: it returns the explanation through
+# json_schema, and the next step posts it as a PR comment.
+#
+# Pull requests from forks get no secrets, so the model key is empty there and
+# the run fails; limit the job to branches of this repository if that matters.
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  explain:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Explain the changes
+        id: pi
+        uses: lw396/pi-agent-action@v1
+        with:
+          model: google/<model-id>
+
+          # Pinned to a commit: humanlayer/skills has no releases, so without
+          # --pin every run would install whatever is on its default branch.
+          skills: |
+            humanlayer/skills plugins/show-me/skills/show-me --pin 653b6411c1f70c275a18e37673b042ff99f67ceb
+
+          # Everything after /skill:show-me is the request the skill works on.
+          prompt: |
+            /skill:show-me Explain what pull request #${{ github.event.pull_request.number }} changes to a reviewer who has not read the code yet. Read it with `gh pr view` and `gh pr diff`.
+
+            The result becomes a GitHub comment: no HTML files, put the Markdown in `explanation`.
+
+          json_schema: |
+            {
+              "type": "object",
+              "properties": {
+                "explanation": {
+                  "type": "string",
+                  "description": "The explanation, as GitHub-flavoured Markdown"
+                }
+              },
+              "required": ["explanation"]
+            }
+
+          # Read-only: the agent reads the pull request and the checkout, and
+          # posts nothing.
+          allowed_tools: "Bash(gh pr view:*),Bash(gh pr diff:*)"
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Post the explanation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Through env, not ${{ }} in the script, so the text cannot run as shell.
+          RESULT: ${{ steps.pi.outputs.structured_output }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          jq -r .explanation <<< "$RESULT" > explanation.md
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file explanation.md

@@ -2,17 +2,18 @@
 
 Ready-to-use workflows for common jobs. Each one runs in agent mode (it sets `prompt`), so it starts on its own event instead of waiting for `@pi`. Copy a file from [`examples/`](../examples), replace `<model-id>` and the provider key, and adjust the prompt.
 
-| Job                                   | Example                                                                        | Event                       |
-| ------------------------------------- | ------------------------------------------------------------------------------ | --------------------------- |
-| Answer `@pi` on issues and PRs        | [`pi.yml`](../examples/pi.yml)                                                 | Comments, issues            |
-| Review every pull request             | [`pr-review-comprehensive.yml`](../examples/pr-review-comprehensive.yml)       | `pull_request`              |
-| Review only some paths                | [`pr-review-filtered-paths.yml`](../examples/pr-review-filtered-paths.yml)     | `pull_request` with `paths` |
-| Review PRs from some authors          | [`pr-review-filtered-authors.yml`](../examples/pr-review-filtered-authors.yml) | `pull_request`              |
-| Label new issues                      | [`issue-triage.yml`](../examples/issue-triage.yml)                             | `issues: opened`            |
-| Find duplicate issues                 | [`issue-deduplication.yml`](../examples/issue-deduplication.yml)               | `issues: opened`            |
-| Fix failing CI on a pull request      | [`ci-failure-auto-fix.yml`](../examples/ci-failure-auto-fix.yml)               | `workflow_run`              |
-| Retry flaky tests (structured output) | [`test-failure-analysis.yml`](../examples/test-failure-analysis.yml)           | `workflow_run`              |
-| Analyse commits on demand             | [`manual-code-analysis.yml`](../examples/manual-code-analysis.yml)             | `workflow_dispatch`         |
+| Job                                    | Example                                                                        | Event                       |
+| -------------------------------------- | ------------------------------------------------------------------------------ | --------------------------- |
+| Answer `@pi` on issues and PRs         | [`pi.yml`](../examples/pi.yml)                                                 | Comments, issues            |
+| Review every pull request              | [`pr-review-comprehensive.yml`](../examples/pr-review-comprehensive.yml)       | `pull_request`              |
+| Explain a new PR with diagrams (skill) | [`pr-explain-show-me.yml`](../examples/pr-explain-show-me.yml)                 | `pull_request: opened`      |
+| Review only some paths                 | [`pr-review-filtered-paths.yml`](../examples/pr-review-filtered-paths.yml)     | `pull_request` with `paths` |
+| Review PRs from some authors           | [`pr-review-filtered-authors.yml`](../examples/pr-review-filtered-authors.yml) | `pull_request`              |
+| Label new issues                       | [`issue-triage.yml`](../examples/issue-triage.yml)                             | `issues: opened`            |
+| Find duplicate issues                  | [`issue-deduplication.yml`](../examples/issue-deduplication.yml)               | `issues: opened`            |
+| Fix failing CI on a pull request       | [`ci-failure-auto-fix.yml`](../examples/ci-failure-auto-fix.yml)               | `workflow_run`              |
+| Retry flaky tests (structured output)  | [`test-failure-analysis.yml`](../examples/test-failure-analysis.yml)           | `workflow_run`              |
+| Analyse commits on demand              | [`manual-code-analysis.yml`](../examples/manual-code-analysis.yml)             | `workflow_dispatch`         |
 
 The sections below explain the parts of these workflows you are most likely to change, and add two jobs that have no example file.
 
