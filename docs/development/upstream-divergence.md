@@ -48,13 +48,15 @@
 
 ## 工具与权限
 
-| 偏离                | 上游 → 本仓库                                                                                                                                                                                      | 类别            | 用户可见 |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | -------- |
-| 未命中规则的调用    | `--permission-mode auto` 交给安全审查 → 直接拒绝；只读工具（Read、Grep、Glob、LS）总是放行（`src/runner/tool-permissions.ts`）                                                                     | `pi-capability` | 是       |
-| 组合命令            | 拆开后逐段匹配，另有内置只读命令 → 有 `Bash(...)` 规则参与判断时，拒绝 `&&`、`;`、`\|`、`$()`、重定向等；只读命令只剩 tag mode 的只读 git 命令（`src/runner/shell-syntax.ts`、`read-only-git.ts`） | `pi-capability` | 是       |
-| 规则语法            | Read、Edit 可带路径，WebFetch 可带 `domain:` → 只有 Bash 规则可带 pattern，其他工具带 pattern 时运行失败；pi 没有的工具只打印警告（`src/runner/tool-rules.ts`）                                    | `pi-capability` | 是       |
-| tag mode 的文件编辑 | acceptEdits 模式 → 扩展放行工作目录内的 `edit`、`write`，`.git/` 除外（`src/runner/workspace-path.ts`）                                                                                            | `pi-capability` | 否       |
+| 偏离                | 上游 → 本仓库                                                                                                                                                                                                                | 类别            | 用户可见 |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | -------- |
+| 未命中规则的调用    | `--permission-mode auto` 交给安全审查 → 直接拒绝；只读工具（Read、Grep、Glob、LS）总是放行（`src/runner/tool-permissions.ts`）                                                                                               | `pi-capability` | 是       |
+| 组合命令            | 拆开后逐段匹配，另有内置只读命令 → 有 `Bash(...)` 规则参与判断时，拒绝 `&&`、`;`、`\|`、`$()`、重定向等；只读命令只剩 tag mode 的只读 git 命令（`src/runner/shell-syntax.ts`、`read-only-git.ts`）                           | `pi-capability` | 是       |
+| 规则语法            | Read、Edit 可带路径，WebFetch 可带 `domain:` → 只有 Bash 规则可带 pattern，其他工具带 pattern 时运行失败；pi 没有的工具只打印警告（`src/runner/tool-rules.ts`）                                                              | `pi-capability` | 是       |
+| codemode            | 无 → `pi_args: --tools +codemode` 开启 pi 的 `codemode` 工具（与 pi 一样默认关闭）：模型可以写 JS 脚本调用其他工具和 classifier 等非对话模型；它本身不需要规则，脚本里的每次工具调用照常按规则检查（`src/runner/run-pi.ts`） | `pi-capability` | 是       |
+| tag mode 的文件编辑 | acceptEdits 模式 → 扩展放行工作目录内的 `edit`、`write`，`.git/` 除外（`src/runner/workspace-path.ts`）                                                                                                                      | `pi-capability` | 否       |
 
+- codemode 不扩大权限：脚本在没有文件系统和网络的 QuickJS 沙箱里运行，只能通过工具和 `models` 影响外部，而工具调用经过同一个 `tool_call` hook（`test/pi-sdk/codemode.test.ts`）。`models` 的调用（分类、生成图片）不是工具调用，规则管不到，费用记在 provider key 上。
 - 不拆分组合命令：拆分要完整实现 bash 语法，漏掉一种写法就能绕过规则；直接拒绝容易验证，模型收到原因后会逐条执行。
 - 不放行 `.git/` 下的写入：写进去的 hook 会在 `git commit` 时执行任意命令，绕过 bash 规则。
 - 只读 git 命令带 `--output`、`--ext-diff`、`--textconv`、`-c`、`-C` 等选项时不放行，因为这些选项能写文件或执行程序。

@@ -34,7 +34,7 @@ type CallResult = {
  */
 async function runCalls(
   calls: ToolCall[],
-  options: Pick<RunnerOptions, "acceptEdits" | "readOnlyGit"> & {
+  options: Pick<RunnerOptions, "acceptEdits" | "readOnlyGit" | "piArgs"> & {
     /** Rules as written in the allowed_tools and disallowed_tools inputs. */
     allowedTools?: string;
     disallowedTools?: string;
@@ -367,6 +367,66 @@ describe("tool permissions", () => {
       expect(ran("pwned")).toBe(false);
     });
   });
+  describe("codemode", () => {
+    const script = (code: string): ToolCall => ({
+      name: "codemode",
+      args: { code },
+    });
+    const ON = "--tools +codemode";
+
+    test("is off unless pi_args turns it on", async () => {
+      const [result] = await runCalls([script('text("ran");')]);
+
+      expect(result!.isError).toBe(true);
+      expect(result!.text).toBe("Tool codemode not found");
+    });
+
+    test("needs no rule once on, but the tools a script calls do", async () => {
+      await Bun.write(join(getScratch().cwd, "notes.txt"), "hello from notes");
+
+      const [result] = await runCalls(
+        [
+          script(
+            [
+              'text(await tools.read({ path: "notes.txt" }));',
+              'await tools.bash({ command: "touch pwned" });',
+            ].join("\n"),
+          ),
+        ],
+        { piArgs: ON },
+      );
+
+      expect(result!.text).toContain("hello from notes");
+      expect(result!.text).toContain("no allowed_tools rule permits it");
+      expect(ran("pwned")).toBe(false);
+    });
+
+    test("a script's calls match allowed_tools rules like direct calls", async () => {
+      const [result] = await runCalls(
+        [
+          script(
+            'await tools.bash({ command: "touch first && touch pwned" });',
+          ),
+        ],
+        { piArgs: ON, allowedTools: "Bash(touch first:*)" },
+      );
+
+      expect(result!.text).toContain("shell syntax");
+      expect(ran("first")).toBe(false);
+      expect(ran("pwned")).toBe(false);
+    });
+
+    test("disallowed_tools can block it", async () => {
+      const [result] = await runCalls([script('text("ran");')], {
+        piArgs: ON,
+        disallowedTools: "codemode",
+      });
+
+      expect(result!.isError).toBe(true);
+      expect(result!.text).toContain("disallowed_tools");
+    });
+  });
+
   describe("acceptEdits (tag mode)", () => {
     const write = (path: string): ToolCall => ({
       name: "write",

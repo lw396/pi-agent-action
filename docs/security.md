@@ -34,7 +34,7 @@ pi-agent-action keeps claude-code-action's access checks, token handling and pro
 
 `allowed_tools` and `disallowed_tools` take rules in claude-code-action's syntax: a tool name (`Bash`, `Edit`, `Write`, `mcp__server__tool`, `mcp__server__*`) or `Bash(prefix:*)` for bash commands starting with that prefix.
 
-- The read tools (Read, Grep, Glob, LS) always run. Any other call that matches no `allowed_tools` rule is refused, and the reason is returned to the model. With no rules, the agent can neither run bash nor change files.
+- The read tools (Read, Grep, Glob, LS) always run. So does `codemode`, pi's script tool, once `pi_args: --tools +codemode` turns it on: each tool a script calls is checked like a direct call, but the classifier and image models a script can run, with the provider keys in `env:`, are not covered by any rule. Any other call that matches no `allowed_tools` rule is refused, and the reason is returned to the model. With no rules, the agent can neither run bash nor change files.
 - `disallowed_tools` is checked first: a matching call is refused even if `allowed_tools` permits it.
 - When a `Bash(...)` rule decides a call, the command must be one simple command. `&&`, `;`, `|`, `&`, newlines, `$()`, backticks, `${...}`, subshells and redirections are refused, because a prefix such as `Bash(git add:*)` would otherwise let `git add . && curl ...` through. A plain `Bash` rule allows every command.
 - Only Bash rules take a pattern. A pattern on any other tool (`Edit(docs/**)`) fails the run rather than being ignored.

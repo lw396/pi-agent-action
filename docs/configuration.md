@@ -50,6 +50,17 @@ env:
   DATABASE_URL: postgres://test:test@localhost:5432/test
 ```
 
+### Scripts (codemode)
+
+pi's `codemode` tool lets the model write a JavaScript script that calls other tools, in parallel if it likes, and passes back only what the script prints. It is off by default, as in pi. Turn it on with:
+
+```yaml
+with:
+  pi_args: --tools +codemode
+```
+
+`codemode` itself needs no rule, but each tool a script calls is checked against `allowed_tools` like a direct call. Scripts can also run classifier and image models with the provider keys in `env:`; no rule covers those calls. See [Tool permissions](./security.md#tool-permissions).
+
 ## Instructions for the agent
 
 pi reads these files from the checked-out repository, as it does locally, so project conventions you already keep there apply in the action too:

@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import {
   createAgentSession,
+  createCodemodeExtension,
   DefaultResourceLoader,
   ModelRuntime,
   resolveCliModel,
@@ -122,6 +123,15 @@ const OMITTED_EVENTS = new Set<AgentSessionEvent["type"]>([
 ]);
 
 /**
+ * pi's codemode tool. Its extension is always loaded but, as in pi, the tool
+ * is off until `--tools +codemode` in pi_args turns it on. Running a script
+ * then needs no rule; disallowed_tools can still block it. The tools a script
+ * calls go through tool_call, so the tool permissions extension checks them
+ * like direct calls.
+ */
+const CODEMODE_RULE: ToolRule = { text: "codemode", tool: "codemode" };
+
+/**
  * Variables the agent must not see, removed as Upstream removes them from the
  * Claude Code environment. With the OIDC request pair the agent could mint new
  * tokens; ALL_INPUTS holds the serialized workflow inputs and is only needed
@@ -192,6 +202,7 @@ export async function runPi(
     settingsManager,
     extensionFactories: [
       toolPermissionsExtension(toolPermissions),
+      createCodemodeExtension(),
       commentRedactionExtension(),
       ...(structuredOutput ? [structuredOutput.extension] : []),
       ...mcpServerExtensions(
@@ -267,7 +278,7 @@ function buildToolPermissions(
   cwd: string,
   structuredOutput: StructuredOutput | undefined,
 ): ToolPermissions {
-  const allowed = options.allowedTools ?? [];
+  const allowed = [...(options.allowedTools ?? []), CODEMODE_RULE];
   return {
     allowed: structuredOutput
       ? [...allowed, structuredOutput.allowRule]
