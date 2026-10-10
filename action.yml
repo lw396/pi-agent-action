@@ -1,5 +1,5 @@
 name: "pi Agent Action"
-description: "Run the pi coding agent on GitHub issues and pull requests, with any model pi supports. Auto-detects mode based on event type: PR reviews, @pi mentions, or custom automation."
+description: "Run the pi coding agent on GitHub issues and PRs with any model: answer @pi mentions, review code and run automations."
 branding:
   icon: "at-sign"
   color: "orange"
