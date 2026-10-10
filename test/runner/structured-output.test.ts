@@ -147,21 +147,23 @@ describe("structured output", () => {
     });
   });
 
-  test.each(["--tools read", "--no-tools", "--no-builtin-tools"])(
-    "keeps submit_result when pi_args has %s",
-    async (piArgs) => {
-      const { result } = await run([submit({ verdict: "pass", count: 5 })], {
-        jsonSchema: SCHEMA,
-        piArgs,
-      });
+  test.each([
+    "--tools read",
+    "--tools +grep",
+    "--no-tools",
+    "--no-builtin-tools",
+  ])("keeps submit_result when pi_args has %s", async (piArgs) => {
+    const { result } = await run([submit({ verdict: "pass", count: 5 })], {
+      jsonSchema: SCHEMA,
+      piArgs,
+    });
 
-      const { structuredOutput } = await result;
-      expect(JSON.parse(structuredOutput!)).toEqual({
-        verdict: "pass",
-        count: 5,
-      });
-    },
-  );
+    const { structuredOutput } = await result;
+    expect(JSON.parse(structuredOutput!)).toEqual({
+      verdict: "pass",
+      count: 5,
+    });
+  });
 
   test("refuses pi_args that exclude submit_result, before calling the model", async () => {
     const { faux, result } = await run([fauxAssistantMessage("unused")], {

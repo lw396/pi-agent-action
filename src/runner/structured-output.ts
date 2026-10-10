@@ -138,6 +138,10 @@ export function createStructuredOutput(
     allowRule: { text: "json_schema", tool: SUBMIT_RESULT_TOOL },
     extension: structuredOutputExtension(schema, state),
     sessionTools({ tools, noTools }) {
+      // pi rejects a list that mixes names with +name/-name entries.
+      if (tools?.length && tools.every((t) => /^[+-]/.test(t))) {
+        return [...tools, `+${SUBMIT_RESULT_TOOL}`];
+      }
       if (tools) return [...tools, SUBMIT_RESULT_TOOL];
       if (noTools === "all") return [SUBMIT_RESULT_TOOL];
       return undefined;
