@@ -1,11 +1,11 @@
 import { Octokit } from "@octokit/rest";
+import type { TrackingComment } from "./tracking-comment";
 
 export type UpdateCommentParams = {
   owner: string;
   repo: string;
-  commentId: number;
+  comment: TrackingComment;
   body: string;
-  isPullRequestReviewComment: boolean;
 };
 
 export type UpdateCommentResult = {
@@ -14,53 +14,27 @@ export type UpdateCommentResult = {
   updated_at: string;
 };
 
-/**
- * Updates the tracking comment on GitHub (either an issue/PR comment or a PR review comment)
- *
- * @param octokit - Authenticated Octokit instance
- * @param params - Parameters for updating the comment
- * @returns The updated comment details
- * @throws Error if the update fails
- */
+/** Update the tracking comment through the API its namespace names. */
 export async function updateComment(
   octokit: Octokit,
   params: UpdateCommentParams,
 ): Promise<UpdateCommentResult> {
-  const { owner, repo, commentId, body, isPullRequestReviewComment } = params;
+  const { owner, repo, comment, body } = params;
 
-  let response;
-
-  try {
-    if (isPullRequestReviewComment) {
-      // Try PR review comment API first
-      response = await octokit.rest.pulls.updateReviewComment({
-        owner,
-        repo,
-        comment_id: commentId,
-        body,
-      });
-    } else {
-      // Use issue comment API (works for both issues and PR general comments)
-      response = await octokit.rest.issues.updateComment({
-        owner,
-        repo,
-        comment_id: commentId,
-        body,
-      });
-    }
-  } catch (error: any) {
-    // If PR review comment update fails with 404, fall back to issue comment API
-    if (isPullRequestReviewComment && error.status === 404) {
-      response = await octokit.rest.issues.updateComment({
-        owner,
-        repo,
-        comment_id: commentId,
-        body,
-      });
-    } else {
-      throw error;
-    }
-  }
+  const response =
+    comment.namespace === "review"
+      ? await octokit.rest.pulls.updateReviewComment({
+          owner,
+          repo,
+          comment_id: comment.id,
+          body,
+        })
+      : await octokit.rest.issues.updateComment({
+          owner,
+          repo,
+          comment_id: comment.id,
+          body,
+        });
 
   return {
     id: response.data.id,

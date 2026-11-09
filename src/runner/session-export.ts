@@ -6,8 +6,8 @@ import {
   type SessionEntry,
   type SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { redactSecrets } from "../github/utils/sanitizer";
-import { redactNamedSecretValues } from "./secret-values";
+import { redactSecrets } from "../security/sanitizer";
+import { redactNamedSecretValues } from "../security/secret-values";
 
 /**
  * The export_session input: the Runner's session, redacted, as pi's JSONL

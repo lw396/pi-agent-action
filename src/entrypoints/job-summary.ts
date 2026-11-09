@@ -1,7 +1,7 @@
 import * as core from "@actions/core";
 import { existsSync, readFileSync } from "fs";
 import { appendFile } from "fs/promises";
-import { redactSecrets } from "../github/utils/sanitizer";
+import { redactSecrets } from "../security/sanitizer";
 import { readExecutionFile } from "../runner/execution-file";
 import type { RunAudit, Termination } from "../runner/run-audit";
 import { formatTurnsFromData } from "./format-turns";

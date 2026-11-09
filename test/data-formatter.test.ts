@@ -4,7 +4,6 @@ import {
   formatBody,
   formatComments,
   formatReviewComments,
-  formatChangedFiles,
   formatChangedFilesWithSHA,
 } from "../src/github/data/formatter";
 import type {
@@ -1009,35 +1008,6 @@ describe("formatReviewComments", () => {
     expect(result).toBe(
       `[Review by reviewer1 at 2023-01-01T00:00:00Z]: APPROVED\nFirst review\n  [Comment on src/index.ts:42]: Good comment\n\n[Review by reviewer2 at 2023-01-02T00:00:00Z]: COMMENTED\nSecond review`,
     );
-  });
-});
-
-describe("formatChangedFiles", () => {
-  test("formats changed files correctly", () => {
-    const files: GitHubFile[] = [
-      {
-        path: "src/index.ts",
-        additions: 10,
-        deletions: 5,
-        changeType: "MODIFIED",
-      },
-      {
-        path: "src/utils.ts",
-        additions: 20,
-        deletions: 0,
-        changeType: "ADDED",
-      },
-    ];
-
-    const result = formatChangedFiles(files);
-    expect(result).toBe(
-      `- src/index.ts (MODIFIED) +10/-5\n- src/utils.ts (ADDED) +20/-0`,
-    );
-  });
-
-  test("returns empty string for empty files array", () => {
-    const result = formatChangedFiles([]);
-    expect(result).toBe("");
   });
 });
 

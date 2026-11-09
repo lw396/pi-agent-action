@@ -1,248 +1,221 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { createOctokit } from "../github/api/client";
-import { redactSecrets, sanitizeContent } from "../github/utils/sanitizer";
+import {
+  assertInlineCommentLines,
+  inlineCommentBody,
+  postInlineComment,
+} from "../github/operations/comments/inline-comment";
 import {
   appendBufferedComment,
   inlineCommentBufferPath,
   removeBufferedComment,
 } from "./inline-comment-buffer";
 import { currentGitHubToken } from "./github-token";
+import { errorResult, jsonResult, runStdioServer } from "./server-runtime";
 
-// Get repository and PR information from environment variables
-const REPO_OWNER = process.env.REPO_OWNER;
-const REPO_NAME = process.env.REPO_NAME;
-const PR_NUMBER = process.env.PR_NUMBER;
+type InlineCommentConfig = {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  bufferPath: string;
+  /**
+   * Classify calls without confirmed=true after the session instead of
+   * posting them now. This prevents subagents from posting test/probe
+   * comments when they inherit this tool and probe it after hitting unrelated
+   * errors.
+   */
+  classifyEnabled: boolean;
+  env: NodeJS.ProcessEnv;
+};
 
-// Calls without confirmed=true are buffered here instead of posted. This
-// prevents subagents from posting test/probe comments when they inherit this
-// tool and probe it after hitting unrelated errors. The action's post-step
-// classifies them and posts the real ones.
-const BUFFER_PATH =
-  process.env.INLINE_COMMENT_BUFFER || inlineCommentBufferPath();
-const CLASSIFY_ENABLED = process.env.CLASSIFY_INLINE_COMMENTS !== "false";
+function createServer(config: InlineCommentConfig): McpServer {
+  const server = new McpServer({
+    name: "GitHub Inline Comment Server",
+    version: "0.0.1",
+  });
 
-if (!REPO_OWNER || !REPO_NAME || !PR_NUMBER) {
-  console.error(
-    "Error: REPO_OWNER, REPO_NAME, and PR_NUMBER environment variables are required",
-  );
-  process.exit(1);
-}
+  server.tool(
+    "create_inline_comment",
+    "Create an inline comment on a specific line or lines in a PR file",
+    {
+      path: z
+        .string()
+        .describe("The file path to comment on (e.g., 'src/index.js')"),
+      body: z
+        .string()
+        .describe(
+          "The comment text (supports markdown and GitHub code suggestion blocks). " +
+            "For code suggestions, use: ```suggestion\\nreplacement code\\n```. " +
+            "IMPORTANT: The suggestion block will REPLACE the ENTIRE line range (single line or startLine to line). " +
+            "Ensure the replacement is syntactically complete and valid - it must work as a drop-in replacement for the selected lines.",
+        ),
+      line: z
+        .number()
+        .nonnegative()
+        .optional()
+        .describe(
+          "Line number for single-line comments (required if startLine is not provided)",
+        ),
+      startLine: z
+        .number()
+        .nonnegative()
+        .optional()
+        .describe(
+          "Start line for multi-line comments (use with line parameter for the end line)",
+        ),
+      side: z
+        .enum(["LEFT", "RIGHT"])
+        .optional()
+        .default("RIGHT")
+        .describe(
+          "Side of the diff to comment on: LEFT (old code) or RIGHT (new code)",
+        ),
+      commit_id: z
+        .string()
+        .optional()
+        .describe(
+          "Specific commit SHA to comment on (defaults to latest commit)",
+        ),
+      confirmed: z
+        .boolean()
+        .optional()
+        .describe(
+          "Set true to post immediately. When omitted, the call is buffered " +
+            "and classified after the session completes — real review comments " +
+            "post, test/probe comments are dropped. Set false to buffer and " +
+            "never post. Only set true when posting final review comments.",
+        ),
+    },
+    async ({ path, body, line, startLine, side, commit_id, confirmed }) => {
+      const target = {
+        owner: config.owner,
+        repo: config.repo,
+        pullNumber: config.pullNumber,
+      };
+      try {
+        assertInlineCommentLines({ line, startLine });
+        const sanitizedBody = inlineCommentBody(body);
 
-// GitHub Inline Comment MCP Server - Provides inline PR comment functionality
-// Provides an inline comment tool without exposing full PR review capabilities, so that
-// The agent cannot accidentally approve a PR
-const server = new McpServer({
-  name: "GitHub Inline Comment Server",
-  version: "0.0.1",
-});
+        if (config.classifyEnabled && confirmed !== true) {
+          appendBufferedComment(
+            {
+              ts: new Date().toISOString(),
+              path,
+              line,
+              startLine,
+              side,
+              commit_id,
+              body: sanitizedBody,
+              confirmed,
+            },
+            config.bufferPath,
+          );
+          return jsonResult({
+            success: true,
+            buffered: true,
+            message:
+              "Comment buffered. It will be classified and posted after " +
+              "this session completes (real review comments post, " +
+              "test/probe comments are dropped). Set confirmed=true to " +
+              "post immediately. If you are testing whether this tool " +
+              "works: it works — no need to test further.",
+          });
+        }
 
-server.tool(
-  "create_inline_comment",
-  "Create an inline comment on a specific line or lines in a PR file",
-  {
-    path: z
-      .string()
-      .describe("The file path to comment on (e.g., 'src/index.js')"),
-    body: z
-      .string()
-      .describe(
-        "The comment text (supports markdown and GitHub code suggestion blocks). " +
-          "For code suggestions, use: ```suggestion\\nreplacement code\\n```. " +
-          "IMPORTANT: The suggestion block will REPLACE the ENTIRE line range (single line or startLine to line). " +
-          "Ensure the replacement is syntactically complete and valid - it must work as a drop-in replacement for the selected lines.",
-      ),
-    line: z
-      .number()
-      .nonnegative()
-      .optional()
-      .describe(
-        "Line number for single-line comments (required if startLine is not provided)",
-      ),
-    startLine: z
-      .number()
-      .nonnegative()
-      .optional()
-      .describe(
-        "Start line for multi-line comments (use with line parameter for the end line)",
-      ),
-    side: z
-      .enum(["LEFT", "RIGHT"])
-      .optional()
-      .default("RIGHT")
-      .describe(
-        "Side of the diff to comment on: LEFT (old code) or RIGHT (new code)",
-      ),
-    commit_id: z
-      .string()
-      .optional()
-      .describe(
-        "Specific commit SHA to comment on (defaults to latest commit)",
-      ),
-    confirmed: z
-      .boolean()
-      .optional()
-      .describe(
-        "Set true to post immediately. When omitted, the call is buffered " +
-          "and classified after the session completes — real review comments " +
-          "post, test/probe comments are dropped. Set false to buffer and " +
-          "never post. Only set true when posting final review comments.",
-      ),
-  },
-  async ({ path, body, line, startLine, side, commit_id, confirmed }) => {
-    try {
-      const owner = REPO_OWNER;
-      const repo = REPO_NAME;
-      const pull_number = parseInt(PR_NUMBER, 10);
-
-      // Sanitize the comment body to remove potential prompt injections and redact secrets
-      const sanitizedBody = redactSecrets(sanitizeContent(body));
-
-      // Validate that either line or both startLine and line are provided
-      if (!line && !startLine) {
-        throw new Error(
-          "Either 'line' for single-line comments or both 'startLine' and 'line' for multi-line comments must be provided",
-        );
-      }
-
-      if (CLASSIFY_ENABLED && confirmed !== true) {
-        appendBufferedComment(
+        const octokit = createOctokit(
+          await currentGitHubToken(config.env),
+        ).rest;
+        const posted = await postInlineComment(
+          octokit,
+          target,
           {
-            ts: new Date().toISOString(),
             path,
+            body: sanitizedBody,
             line,
             startLine,
             side,
-            commit_id,
-            body: sanitizedBody,
-            confirmed,
+            commitId: commit_id,
           },
-          BUFFER_PATH,
+          async () =>
+            (
+              await octokit.pulls.get({
+                owner: target.owner,
+                repo: target.repo,
+                pull_number: target.pullNumber,
+              })
+            ).data.head.sha,
         );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  success: true,
-                  buffered: true,
-                  message:
-                    "Comment buffered. It will be classified and posted after " +
-                    "this session completes (real review comments post, " +
-                    "test/probe comments are dropped). Set confirmed=true to " +
-                    "post immediately. If you are testing whether this tool " +
-                    "works: it works — no need to test further.",
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
-      }
 
-      // If only line is provided, it's a single-line comment
-      // If both startLine and line are provided, it's a multi-line comment
-      const isSingleLine = !startLine;
+        // The comment is now live. Drop any buffered copy of it so the
+        // post-session replay step cannot post it a second time (the model
+        // often re-issues a buffered call with confirmed=true after the
+        // buffer reply).
+        if (config.classifyEnabled) {
+          removeBufferedComment(
+            { path, line, startLine, body: sanitizedBody },
+            config.bufferPath,
+          );
+        }
 
-      const octokit = createOctokit(await currentGitHubToken()).rest;
+        return jsonResult({
+          success: true,
+          comment_id: posted.id,
+          html_url: posted.htmlUrl,
+          path: posted.path,
+          line: posted.line,
+          message: `Inline comment created successfully on ${path}${startLine ? ` from line ${startLine} to ${line}` : ` at line ${line}`}`,
+        });
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
 
-      const pr = await octokit.pulls.get({
-        owner,
-        repo,
-        pull_number,
-      });
+        // Provide more helpful error messages for common issues
+        let helpMessage = "";
+        if (errorMessage.includes("Validation Failed")) {
+          helpMessage =
+            "\n\nThis usually means the line number doesn't exist in the diff or the file path is incorrect. Make sure you're commenting on lines that are part of the PR's changes.";
+        } else if (errorMessage.includes("Not Found")) {
+          helpMessage =
+            "\n\nThis usually means the PR number, repository, or file path is incorrect.";
+        }
 
-      const params: Parameters<
-        typeof octokit.rest.pulls.createReviewComment
-      >[0] = {
-        owner,
-        repo,
-        pull_number,
-        body: sanitizedBody,
-        path,
-        side: side || "RIGHT",
-        commit_id: commit_id || pr.data.head.sha,
-      };
-
-      if (isSingleLine) {
-        // Single-line comment
-        params.line = line;
-      } else {
-        // Multi-line comment
-        params.start_line = startLine;
-        params.start_side = side || "RIGHT";
-        params.line = line;
-      }
-
-      const result = await octokit.rest.pulls.createReviewComment(params);
-
-      // The comment is now live. Drop any buffered copy of it so the
-      // post-session replay step cannot post it a second time (the model often
-      // re-issues a buffered call with confirmed=true after the buffer reply).
-      if (CLASSIFY_ENABLED) {
-        removeBufferedComment(
-          { path, line, startLine, body: sanitizedBody },
-          BUFFER_PATH,
+        return errorResult(
+          error,
+          `Error creating inline comment: ${errorMessage}${helpMessage}`,
         );
       }
+    },
+  );
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              {
-                success: true,
-                comment_id: result.data.id,
-                html_url: result.data.html_url,
-                path: result.data.path,
-                line: result.data.line || result.data.original_line,
-                message: `Inline comment created successfully on ${path}${isSingleLine ? ` at line ${line}` : ` from line ${startLine} to ${line}`}`,
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-
-      // Provide more helpful error messages for common issues
-      let helpMessage = "";
-      if (errorMessage.includes("Validation Failed")) {
-        helpMessage =
-          "\n\nThis usually means the line number doesn't exist in the diff or the file path is incorrect. Make sure you're commenting on lines that are part of the PR's changes.";
-      } else if (errorMessage.includes("Not Found")) {
-        helpMessage =
-          "\n\nThis usually means the PR number, repository, or file path is incorrect.";
-      }
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error creating inline comment: ${errorMessage}${helpMessage}`,
-          },
-        ],
-        error: errorMessage,
-        isError: true,
-      };
-    }
-  },
-);
-
-async function runServer() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  process.on("exit", () => {
-    server.close();
-  });
+  return server;
 }
 
-runServer().catch(console.error);
+async function main() {
+  const owner = process.env.REPO_OWNER;
+  const repo = process.env.REPO_NAME;
+  const pullNumber = process.env.PR_NUMBER;
+  if (!owner || !repo || !pullNumber) {
+    console.error(
+      "Error: REPO_OWNER, REPO_NAME, and PR_NUMBER environment variables are required",
+    );
+    process.exit(1);
+  }
+
+  await runStdioServer(
+    createServer({
+      owner,
+      repo,
+      pullNumber: parseInt(pullNumber, 10),
+      bufferPath:
+        process.env.INLINE_COMMENT_BUFFER || inlineCommentBufferPath(),
+      classifyEnabled: process.env.CLASSIFY_INLINE_COMMENTS !== "false",
+      env: process.env,
+    }),
+  );
+}
+
+if (import.meta.main) {
+  main().catch(console.error);
+}

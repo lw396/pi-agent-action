@@ -1,10 +1,5 @@
 #!/usr/bin/env bun
 
-/**
- * Create the initial tracking comment when Claude Code starts working
- * This comment shows the working status and includes a link to the job run
- */
-
 import { appendFileSync } from "fs";
 import { createJobRunLink, createCommentBody } from "./common";
 import {
@@ -14,15 +9,22 @@ import {
 } from "../../context";
 import type { Octokit } from "@octokit/rest";
 import { APP_BOT_ID } from "../../constants";
+import type { TrackingComment } from "./tracking-comment";
 
 export async function createInitialComment(
   octokit: Octokit,
   context: ParsedGitHubContext,
-) {
+): Promise<TrackingComment> {
   const { owner, repo } = context.repository;
 
   const jobRunLink = createJobRunLink(owner, repo, context.runId);
   const initialBody = createCommentBody(jobRunLink);
+
+  const record = (comment: TrackingComment) => {
+    const githubOutput = process.env.GITHUB_OUTPUT!;
+    appendFileSync(githubOutput, `tracking_comment_id=${comment.id}\n`);
+    return comment;
+  };
 
   try {
     let response;
@@ -54,7 +56,6 @@ export async function createInitialComment(
           body: initialBody,
         });
       } else {
-        // Create new comment if no existing one found
         response = await octokit.rest.issues.createComment({
           owner,
           repo,
@@ -63,7 +64,6 @@ export async function createInitialComment(
         });
       }
     } else if (isPullRequestReviewCommentEvent(context)) {
-      // Only use createReplyForReviewComment if it's a PR review comment AND we have a comment_id
       response = await octokit.rest.pulls.createReplyForReviewComment({
         owner,
         repo,
@@ -71,8 +71,9 @@ export async function createInitialComment(
         comment_id: context.payload.comment.id,
         body: initialBody,
       });
+      console.log(`✅ Created initial comment with ID: ${response.data.id}`);
+      return record({ id: response.data.id, namespace: "review" });
     } else {
-      // For all other cases (issues, issue comments, or missing comment_id)
       response = await octokit.rest.issues.createComment({
         owner,
         repo,
@@ -81,15 +82,13 @@ export async function createInitialComment(
       });
     }
 
-    // Output the comment ID for downstream steps using GITHUB_OUTPUT
-    const githubOutput = process.env.GITHUB_OUTPUT!;
-    appendFileSync(githubOutput, `tracking_comment_id=${response.data.id}\n`);
     console.log(`✅ Created initial comment with ID: ${response.data.id}`);
-    return response.data;
+    return record({ id: response.data.id, namespace: "issue" });
   } catch (error) {
     console.error("Error in initial comment:", error);
 
-    // Always fall back to regular issue comment if anything fails
+    // Any failure creating the comment the event asks for leaves an issue
+    // comment as the only way to report progress.
     try {
       const response = await octokit.rest.issues.createComment({
         owner,
@@ -98,10 +97,8 @@ export async function createInitialComment(
         body: initialBody,
       });
 
-      const githubOutput = process.env.GITHUB_OUTPUT!;
-      appendFileSync(githubOutput, `tracking_comment_id=${response.data.id}\n`);
       console.log(`✅ Created fallback comment with ID: ${response.data.id}`);
-      return response.data;
+      return record({ id: response.data.id, namespace: "issue" });
     } catch (fallbackError) {
       console.error("Error creating fallback comment:", fallbackError);
       throw fallbackError;

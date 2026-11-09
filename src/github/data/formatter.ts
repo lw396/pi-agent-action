@@ -2,11 +2,10 @@ import type {
   GitHubPullRequest,
   GitHubIssue,
   GitHubComment,
-  GitHubFile,
   GitHubReview,
 } from "../types";
 import type { GitHubFileWithSHA } from "./fetcher";
-import { sanitizeContent } from "../utils/sanitizer";
+import { sanitizeContent } from "../../security/sanitizer";
 
 function formatLabels(labelNodes: Array<{ name: string }>): string {
   if (labelNodes.length === 0) return "none";
@@ -61,15 +60,9 @@ export function formatComments(
   return comments
     .filter((comment) => !comment.isMinimized)
     .map((comment) => {
-      let body = comment.body;
-
-      if (imageUrlMap && body) {
-        for (const [originalUrl, localPath] of imageUrlMap) {
-          body = body.replaceAll(originalUrl, localPath);
-        }
-      }
-
-      body = sanitizeContent(body);
+      const body = imageUrlMap
+        ? formatBody(comment.body, imageUrlMap)
+        : sanitizeContent(comment.body);
 
       return `[${comment.author?.login ?? "ghost"} at ${comment.createdAt}]: ${body}`;
     })
@@ -88,15 +81,9 @@ export function formatReviewComments(
     let reviewOutput = `[Review by ${review.author?.login ?? "ghost"} at ${review.submittedAt}]: ${review.state}`;
 
     if (review.body && review.body.trim()) {
-      let body = review.body;
-
-      if (imageUrlMap) {
-        for (const [originalUrl, localPath] of imageUrlMap) {
-          body = body.replaceAll(originalUrl, localPath);
-        }
-      }
-
-      const sanitizedBody = sanitizeContent(body);
+      const sanitizedBody = imageUrlMap
+        ? formatBody(review.body, imageUrlMap)
+        : sanitizeContent(review.body);
       reviewOutput += `\n${sanitizedBody}`;
     }
 
@@ -108,15 +95,9 @@ export function formatReviewComments(
       const comments = review.comments.nodes
         .filter((comment) => !comment.isMinimized)
         .map((comment) => {
-          let body = comment.body;
-
-          if (imageUrlMap) {
-            for (const [originalUrl, localPath] of imageUrlMap) {
-              body = body.replaceAll(originalUrl, localPath);
-            }
-          }
-
-          body = sanitizeContent(body);
+          const body = imageUrlMap
+            ? formatBody(comment.body, imageUrlMap)
+            : sanitizeContent(comment.body);
 
           let formatted = `  [Comment on ${comment.path}:${comment.line || "?"}]: ${body}`;
 
@@ -139,15 +120,6 @@ export function formatReviewComments(
   });
 
   return formattedReviews.join("\n\n");
-}
-
-export function formatChangedFiles(changedFiles: GitHubFile[]): string {
-  return changedFiles
-    .map(
-      (file) =>
-        `- ${file.path} (${file.changeType}) +${file.additions}/-${file.deletions}`,
-    )
-    .join("\n");
 }
 
 export function formatChangedFilesWithSHA(

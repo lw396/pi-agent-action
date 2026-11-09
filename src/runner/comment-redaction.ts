@@ -1,5 +1,5 @@
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
-import { redactSecrets } from "../github/utils/sanitizer";
+import { redactSecrets } from "../security/sanitizer";
 
 /**
  * Every MCP server the action registers talks to GitHub (comments, inline

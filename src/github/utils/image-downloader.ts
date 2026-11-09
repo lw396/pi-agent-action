@@ -110,15 +110,12 @@ export async function downloadCommentImages(
   }> = [];
 
   for (const comment of comments) {
-    // Extract URLs from Markdown format
     const markdownMatches = [...comment.body.matchAll(IMAGE_REGEX)];
     const markdownUrls = markdownMatches.map((match) => match[1] as string);
 
-    // Extract URLs from HTML format
     const htmlMatches = [...comment.body.matchAll(HTML_IMG_REGEX)];
     const htmlUrls = htmlMatches.map((match) => match[1] as string);
 
-    // Combine and deduplicate URLs
     const urls = [...new Set([...markdownUrls, ...htmlUrls])];
 
     if (urls.length > 0) {
@@ -133,12 +130,10 @@ export async function downloadCommentImages(
     }
   }
 
-  // Process each comment with images
   for (const { comment, urls } of commentsWithImages) {
     try {
       let bodyHtml: string | undefined;
 
-      // Get the HTML version based on comment type
       switch (comment.type) {
         case "issue_comment": {
           const response = await octokits.rest.issues.getComment({
@@ -230,9 +225,7 @@ export async function downloadCommentImages(
         }
       }
 
-      // Download each image
       for (const [i, originalUrl] of urls.entries()) {
-        // Check if we've already downloaded this URL
         if (urlToPathMap.has(originalUrl)) {
           continue;
         }

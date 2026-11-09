@@ -32,7 +32,6 @@ export const REDACTED = "[REDACTED]";
  * test/secret-values.test.ts checks that.
  */
 export const ACTION_SETTINGS_ENV: readonly string[] = [
-  "MODE",
   "PROMPT",
   "TRIGGER_PHRASE",
   "ASSIGNEE_TRIGGER",
@@ -132,8 +131,8 @@ function base64Forms(value: string): string[] {
  * Until it is called, redactSecrets() matches known formats only. Every
  * process that publishes text and has secrets in its environment must call
  * it first: run.ts and the buffered inline comment post-step do. The MCP
- * servers do not need to, since their env holds no provider keys and the
- * Runner redacts MCP tool arguments by value before a call reaches them
+ * servers rely on the known formats, plus the value redaction the Runner
+ * applies to tool arguments before a call reaches them
  * (src/runner/comment-redaction.ts).
  * A value that an allowlisted variable also holds (PWD and GITHUB_WORKSPACE,
  * for example) is not a secret.

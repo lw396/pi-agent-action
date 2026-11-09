@@ -7,12 +7,27 @@ import { parseSettings, type RunSettings } from "./settings";
 import { parseToolRules, type ToolRule } from "./tool-rules";
 
 /**
+ * The model inputs: the model, its api_key and the endpoint overrides. Read on
+ * their own by the always() comment post-step, which needs no other input.
+ */
+export type ModelInputs = Required<ModelRuntimeOptions> & {
+  model?: string;
+  apiKey?: string;
+};
+
+export function readModelInputs(env: NodeJS.ProcessEnv): ModelInputs {
+  return {
+    model: env.MODEL,
+    apiKey: env.API_KEY,
+    baseUrls: readBaseUrls(env),
+  };
+}
+
+/**
  * The action inputs the Runner uses, read once from the env vars that
  * action.yml sets from them. Nothing else reads these variables.
  */
-export type RunnerInputs = Required<ModelRuntimeOptions> & {
-  model?: string;
-  apiKey?: string;
+export type RunnerInputs = ModelInputs & {
   piArgs?: string;
   /** The max_retries input: pi's retry.maxRetries for transient model errors. */
   maxRetries: number;
@@ -86,9 +101,7 @@ export function parseMaxRetries(value: string | undefined): number {
 export function readRunnerInputs(env: NodeJS.ProcessEnv): RunnerInputs {
   const untrustedInput = !!env.ALLOWED_NON_WRITE_USERS;
   return {
-    model: env.MODEL,
-    apiKey: env.API_KEY,
-    baseUrls: readBaseUrls(env),
+    ...readModelInputs(env),
     piArgs: env.PI_ARGS,
     maxRetries: parseMaxRetries(env.INPUT_MAX_RETRIES),
     settings: parseSettings(env.INPUT_SETTINGS),

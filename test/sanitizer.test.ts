@@ -9,7 +9,7 @@ import {
   stripHtmlComments,
   redactGitHubTokens,
   redactSecrets,
-} from "../src/github/utils/sanitizer";
+} from "../src/security/sanitizer";
 
 describe("stripInvisibleCharacters", () => {
   it("should remove zero-width characters", () => {

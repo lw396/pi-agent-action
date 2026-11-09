@@ -12,9 +12,10 @@
  */
 import { rmSync } from "fs";
 import { createOctokit } from "../github/api/client";
-import { redactSecrets } from "../github/utils/sanitizer";
-import { collectSecretValues } from "../runner/secret-values";
-import { readRunnerInputs } from "../runner/run-plan";
+import { redactSecrets } from "../security/sanitizer";
+import { collectSecretValues } from "../security/secret-values";
+import { readModelInputs } from "../runner/run-plan";
+import { postInlineComment } from "../github/operations/comments/inline-comment";
 import {
   inlineCommentBufferPath,
   readBufferedComments,
@@ -109,22 +110,20 @@ function gitHubPoster(
     headSha ??= octokit.pulls
       .get({ owner, repo, pull_number })
       .then((pr) => pr.data.head.sha);
-    const params: Parameters<typeof octokit.pulls.createReviewComment>[0] = {
-      owner,
-      repo,
-      pull_number,
-      body: redactSecrets(c.body),
-      path: c.path,
-      side: c.side || "RIGHT",
-      commit_id: c.commit_id || (await headSha),
-      line: c.line,
-    };
-    if (c.startLine) {
-      params.start_line = c.startLine;
-      params.start_side = c.side || "RIGHT";
-    }
     try {
-      await octokit.pulls.createReviewComment(params);
+      await postInlineComment(
+        octokit,
+        { owner, repo, pullNumber: pull_number },
+        {
+          path: c.path,
+          body: c.body,
+          line: c.line,
+          startLine: c.startLine,
+          side: c.side,
+          commitId: c.commit_id,
+        },
+        () => headSha!,
+      );
       return true;
     } catch (e) {
       console.log(
@@ -158,15 +157,15 @@ async function main() {
   await postBufferedComments(comments, {
     classify: async (bodies) => {
       try {
-        const runnerInputs = readRunnerInputs(process.env);
+        const modelInputs = readModelInputs(process.env);
         return await classifyComments(bodies, {
-          model: runnerInputs.model,
+          model: modelInputs.model,
           classifyModel: process.env.CLASSIFY_MODEL,
-          apiKey: runnerInputs.apiKey,
-          baseUrls: runnerInputs.baseUrls,
+          apiKey: modelInputs.apiKey,
+          baseUrls: modelInputs.baseUrls,
         });
       } catch (error) {
-        // Invalid runner configuration must not prevent the always() step
+        // Invalid model configuration must not prevent the always() step
         // from posting candidates, just like any other classification failure.
         const message = error instanceof Error ? error.message : String(error);
         console.log(

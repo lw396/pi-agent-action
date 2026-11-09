@@ -7,7 +7,7 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { quote } from "shell-quote";
-import { BASH_ENV_ALLOWLIST } from "./env-allowlist";
+import { BASH_ENV_ALLOWLIST } from "../security/env-allowlist";
 
 const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 

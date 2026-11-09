@@ -1,87 +1,28 @@
 import type { GitHubContext } from "../github/context";
-import {
-  isEntityContext,
-  isIssueCommentEvent,
-  isPullRequestReviewCommentEvent,
-  isPullRequestEvent,
-  isIssuesEvent,
-  isPullRequestReviewEvent,
-} from "../github/context";
+import { isEntityContext, isPullRequestEvent } from "../github/context";
 import { checkContainsTrigger } from "../github/validation/trigger";
 
 export type AutoDetectedMode = "tag" | "agent";
 
 export function detectMode(context: GitHubContext): AutoDetectedMode {
-  // Validate track_progress usage
   if (context.inputs.trackProgress) {
     validateTrackProgressEvent(context);
+    return "tag";
   }
 
-  // If track_progress is set for PR/issue events, force tag mode
-  if (context.inputs.trackProgress && isEntityContext(context)) {
-    if (
-      isPullRequestEvent(context) ||
-      isIssuesEvent(context) ||
-      isIssueCommentEvent(context) ||
-      isPullRequestReviewCommentEvent(context) ||
-      isPullRequestReviewEvent(context)
-    ) {
-      return "tag";
-    }
+  if (!isEntityContext(context)) return "agent";
+
+  if (context.inputs.prompt) return "agent";
+
+  // A mention in a PR body or title alone does not select tag mode.
+  if (!isPullRequestEvent(context) && checkContainsTrigger(context)) {
+    return "tag";
   }
 
-  // Comment events (current behavior - unchanged)
-  if (isEntityContext(context)) {
-    if (
-      isIssueCommentEvent(context) ||
-      isPullRequestReviewCommentEvent(context) ||
-      isPullRequestReviewEvent(context)
-    ) {
-      // If prompt is provided on comment events, use agent mode
-      if (context.inputs.prompt) {
-        return "agent";
-      }
-      // Default to tag mode if @pi mention found
-      if (checkContainsTrigger(context)) {
-        return "tag";
-      }
-    }
-  }
-
-  // Issue events
-  if (isEntityContext(context) && isIssuesEvent(context)) {
-    // If prompt is provided, use agent mode (same as PR events)
-    if (context.inputs.prompt) {
-      return "agent";
-    }
-    // Check for @pi mentions or labels/assignees
-    if (checkContainsTrigger(context)) {
-      return "tag";
-    }
-  }
-
-  // PR events (opened, synchronize, etc.)
-  if (isEntityContext(context) && isPullRequestEvent(context)) {
-    const supportedActions = [
-      "opened",
-      "synchronize",
-      "ready_for_review",
-      "reopened",
-    ];
-    if (context.eventAction && supportedActions.includes(context.eventAction)) {
-      // If prompt is provided, use agent mode (default for automation)
-      if (context.inputs.prompt) {
-        return "agent";
-      }
-    }
-  }
-
-  // Default to agent mode (which won't trigger without a prompt)
   return "agent";
 }
 
 function validateTrackProgressEvent(context: GitHubContext): void {
-  // track_progress is only valid for pull_request and issue events
   const validEvents = [
     "pull_request",
     "issues",
@@ -96,7 +37,6 @@ function validateTrackProgressEvent(context: GitHubContext): void {
     );
   }
 
-  // Additionally validate PR actions
   if (context.eventName === "pull_request" && context.eventAction) {
     const validActions = [
       "opened",

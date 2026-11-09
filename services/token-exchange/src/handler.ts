@@ -13,15 +13,11 @@ import {
   type JwksProvider,
 } from "./oidc";
 
-// Same path as the upstream exchange service, so the action only swaps the host.
-export const TOKEN_EXCHANGE_PATH = "/api/github/github-app-token-exchange";
-
-// Same defaults as upstream; `additional_permissions` adds to these.
-export const DEFAULT_PERMISSIONS: Permissions = {
-  contents: "write",
-  pull_requests: "write",
-  issues: "write",
-};
+import {
+  DEFAULT_PERMISSIONS,
+  TOKEN_EXCHANGE_PATH,
+  WORKFLOW_VALIDATION_ERROR_CODE,
+} from "../../../src/contracts/token-exchange";
 
 const PERMISSION_LEVELS: Record<string, number> = {
   read: 1,
@@ -414,7 +410,7 @@ function workflowValidationError(
     : "default branch";
   return new ExchangeError(
     401,
-    "workflow_not_found_on_default_branch",
+    WORKFLOW_VALIDATION_ERROR_CODE,
     `Workflow validation failed: ${workflow} must exist on the repository's ${branch} ` +
       "with the same content as the version this run used. A workflow added or changed in a " +
       "branch or pull request starts working once the change is merged.",

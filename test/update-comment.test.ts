@@ -39,9 +39,8 @@ describe("updateComment", () => {
     const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
-      commentId: 123456,
+      comment: { id: 123456, namespace: "issue" },
       body: "Updated comment",
-      isPullRequestReviewComment: false,
     };
 
     const result = await updateComment(mockOctokit, params);
@@ -78,9 +77,8 @@ describe("updateComment", () => {
     const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
-      commentId: 789012,
+      comment: { id: 789012, namespace: "issue" },
       body: "Updated PR comment",
-      isPullRequestReviewComment: false,
     };
 
     const result = await updateComment(mockOctokit, params);
@@ -117,9 +115,8 @@ describe("updateComment", () => {
     const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
-      commentId: 345678,
+      comment: { id: 345678, namespace: "review" },
       body: "Updated review comment",
-      isPullRequestReviewComment: true,
     };
 
     const result = await updateComment(mockOctokit, params);
@@ -130,6 +127,7 @@ describe("updateComment", () => {
       comment_id: 345678,
       body: "Updated review comment",
     });
+    expect(mockOctokit.rest.issues.updateComment).not.toHaveBeenCalled();
 
     expect(result).toEqual({
       id: 345678,
@@ -138,57 +136,24 @@ describe("updateComment", () => {
     });
   });
 
-  test("should fallback to issue comment API when PR review comment update fails with 404", async () => {
-    const mockError = new Error("Not Found") as any;
-    mockError.status = 404;
-
-    const mockResponse = {
-      data: {
-        id: 456789,
-        html_url: "https://github.com/owner/repo/pull/4#issuecomment-456789",
-        updated_at: "2024-01-04T00:00:00Z",
-        body: "Updated via fallback",
-      },
-    };
+  test("should not update an issue comment with the same ID when the review update fails with 404", async () => {
+    const notFound = Object.assign(new Error("Not Found"), { status: 404 });
 
     // @ts-expect-error Mock implementation doesn't match full type signature
     mockOctokit.rest.pulls.updateReviewComment = jest
       .fn()
-      .mockRejectedValue(mockError);
-    // @ts-expect-error Mock implementation doesn't match full type signature
-    mockOctokit.rest.issues.updateComment = jest
-      .fn()
-      .mockResolvedValue(mockResponse);
+      .mockRejectedValue(notFound);
 
     const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
-      commentId: 456789,
+      comment: { id: 456789, namespace: "review" },
       body: "Updated via fallback",
-      isPullRequestReviewComment: true,
     };
 
-    const result = await updateComment(mockOctokit, params);
+    await expect(updateComment(mockOctokit, params)).rejects.toEqual(notFound);
 
-    expect(mockOctokit.rest.pulls.updateReviewComment).toHaveBeenCalledWith({
-      owner: "testowner",
-      repo: "testrepo",
-      comment_id: 456789,
-      body: "Updated via fallback",
-    });
-
-    expect(mockOctokit.rest.issues.updateComment).toHaveBeenCalledWith({
-      owner: "testowner",
-      repo: "testrepo",
-      comment_id: 456789,
-      body: "Updated via fallback",
-    });
-
-    expect(result).toEqual({
-      id: 456789,
-      html_url: "https://github.com/owner/repo/pull/4#issuecomment-456789",
-      updated_at: "2024-01-04T00:00:00Z",
-    });
+    expect(mockOctokit.rest.issues.updateComment).not.toHaveBeenCalled();
   });
 
   test("should propagate error when PR review comment update fails with non-404 error", async () => {
@@ -203,9 +168,8 @@ describe("updateComment", () => {
     const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
-      commentId: 567890,
+      comment: { id: 567890, namespace: "review" },
       body: "This will fail",
-      isPullRequestReviewComment: true,
     };
 
     await expect(updateComment(mockOctokit, params)).rejects.toEqual(mockError);
@@ -217,7 +181,7 @@ describe("updateComment", () => {
       body: "This will fail",
     });
 
-    // Ensure fallback wasn't attempted
+    // Ensure the issue comment API was not attempted
     expect(mockOctokit.rest.issues.updateComment).not.toHaveBeenCalled();
   });
 
@@ -232,9 +196,8 @@ describe("updateComment", () => {
     const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
-      commentId: 678901,
+      comment: { id: 678901, namespace: "issue" },
       body: "This will also fail",
-      isPullRequestReviewComment: false,
     };
 
     await expect(updateComment(mockOctokit, params)).rejects.toEqual(mockError);
@@ -265,9 +228,8 @@ describe("updateComment", () => {
     const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
-      commentId: 111222,
+      comment: { id: 111222, namespace: "issue" },
       body: "",
-      isPullRequestReviewComment: false,
     };
 
     const result = await updateComment(mockOctokit, params);
@@ -298,9 +260,8 @@ describe("updateComment", () => {
     const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
-      commentId: 333444,
+      comment: { id: 333444, namespace: "issue" },
       body: longBody,
-      isPullRequestReviewComment: false,
     };
 
     const result = await updateComment(mockOctokit, params);
@@ -349,9 +310,8 @@ const code = "example";
     const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
-      commentId: 555666,
+      comment: { id: 555666, namespace: "issue" },
       body: markdownBody,
-      isPullRequestReviewComment: false,
     };
 
     const result = await updateComment(mockOctokit, params);
@@ -392,9 +352,8 @@ const code = "example";
     const params: UpdateCommentParams = {
       owner: "testowner",
       repo: "testrepo",
-      commentId: 777888,
+      comment: { id: 777888, namespace: "review" },
       body: "Updated",
-      isPullRequestReviewComment: true,
     };
 
     const result = await updateComment(mockOctokit, params);

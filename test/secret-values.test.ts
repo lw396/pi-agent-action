@@ -5,14 +5,14 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter } from "node:path";
-import { BASH_ENV_ALLOWLIST } from "../src/runner/env-allowlist";
+import { BASH_ENV_ALLOWLIST } from "../src/security/env-allowlist";
 import {
   ACTION_SECRET_ENV,
   ACTION_SETTINGS_ENV,
   collectSecretValues,
   redactSecretValues,
-} from "../src/runner/secret-values";
-import { redactSecrets } from "../src/github/utils/sanitizer";
+} from "../src/security/secret-values";
+import { redactSecrets } from "../src/security/sanitizer";
 
 // No known format, so only redaction by value can catch it.
 const SECRET = "oc-7f3a9b2c1d4e5f60a7b8c9d0e1f2a3b4";

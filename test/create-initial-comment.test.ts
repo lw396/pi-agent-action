@@ -1,26 +1,31 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Octokit } from "@octokit/rest";
 import { createInitialComment } from "../src/github/operations/comments/create-initial";
-import { mockPullRequestOpenedContext } from "./mockContext";
+import {
+  mockPullRequestOpenedContext,
+  mockPullRequestReviewCommentContext,
+} from "./mockContext";
 
 const stickyContext = {
   ...mockPullRequestOpenedContext,
   inputs: { ...mockPullRequestOpenedContext.inputs, useStickyComment: true },
 };
 
-describe("createInitialComment with use_sticky_comment", () => {
+describe("createInitialComment", () => {
   let outputDir: string;
   let originalOutput: string | undefined;
   let logSpy: ReturnType<typeof spyOn>;
+  let errorSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     outputDir = mkdtempSync(join(tmpdir(), "create-initial-"));
     originalOutput = process.env.GITHUB_OUTPUT;
     process.env.GITHUB_OUTPUT = join(outputDir, "output");
     logSpy = spyOn(console, "log").mockImplementation(() => {});
+    errorSpy = spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -28,7 +33,12 @@ describe("createInitialComment with use_sticky_comment", () => {
     else process.env.GITHUB_OUTPUT = originalOutput;
     rmSync(outputDir, { recursive: true, force: true });
     logSpy.mockRestore();
+    errorSpy.mockRestore();
   });
+
+  function output(): string {
+    return readFileSync(process.env.GITHUB_OUTPUT!, "utf8");
+  }
 
   function octokitWithComments(comments: unknown[]) {
     const calls = { update: [] as unknown[], create: [] as unknown[] };
@@ -78,5 +88,84 @@ describe("createInitialComment with use_sticky_comment", () => {
 
     expect(calls.update).toHaveLength(0);
     expect(calls.create).toHaveLength(1);
+  });
+
+  test("returns the issue namespace for a sticky comment it reuses", async () => {
+    const { octokit } = octokitWithComments([
+      {
+        id: 7,
+        body: "an older status",
+        user: { id: 339978130, login: "pi-agent-action[bot]", type: "Bot" },
+      },
+    ]);
+
+    const comment = await createInitialComment(octokit, stickyContext);
+
+    expect(comment).toEqual({ id: 7, namespace: "issue" });
+    expect(output()).toContain("tracking_comment_id=7");
+  });
+
+  test("replies to the review comment it was triggered by", async () => {
+    const replies: unknown[] = [];
+    const octokit = {
+      rest: {
+        pulls: {
+          createReplyForReviewComment: async (params: unknown) => {
+            replies.push(params);
+            return { data: { id: 11 } };
+          },
+        },
+        issues: {
+          createComment: async () => {
+            throw new Error("not an issue comment");
+          },
+        },
+      },
+    } as unknown as Octokit;
+
+    const comment = await createInitialComment(
+      octokit,
+      mockPullRequestReviewCommentContext,
+    );
+
+    expect(replies).toEqual([
+      {
+        owner: "test-owner",
+        repo: "test-repo",
+        pull_number: 999,
+        comment_id: 99988877,
+        body: expect.any(String),
+      },
+    ]);
+    expect(comment).toEqual({ id: 11, namespace: "review" });
+    expect(output()).toContain("tracking_comment_id=11");
+  });
+
+  test("falls back to an issue comment, and reports its namespace, when the reply fails", async () => {
+    const created: unknown[] = [];
+    const octokit = {
+      rest: {
+        pulls: {
+          createReplyForReviewComment: async () => {
+            throw new Error("Validation Failed");
+          },
+        },
+        issues: {
+          createComment: async (params: unknown) => {
+            created.push(params);
+            return { data: { id: 12 } };
+          },
+        },
+      },
+    } as unknown as Octokit;
+
+    const comment = await createInitialComment(
+      octokit,
+      mockPullRequestReviewCommentContext,
+    );
+
+    expect(created).toHaveLength(1);
+    expect(comment).toEqual({ id: 12, namespace: "issue" });
+    expect(output()).toContain("tracking_comment_id=12");
   });
 });

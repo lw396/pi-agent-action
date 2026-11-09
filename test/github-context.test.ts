@@ -32,7 +32,6 @@ import {
   isPullRequestReviewCommentEvent,
   isIssuesAssignedEvent,
   isEntityContext,
-  isAutomationContext,
   isWorkflowRunEvent,
   type ParsedGitHubContext,
 } from "../src/github/context";
@@ -246,7 +245,6 @@ describe("parseGitHubContext", () => {
       const context = parseGitHubContext();
 
       expect(context.eventName).toBe("workflow_dispatch");
-      expect(isAutomationContext(context)).toBe(true);
       expect("entityNumber" in context).toBe(false);
       expect("isPR" in context).toBe(false);
     });
@@ -263,7 +261,7 @@ describe("parseGitHubContext", () => {
 
       expect(context.eventName).toBe("repository_dispatch");
       expect(context.eventAction).toBe("trigger-analysis");
-      expect(isAutomationContext(context)).toBe(true);
+      expect("entityNumber" in context).toBe(false);
     });
 
     test("schedule produces an automation context", () => {
@@ -275,7 +273,7 @@ describe("parseGitHubContext", () => {
       const context = parseGitHubContext();
 
       expect(context.eventName).toBe("schedule");
-      expect(isAutomationContext(context)).toBe(true);
+      expect("entityNumber" in context).toBe(false);
     });
 
     test("payload without repository keeps default_branch undefined", () => {
@@ -296,7 +294,7 @@ describe("parseGitHubContext", () => {
       const context = parseGitHubContext();
 
       expect(context.eventName).toBe("workflow_run");
-      expect(isAutomationContext(context)).toBe(true);
+      expect("entityNumber" in context).toBe(false);
     });
   });
 
@@ -529,26 +527,6 @@ describe("type guards", () => {
     expect(isEntityContext(reviewContext)).toBe(true);
     expect(isEntityContext(reviewCommentContext)).toBe(true);
     expect(isEntityContext(workflowDispatchContext)).toBe(false);
-  });
-
-  test("isAutomationContext accepts the four automation events", () => {
-    expect(isAutomationContext(workflowDispatchContext)).toBe(true);
-    expect(
-      isAutomationContext(
-        createMockAutomationContext({ eventName: "repository_dispatch" }),
-      ),
-    ).toBe(true);
-    expect(
-      isAutomationContext(
-        createMockAutomationContext({ eventName: "schedule" }),
-      ),
-    ).toBe(true);
-    expect(
-      isAutomationContext(
-        createMockAutomationContext({ eventName: "workflow_run" }),
-      ),
-    ).toBe(true);
-    expect(isAutomationContext(issuesContext)).toBe(false);
   });
 
   test("isWorkflowRunEvent accepts only workflow_run", () => {

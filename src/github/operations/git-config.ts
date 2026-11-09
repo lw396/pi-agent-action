@@ -1,10 +1,5 @@
 #!/usr/bin/env bun
 
-/**
- * Configure git authentication for non-signing mode
- * Sets up git user and authentication to work with GitHub App tokens
- */
-
 import { $ } from "bun";
 import { existsSync } from "fs";
 import { mkdir, writeFile, rm } from "fs/promises";

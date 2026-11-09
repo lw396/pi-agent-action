@@ -1,6 +1,7 @@
 import { prepareMcpConfig } from "../../mcp/install-mcp-server";
 import { setupGitAuth } from "../git-auth";
 import { checkHumanActor } from "../../github/validation/actor";
+import { isEntityContext } from "../../github/context";
 import type { PrepareOptions, PrepareResult } from "../types";
 
 /**
@@ -18,7 +19,6 @@ export async function prepareAgentMode({
   allowedTools,
   untrustedInput,
 }: PrepareOptions): Promise<PrepareResult> {
-  // Check if actor is human (prevents bot-triggered loops)
   await checkHumanActor(octokit.rest, context);
 
   // Unlike tag mode, a run can go on without git credentials.
@@ -38,30 +38,34 @@ export async function prepareAgentMode({
   const defaultBranch = context.repository.default_branch || "main";
   const baseBranch = context.inputs.baseBranch || defaultBranch;
 
-  // Detect current branch from GitHub environment
   const currentBranch =
     agentBranch ||
     process.env.GITHUB_HEAD_REF ||
     process.env.GITHUB_REF_NAME ||
     defaultBranch;
 
-  // The allowed_tools input decides which of the action's MCP servers start
   const mcpServers = await prepareMcpConfig({
     githubToken,
     tokenBroker,
     owner: context.repository.owner,
     repo: context.repository.repo,
-    branch: currentBranch,
-    baseBranch: baseBranch,
-    trackingCommentId: undefined, // No tracking comment in agent mode
     allowedTools: allowedTools.map((rule) => rule.tool),
-    mode: "agent",
-    context,
+    trackingComment: undefined,
+    pullRequest:
+      isEntityContext(context) && context.isPR
+        ? {
+            number: context.entityNumber,
+            classifyInlineComments: context.inputs.classifyInlineComments,
+          }
+        : undefined,
+    fileOps: context.inputs.useCommitSigning
+      ? { branch: currentBranch, baseBranch }
+      : undefined,
   });
 
   return {
     prompt,
-    commentId: undefined,
+    trackingComment: undefined,
     branchInfo: {
       baseBranch: baseBranch,
       currentBranch: baseBranch, // Use base branch as current when creating new branch

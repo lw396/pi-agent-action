@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { redactSecrets, sanitizeContent } from "../src/github/utils/sanitizer";
+import { redactSecrets, sanitizeContent } from "../src/security/sanitizer";
 
 describe("Public Comment Output Sanitization & Redaction", () => {
   it("redacts all credential types from public comment output", () => {

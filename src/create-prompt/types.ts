@@ -40,7 +40,6 @@ type IssueCommentEvent = {
   commentBody: string;
 };
 
-// Not actually a real github event, since issue comments and PR coments are both sent as issue_comment
 type PullRequestCommentEvent = {
   eventName: "issue_comment";
   commentId: string;
@@ -92,11 +91,6 @@ type PullRequestEvent = PullRequestBaseEvent & {
   eventName: "pull_request";
 };
 
-type PullRequestTargetEvent = PullRequestBaseEvent & {
-  eventName: "pull_request_target";
-};
-
-// Union type for all possible event types
 export type EventData =
   | PullRequestReviewCommentEvent
   | PullRequestReviewEvent
@@ -105,10 +99,8 @@ export type EventData =
   | IssueOpenedEvent
   | IssueAssignedEvent
   | IssueLabeledEvent
-  | PullRequestEvent
-  | PullRequestTargetEvent;
+  | PullRequestEvent;
 
-// Combined type with separate eventData field
 export type PreparedContext = CommonFields & {
   eventData: EventData;
   githubContext?: GitHubContext;

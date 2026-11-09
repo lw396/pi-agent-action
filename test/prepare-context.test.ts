@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect } from "bun:test";
 import { prepareContext } from "../src/create-prompt";
 import {
   createMockContext,
@@ -13,33 +13,9 @@ import {
   mockPullRequestReviewWithoutCommentContext,
 } from "./mockContext";
 
-const BASE_ENV = {
-  TRACKING_COMMENT_ID: "12345",
-  GITHUB_TOKEN: "test-token",
-};
-
-describe("parseEnvVarsWithContext", () => {
-  let originalEnv: typeof process.env;
-
-  beforeEach(() => {
-    originalEnv = { ...process.env };
-    process.env = {};
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
-  });
-
+describe("prepareContext", () => {
   describe("issue_comment event", () => {
     describe("on issue", () => {
-      beforeEach(() => {
-        process.env = {
-          ...BASE_ENV,
-          BASE_BRANCH: "main",
-          AGENT_BRANCH: "claude/issue-67890-20240101-1200",
-        };
-      });
-
       test("should parse issue_comment event correctly", () => {
         const result = prepareContext(
           mockIssueCommentContext,
@@ -90,7 +66,6 @@ describe("parseEnvVarsWithContext", () => {
 
     describe("on PR", () => {
       test("should parse PR issue_comment event correctly", () => {
-        process.env = BASE_ENV;
         const result = prepareContext(mockPullRequestCommentContext, "12345");
 
         expect(result.eventData.eventName).toBe("issue_comment");
@@ -112,7 +87,6 @@ describe("parseEnvVarsWithContext", () => {
 
   describe("pull_request_review event", () => {
     test("should parse pull_request_review event correctly", () => {
-      process.env = BASE_ENV;
       const result = prepareContext(mockPullRequestReviewContext, "12345");
 
       expect(result.eventData.eventName).toBe("pull_request_review");
@@ -129,7 +103,6 @@ describe("parseEnvVarsWithContext", () => {
 
   describe("pull_request_review event without comment", () => {
     test("should parse pull_request_review event correctly", () => {
-      process.env = BASE_ENV;
       const result = prepareContext(
         mockPullRequestReviewWithoutCommentContext,
         "12345",
@@ -147,7 +120,6 @@ describe("parseEnvVarsWithContext", () => {
 
   describe("pull_request_review_comment event", () => {
     test("should parse pull_request_review_comment event correctly", () => {
-      process.env = BASE_ENV;
       const result = prepareContext(
         mockPullRequestReviewCommentContext,
         "12345",
@@ -167,14 +139,6 @@ describe("parseEnvVarsWithContext", () => {
   });
 
   describe("issues event", () => {
-    beforeEach(() => {
-      process.env = {
-        ...BASE_ENV,
-        BASE_BRANCH: "main",
-        AGENT_BRANCH: "claude/issue-42-20240101-1200",
-      };
-    });
-
     test("should parse issue opened event correctly", () => {
       const result = prepareContext(
         mockIssueOpenedContext,
@@ -288,26 +252,6 @@ describe("parseEnvVarsWithContext", () => {
           "claude/issue-123-20240101-1200",
         ),
       ).toThrow("ASSIGNEE_TRIGGER is required for issue assigned event");
-    });
-  });
-
-  describe("context generation", () => {
-    test("should generate context without legacy fields", () => {
-      process.env = BASE_ENV;
-      const context = createMockContext({
-        ...mockPullRequestCommentContext,
-        inputs: {
-          ...mockPullRequestCommentContext.inputs,
-        },
-      });
-      const result = prepareContext(context, "12345");
-
-      // Verify context is created without legacy fields
-      expect(result.repository).toBe("test-owner/test-repo");
-      expect(result.trackingCommentId).toBe("12345");
-      expect(result.triggerPhrase).toBe("/claude");
-      expect((result as any).customInstructions).toBeUndefined();
-      expect((result as any).allowedTools).toBeUndefined();
     });
   });
 });

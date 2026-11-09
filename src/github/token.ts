@@ -4,8 +4,12 @@ import * as core from "@actions/core";
 import { retryWithBackoff } from "../utils/retry";
 import { GITHUB_API_URL } from "./api/config";
 
-/** The audience of the OIDC token the Token exchange service accepts. */
-const OIDC_AUDIENCE = "pi-agent-action";
+import {
+  DEFAULT_PERMISSIONS,
+  OIDC_AUDIENCE,
+  TOKEN_EXCHANGE_URL,
+  WORKFLOW_VALIDATION_ERROR_CODE,
+} from "../contracts/token-exchange";
 
 export class WorkflowValidationSkipError extends Error {
   constructor(message: string) {
@@ -25,10 +29,6 @@ type AppTokenExchangeErrorResponse = {
   message?: string;
 };
 
-const WORKFLOW_VALIDATION_ERROR_CODES = new Set([
-  "workflow_not_found_on_default_branch",
-]);
-
 function getAppTokenExchangeErrorMessage(
   responseJson: AppTokenExchangeErrorResponse,
 ): string {
@@ -40,10 +40,7 @@ function isWorkflowValidationError(
   responseJson: AppTokenExchangeErrorResponse,
 ): boolean {
   const errorCode = responseJson.error?.details?.error_code;
-  if (
-    errorCode !== undefined &&
-    WORKFLOW_VALIDATION_ERROR_CODES.has(errorCode)
-  ) {
+  if (errorCode === WORKFLOW_VALIDATION_ERROR_CODE) {
     return true;
   }
 
@@ -69,12 +66,6 @@ async function getOidcToken(): Promise<string> {
     );
   }
 }
-
-const DEFAULT_PERMISSIONS: Record<string, string> = {
-  contents: "write",
-  pull_requests: "write",
-  issues: "write",
-};
 
 export function parseAdditionalPermissions():
   | Record<string, string>
@@ -121,10 +112,7 @@ async function exchangeForAppToken(
     fetchOptions.body = JSON.stringify({ permissions });
   }
 
-  const response = await fetch(
-    "https://pi-agent-action.8d7h5sbqdh.workers.dev/api/github/github-app-token-exchange",
-    fetchOptions,
-  );
+  const response = await fetch(TOKEN_EXCHANGE_URL, fetchOptions);
 
   if (!response.ok) {
     const responseJson =
@@ -165,13 +153,17 @@ async function exchangeForAppToken(
  */
 export type GitHubTokenSource = "app" | "input";
 
-export async function setupGitHubToken(): Promise<string> {
-  // Check if GitHub token was provided as override
+export type GitHubAuthentication = {
+  token: string;
+  source: GitHubTokenSource;
+};
+
+export async function setupGitHubToken(): Promise<GitHubAuthentication> {
   const providedToken = process.env.OVERRIDE_GITHUB_TOKEN;
 
   if (providedToken) {
     console.log("Using provided GITHUB_TOKEN for authentication");
-    return providedToken;
+    return { token: providedToken, source: "input" };
   }
 
   console.log("Requesting OIDC token...");
@@ -191,7 +183,7 @@ export async function setupGitHubToken(): Promise<string> {
   core.setSecret(appToken);
 
   console.log("Using GITHUB_TOKEN from OIDC");
-  return appToken;
+  return { token: appToken, source: "app" };
 }
 
 /** Gets a new app token, as setupGitHubToken() got the first one. */

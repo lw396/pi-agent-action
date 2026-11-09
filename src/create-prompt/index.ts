@@ -16,21 +16,14 @@ export { generateDefaultPrompt } from "./default-prompt";
 export { getEventTypeAndContext, prepareContext } from "./prepare-context";
 
 /**
- * The prompt the model gets. Agent mode uses the workflow's prompt as is; tag
- * mode builds one from the GitHub context and appends the workflow's prompt,
- * if any, as <custom_instructions>.
+ * The tag-mode prompt: built from the GitHub context, with the workflow's
+ * prompt, if any, appended as <custom_instructions>.
  */
 export function generatePrompt(
   context: PreparedContext,
   githubData: FetchDataResult,
   useCommitSigning: boolean,
-  modeName: "tag" | "agent",
 ): string {
-  if (modeName === "agent") {
-    return context.prompt || `Repository: ${context.repository}`;
-  }
-
-  // Tag mode
   if (process.env.USE_SIMPLE_PROMPT === "true") {
     core.warning(
       "USE_SIMPLE_PROMPT is not supported and is ignored; the default tag-mode prompt is used.",
@@ -128,7 +121,6 @@ export function createPrompt(
     preparedContext,
     githubData,
     context.inputs.useCommitSigning,
-    "tag",
   );
   console.log("===== FINAL PROMPT =====");
   console.log(prompt);

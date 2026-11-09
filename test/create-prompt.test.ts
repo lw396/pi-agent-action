@@ -143,7 +143,7 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     expect(prompt).toContain("You are an AI coding agent");
     expect(prompt).toContain("<event_type>GENERAL_COMMENT</event_type>");
@@ -190,7 +190,6 @@ describe("generatePrompt", () => {
           envVars,
           mockGitHubData,
           useCommitSigning,
-          "tag",
         );
 
         expect(prompt).toContain(
@@ -256,7 +255,6 @@ describe("generatePrompt", () => {
       },
       mockGitHubData,
       false,
-      "tag",
     );
 
     expect(prompt).toContain(
@@ -283,7 +281,6 @@ describe("generatePrompt", () => {
       },
       mockGitHubData,
       false,
-      "tag",
     );
 
     expect(prompt).toContain(
@@ -306,7 +303,7 @@ describe("generatePrompt", () => {
     };
 
     for (const signing of [false, true]) {
-      const prompt = generatePrompt(context, mockGitHubData, signing, "tag");
+      const prompt = generatePrompt(context, mockGitHubData, signing);
       for (const obsolete of [
         "Think carefully",
         "<analysis>",
@@ -384,12 +381,10 @@ describe("generatePrompt", () => {
             ? "The request is in <pr_or_issue_body>, following '@pi'."
             : "The entire <pr_or_issue_body> defines the task; no trigger phrase is required.",
       })),
-      ...(["pull_request", "pull_request_target"] as const).map(
-        (eventName) => ({
-          eventData: { eventName, isPR: true as const, prNumber: "456" },
-          source: "The request is in <pr_or_issue_body>.",
-        }),
-      ),
+      ...(["pull_request"] as const).map((eventName) => ({
+        eventData: { eventName, isPR: true as const, prNumber: "456" },
+        source: "The request is in <pr_or_issue_body>.",
+      })),
     ];
 
     for (const { eventData, source } of events) {
@@ -402,15 +397,13 @@ describe("generatePrompt", () => {
         },
         mockGitHubData,
         false,
-        "tag",
       );
       expect(prompt).toContain(source);
       expect(prompt).toContain("Only this request source defines the work");
       expect(prompt).not.toContain("Only the comment/issue containing");
       if (
         eventData.eventName === "issues" ||
-        eventData.eventName === "pull_request" ||
-        eventData.eventName === "pull_request_target"
+        eventData.eventName === "pull_request"
       ) {
         expect(prompt).not.toContain("The request is in <trigger_comment>.");
       }
@@ -432,7 +425,6 @@ describe("generatePrompt", () => {
       },
       mockGitHubData,
       false,
-      "tag",
     );
     expect(prompt).toContain(
       "If it is absent or empty, report that no actionable request was provided",
@@ -440,7 +432,7 @@ describe("generatePrompt", () => {
     expect(prompt).not.toContain("\n<trigger_comment>\n");
   });
 
-  test("keeps workflow-provided tag instructions appended and agent prompts verbatim", () => {
+  test("keeps workflow-provided tag instructions appended", () => {
     const context: PreparedContext = {
       repository: "owner/repo",
       trackingCommentId: "12345",
@@ -451,15 +443,12 @@ describe("generatePrompt", () => {
       }),
       eventData: { eventName: "pull_request", isPR: true, prNumber: "456" },
     };
-    const prompt = generatePrompt(context, mockGitHubData, false, "tag");
+    const prompt = generatePrompt(context, mockGitHubData, false);
     expect(prompt).toContain(
       "complete every requested requirement and acceptance criterion",
     );
     expect(prompt).toEndWith(
       "<custom_instructions>\nUse Spanish for comments\n</custom_instructions>",
-    );
-    expect(generatePrompt(context, mockGitHubData, false, "agent")).toBe(
-      context.prompt!,
     );
   });
 
@@ -500,7 +489,7 @@ describe("generatePrompt", () => {
         }),
         eventData,
       };
-      const prompt = generatePrompt(context, mockGitHubData, false, "tag");
+      const prompt = generatePrompt(context, mockGitHubData, false);
 
       expect(prompt).toContain(
         "The request is in <custom_instructions> at the end of this prompt, written by the workflow author.",
@@ -526,7 +515,7 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     expect(prompt).toContain("<event_type>PR_REVIEW</event_type>");
     expect(prompt).toContain("<is_pr>true</is_pr>");
@@ -551,7 +540,7 @@ describe("generatePrompt", () => {
       githubContext: createMockContext({ isPR: true }),
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     expect(prompt).not.toContain("Fix this");
     expect(prompt).not.toContain("claude.ai/code?q=");
@@ -572,7 +561,7 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     expect(prompt).toContain("[Create a PR]");
     expect(prompt).not.toContain("Generated with");
@@ -594,7 +583,7 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     expect(prompt).toContain("<event_type>ISSUE_CREATED</event_type>");
     expect(prompt).toContain(
@@ -624,7 +613,7 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     expect(prompt).toContain("<event_type>ISSUE_ASSIGNED</event_type>");
     expect(prompt).toContain(
@@ -651,7 +640,7 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     expect(prompt).toContain("<event_type>ISSUE_LABELED</event_type>");
     expect(prompt).toContain(
@@ -677,7 +666,7 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     expect(prompt).toContain("<event_type>PULL_REQUEST</event_type>");
     expect(prompt).toContain("<is_pr>true</is_pr>");
@@ -701,153 +690,11 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     // Verify prompt generates successfully without custom instructions
     expect(prompt).toContain("@claude please fix this");
     expect(prompt).not.toContain("CUSTOM INSTRUCTIONS");
-  });
-
-  test("should use override_prompt when provided", async () => {
-    const envVars: PreparedContext = {
-      repository: "owner/repo",
-      trackingCommentId: "12345",
-      triggerPhrase: "@claude",
-      prompt: "Simple prompt for reviewing PR",
-      eventData: {
-        eventName: "pull_request",
-        eventAction: "opened",
-        isPR: true,
-        prNumber: "123",
-      },
-    };
-
-    const prompt = await generatePrompt(
-      envVars,
-      mockGitHubData,
-      false,
-      "agent",
-    );
-
-    // Agent mode: Prompt is passed through as-is
-    expect(prompt).toBe("Simple prompt for reviewing PR");
-    expect(prompt).not.toContain("You are an AI coding agent");
-  });
-
-  test("should pass through prompt without variable substitution", async () => {
-    const envVars: PreparedContext = {
-      repository: "test/repo",
-      trackingCommentId: "12345",
-      triggerPhrase: "@claude",
-      triggerUsername: "john-doe",
-      prompt: `Repository: $REPOSITORY
-      PR: $PR_NUMBER
-      Title: $PR_TITLE
-      Body: $PR_BODY
-      Comments: $PR_COMMENTS
-      Review Comments: $REVIEW_COMMENTS
-      Changed Files: $CHANGED_FILES
-      Trigger Comment: $TRIGGER_COMMENT
-      Username: $TRIGGER_USERNAME
-      Branch: $BRANCH_NAME
-      Base: $BASE_BRANCH
-      Event: $EVENT_TYPE
-      Is PR: $IS_PR`,
-      eventData: {
-        eventName: "pull_request_review_comment",
-        isPR: true,
-        prNumber: "456",
-        commentBody: "Please review this code",
-        agentBranch: "feature-branch",
-        baseBranch: "main",
-      },
-    };
-
-    const prompt = await generatePrompt(
-      envVars,
-      mockGitHubData,
-      false,
-      "agent",
-    );
-
-    // v1.0: Variables are NOT substituted - prompt is passed as-is to Claude Code
-    expect(prompt).toContain("Repository: $REPOSITORY");
-    expect(prompt).toContain("PR: $PR_NUMBER");
-    expect(prompt).toContain("Title: $PR_TITLE");
-    expect(prompt).toContain("Body: $PR_BODY");
-    expect(prompt).toContain("Branch: $BRANCH_NAME");
-    expect(prompt).toContain("Base: $BASE_BRANCH");
-    expect(prompt).toContain("Username: $TRIGGER_USERNAME");
-    expect(prompt).toContain("Comment: $TRIGGER_COMMENT");
-  });
-
-  test("should handle override_prompt for issues", async () => {
-    const envVars: PreparedContext = {
-      repository: "owner/repo",
-      trackingCommentId: "12345",
-      triggerPhrase: "@claude",
-      prompt: "Review issue and provide feedback",
-      eventData: {
-        eventName: "issues",
-        eventAction: "opened",
-        isPR: false,
-        issueNumber: "789",
-        baseBranch: "main",
-        agentBranch: "claude/issue-789-20240101-1200",
-      },
-    };
-
-    const issueGitHubData = {
-      ...mockGitHubData,
-      contextData: {
-        title: "Bug: Login form broken",
-        body: "The login form is not working",
-        author: { login: "testuser" },
-        state: "OPEN",
-        labels: { nodes: [] },
-        createdAt: "2023-01-01T00:00:00Z",
-        comments: {
-          nodes: [],
-        },
-      },
-    };
-
-    const prompt = await generatePrompt(
-      envVars,
-      issueGitHubData,
-      false,
-      "agent",
-    );
-
-    // Agent mode: Prompt is passed through as-is
-    expect(prompt).toBe("Review issue and provide feedback");
-  });
-
-  test("should handle prompt without substitution", async () => {
-    const envVars: PreparedContext = {
-      repository: "owner/repo",
-      trackingCommentId: "12345",
-      triggerPhrase: "@claude",
-      prompt: "PR: $PR_NUMBER, Issue: $ISSUE_NUMBER, Comment: $TRIGGER_COMMENT",
-      eventData: {
-        eventName: "pull_request",
-        eventAction: "opened",
-        isPR: true,
-        prNumber: "123",
-      },
-    };
-
-    const prompt = await generatePrompt(
-      envVars,
-      mockGitHubData,
-      false,
-      "agent",
-    );
-
-    // Agent mode: No substitution - passed as-is
-    expect(prompt).toBe(
-      "PR: $PR_NUMBER, Issue: $ISSUE_NUMBER, Comment: $TRIGGER_COMMENT",
-    );
   });
 
   test("should not substitute variables when override_prompt is not provided", async () => {
@@ -865,7 +712,7 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     expect(prompt).toContain("You are an AI coding agent");
     expect(prompt).toContain("<event_type>ISSUE_CREATED</event_type>");
@@ -888,7 +735,7 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     expect(prompt).toContain("<trigger_username>johndoe</trigger_username>");
     // With commit signing disabled, co-author info appears in git commit instructions
@@ -915,7 +762,7 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     expect(prompt).toContain(
       "Co-authored-by: johndoe <123456+johndoe@users.noreply.github.com>",
@@ -936,15 +783,13 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
-    // Should contain PR-specific instructions (git commands when not using signing)
     expect(prompt).toContain("scripts/git-push.sh origin");
     expect(prompt).toContain(
       "The action has already checked out the pull request's branch",
     );
 
-    // Should NOT contain Issue-specific instructions
     expect(prompt).not.toContain("checked out the working branch (");
     expect(prompt).not.toContain("You are already on the correct branch");
     expect(prompt).not.toContain("Create a PR](https://github.com/");
@@ -965,9 +810,8 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
-    // Should contain Issue-specific instructions
     expect(prompt).toContain(
       "The action has already checked out the working branch (claude/issue-789-20240101-1200)",
     );
@@ -977,7 +821,6 @@ describe("generatePrompt", () => {
       "If you changed files on this branch, include a prefilled PR link",
     );
 
-    // Should NOT contain PR-specific instructions
     expect(prompt).not.toContain("checked out the pull request's branch");
     expect(prompt).not.toContain(
       "The action has already checked out the pull request's branch",
@@ -1001,7 +844,7 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     expect(prompt).toContain(
       "an earlier run on this issue failed, and the action saved what it left in commit 0123456789abcdef",
@@ -1015,7 +858,6 @@ describe("generatePrompt", () => {
       { ...envVars, resumedWipCommit: undefined },
       mockGitHubData,
       false,
-      "tag",
     );
     expect(fresh).not.toContain("unfinished work");
   });
@@ -1036,9 +878,8 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
-    // Should contain the actual branch name with timestamp
     expect(prompt).toContain(
       "The action has already checked out the working branch (claude/issue-123-20240101-1200)",
     );
@@ -1064,9 +905,8 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
-    // Should contain branch-specific instructions like issues
     expect(prompt).toContain(
       "The action has already checked out the working branch (claude/pr-456-20240101-1200)",
     );
@@ -1081,7 +921,6 @@ describe("generatePrompt", () => {
       "If you changed files on this branch, include a prefilled PR link",
     );
 
-    // Should NOT contain open PR instructions
     expect(prompt).not.toContain("checked out the pull request's branch");
   });
 
@@ -1100,15 +939,13 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
-    // Should contain open PR instructions (git commands when not using signing)
     expect(prompt).toContain("scripts/git-push.sh origin");
     expect(prompt).toContain(
       "The action has already checked out the pull request's branch",
     );
 
-    // Should NOT contain new branch instructions
     expect(prompt).not.toContain("Create a PR](https://github.com/");
     expect(prompt).not.toContain("checked out the working branch (");
     expect(prompt).not.toContain(
@@ -1131,9 +968,8 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
-    // Should contain new branch instructions
     expect(prompt).toContain(
       "The action has already checked out the working branch (claude/pr-789-20240101-1230)",
     );
@@ -1159,9 +995,8 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
-    // Should contain new branch instructions
     expect(prompt).toContain(
       "The action has already checked out the working branch (claude/pr-999-20240101-1400)",
     );
@@ -1187,9 +1022,8 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
-    // Should contain new branch instructions
     expect(prompt).toContain(
       "The action has already checked out the working branch (claude/pr-555-20240101-1500)",
     );
@@ -1211,9 +1045,8 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
-    // Should have git command instructions
     expect(prompt).toContain("Stage with git add");
     expect(prompt).toContain("git add");
     expect(prompt).toContain("git commit");
@@ -1224,7 +1057,6 @@ describe("generatePrompt", () => {
     // pi declares the action's MCP tools directly; it has no ToolSearch.
     expect(prompt).not.toContain("ToolSearch");
 
-    // Should not have commit signing tool references
     expect(prompt).not.toContain("mcp__github_file_ops__commit_files");
   });
 
@@ -1242,9 +1074,8 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, true, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, true);
 
-    // Should have commit signing tool instructions
     expect(prompt).toContain("mcp__github_file_ops__commit_files");
     expect(prompt).toContain("mcp__github_file_ops__delete_files");
     expect(prompt).toContain(
@@ -1256,7 +1087,6 @@ describe("generatePrompt", () => {
     // Comment tool should always be from comment server, not file ops
     expect(prompt).toContain("mcp__github_comment__update_comment");
 
-    // Should not have git command instructions
     expect(prompt).not.toContain("Stage with git add");
 
     // Bash is off unless the workflow allows it through the allowed_tools
@@ -1290,7 +1120,6 @@ describe("generatePrompt", () => {
           },
           mockGitHubData,
           signing,
-          "tag",
         );
         if (githubTokenSource === "app") {
           expect(prompt).toContain(appOnly);
@@ -1422,7 +1251,7 @@ describe("generatePrompt", () => {
         baseBranch: "main",
       },
     };
-    const plain = generatePrompt(base, mockGitHubData, false, "tag");
+    const plain = generatePrompt(base, mockGitHubData, false);
     expect(plain).not.toContain(" id=");
     expect(plain).not.toContain("an id generated for this run");
   });
@@ -1476,7 +1305,6 @@ describe("generatePrompt", () => {
               },
               { ...mockGitHubData, triggerDisplayName: undefined },
               signing,
-              "tag",
             );
             const label = `${eventData.eventName} pr=${eventData.isPR} signing=${signing} user=${knownUser}`;
 
@@ -1514,7 +1342,6 @@ describe("generatePrompt", () => {
         },
         mockGitHubData,
         false,
-        "tag",
       );
 
     expect(
@@ -1556,7 +1383,7 @@ describe("generatePrompt", () => {
       },
     };
 
-    const prompt = await generatePrompt(envVars, mockGitHubData, false, "tag");
+    const prompt = await generatePrompt(envVars, mockGitHubData, false);
 
     expect(prompt).toContain("allowed_tools and disallowed_tools");
     expect(prompt).not.toContain(
@@ -1578,14 +1405,12 @@ describe("generatePrompt", () => {
         baseBranch: "main",
       },
     };
-    const expected = generatePrompt(context, mockGitHubData, false, "tag");
+    const expected = generatePrompt(context, mockGitHubData, false);
     const previous = process.env.USE_SIMPLE_PROMPT;
     const warning = spyOn(core, "warning").mockImplementation(() => {});
     process.env.USE_SIMPLE_PROMPT = "true";
     try {
-      expect(generatePrompt(context, mockGitHubData, false, "tag")).toBe(
-        expected,
-      );
+      expect(generatePrompt(context, mockGitHubData, false)).toBe(expected);
       expect(warning).toHaveBeenCalledTimes(1);
       expect(warning.mock.calls[0]?.[0]).toContain("USE_SIMPLE_PROMPT");
     } finally {

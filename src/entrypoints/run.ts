@@ -1,24 +1,12 @@
 #!/usr/bin/env bun
 
-/**
- * Unified entrypoint for the action.
- * Merges all previously separate action.yml steps (prepare, run, cleanup)
- * into a single TypeScript orchestrator.
- */
-
 import * as core from "@actions/core";
+import { setupGitHubToken, WorkflowValidationSkipError } from "../github/token";
 import {
-  appTokenMinter,
-  revokeAppToken,
-  setupGitHubToken,
-  WorkflowValidationSkipError,
-} from "../github/token";
-import { GitHubTokenRefresher } from "../github/token-refresh";
-import { startTokenBroker, type TokenBroker } from "../github/token-broker";
-import { refreshRemoteToken } from "../github/operations/git-config";
+  startGitHubTokenLifecycle,
+  type GitHubTokenLifecycle,
+} from "../github/token-lifecycle";
 import { checkWritePermissions } from "../github/validation/permissions";
-import { createOctokit } from "../github/api/client";
-import type { Octokits } from "../github/api/client";
 import {
   parseGitHubContext,
   isEntityContext,
@@ -44,9 +32,10 @@ import {
 import { GITHUB_SERVER_URL } from "../github/api/config";
 import { assertNoRemovedInputs } from "./removed-inputs";
 import { updateCommentLink } from "./update-comment-link";
+import type { TrackingComment } from "../github/operations/comments/tracking-comment";
 import { writeJobSummary } from "./job-summary";
-import { redactSecrets } from "../github/utils/sanitizer";
-import { collectSecretValues } from "../runner/secret-values";
+import { redactSecrets } from "../security/sanitizer";
+import { collectSecretValues } from "../security/secret-values";
 import { runPi, RunnerFailure } from "../runner/run-pi";
 import type { RunAudit } from "../runner/run-audit";
 import type { SessionExport } from "../runner/session-export";
@@ -69,8 +58,8 @@ async function run() {
   // this process, the Runner's included, redacts these values.
   collectSecretValues(process.env);
 
-  let githubToken: string | undefined;
-  let commentId: number | undefined;
+  let tokenLifecycle: GitHubTokenLifecycle | undefined;
+  let trackingComment: TrackingComment | undefined;
   let agentBranch: string | undefined;
   let baseBranch: string | undefined;
   let executionFile: string | undefined;
@@ -82,10 +71,6 @@ async function run() {
   let prepareSuccess = true;
   let prepareError: string | undefined;
   let context: GitHubContext | undefined;
-  let octokit: Octokits | undefined;
-  // Replace the app token before its hour runs out (none for github_token).
-  let tokenRefresher: GitHubTokenRefresher | undefined;
-  let tokenBroker: TokenBroker | undefined;
   // Paths reverted to the PR base branch, which cleanup must not commit back
   // onto the PR author's branch. Empty unless restoreConfigFromBase ran.
   let restoredConfigPaths: string[] = [];
@@ -94,10 +79,8 @@ async function run() {
   let wipResult: WipSaveResult | undefined;
   // The WIP commit this run resumed, closed if the run succeeds.
   let resumedWip: { branch: string; sha: string } | undefined;
-  // Track whether we've completed prepare phase, so we can attribute errors correctly
   let prepareCompleted = false;
   try {
-    // Phase 1: Prepare
     assertNoRemovedInputs(process.env.ALL_INPUTS);
     // Fails on a tool rule the Runner cannot enforce, before anything is set up.
     const runnerInputs = readRunnerInputs(process.env);
@@ -108,7 +91,10 @@ async function run() {
     );
 
     try {
-      githubToken = await setupGitHubToken();
+      const auth = await setupGitHubToken();
+      // Preserve revocation even if client or broker initialization fails.
+      core.setOutput("github_token", auth.token);
+      tokenLifecycle = startGitHubTokenLifecycle(auth);
     } catch (error) {
       if (error instanceof WorkflowValidationSkipError) {
         core.setOutput("skipped_due_to_workflow_validation_mismatch", "true");
@@ -118,47 +104,17 @@ async function run() {
       throw error;
     }
 
-    octokit = createOctokit(githubToken);
-
-    // Set GITHUB_TOKEN and GH_TOKEN in process env for downstream usage
-    process.env.GITHUB_TOKEN = githubToken;
-    process.env.GH_TOKEN = githubToken;
-
-    // An app token expires after an hour, and a run can take longer. Before
-    // the Runner hides the OIDC request pair from the agent, keep a way to
-    // get new ones, and update everything that holds the token: git and gh
-    // read GH_TOKEN or the origin URL, cleanup uses octokit, and the MCP
-    // servers ask the broker at each call.
-    const mint = process.env.OVERRIDE_GITHUB_TOKEN
-      ? undefined
-      : appTokenMinter();
-    if (mint) {
-      const refresher = new GitHubTokenRefresher({
-        token: githubToken,
-        mint,
-        revoke: revokeAppToken,
-      });
-      refresher.onRefresh(async (token) => {
-        githubToken = token;
-        octokit = createOctokit(token);
-        process.env.GITHUB_TOKEN = token;
-        process.env.GH_TOKEN = token;
-        await refreshRemoteToken(token);
-      });
-      refresher.start();
-      tokenRefresher = refresher;
-      tokenBroker = startTokenBroker(() => refresher.token);
-    }
+    const tokenBroker = tokenLifecycle.broker;
 
     // Check write permissions for entity contexts, and for workflow_run
     // events, whose upstream run may have been started by an actor without
     // write access (e.g. the author of a fork pull request)
     if (isEntityContext(context) || isWorkflowRunEvent(context)) {
       const hasWritePermissions = await checkWritePermissions(
-        octokit.rest,
+        tokenLifecycle.octokit.rest,
         context,
         context.inputs.allowedNonWriteUsers,
-        !!process.env.OVERRIDE_GITHUB_TOKEN,
+        tokenLifecycle.source === "input",
       );
       if (!hasWritePermissions) {
         throw new Error(
@@ -167,7 +123,6 @@ async function run() {
       }
     }
 
-    // Check trigger conditions
     const containsTrigger =
       modeName === "tag"
         ? isEntityContext(context) && checkContainsTrigger(context)
@@ -178,21 +133,18 @@ async function run() {
 
     if (!containsTrigger) {
       console.log("No trigger found, skipping remaining steps");
-      core.setOutput("github_token", githubToken);
+      core.setOutput("github_token", tokenLifecycle.token);
       return;
     }
 
-    // Run prepare
     console.log(
       `Preparing with mode: ${modeName} for event: ${context.eventName}`,
     );
     const prepareOptions = {
       context,
-      octokit,
-      githubToken,
-      githubTokenSource: process.env.OVERRIDE_GITHUB_TOKEN
-        ? ("input" as const)
-        : ("app" as const),
+      octokit: tokenLifecycle.octokit,
+      githubToken: tokenLifecycle.token,
+      githubTokenSource: tokenLifecycle.source,
       tokenBroker: tokenBroker && {
         url: tokenBroker.url,
         key: tokenBroker.key,
@@ -205,7 +157,7 @@ async function run() {
         ? await prepareTagMode(prepareOptions)
         : await prepareAgentMode(prepareOptions);
 
-    commentId = prepareResult.commentId;
+    trackingComment = prepareResult.trackingComment;
     agentBranch = prepareResult.branchInfo.agentBranch;
     baseBranch = prepareResult.branchInfo.baseBranch;
     wipTarget = prepareResult.wipTarget;
@@ -218,8 +170,6 @@ async function run() {
     // Outside the checkout, so they are never committed with the agent's changes.
     const skillsDir = await installSkills(runnerInputs.skills);
     prepareCompleted = true;
-
-    // Phase 2: Run pi through the Runner
 
     // On PRs, .pi/, .claude/, AGENTS.md and the like in the checkout are
     // attacker-controlled. Restore them from the base branch before pi reads them.
@@ -262,7 +212,6 @@ async function run() {
     runAudit = runResult.audit;
     setSessionExportOutputs(runResult.sessionExport);
 
-    // Set action-level outputs
     if (runResult.executionFile) {
       core.setOutput("execution_file", runResult.executionFile);
     }
@@ -281,84 +230,77 @@ async function run() {
     }
     executionFile ??= setExecutionFileOutputIfPresent();
     core.setOutput("conclusion", "failure");
-    // Only mark as prepare failure if we haven't completed the prepare phase
     if (!prepareCompleted) {
       prepareSuccess = false;
       prepareError = errorMessage;
     }
     core.setFailed(`Action failed with error: ${redactSecrets(errorMessage)}`);
   } finally {
-    // Phase 3: Cleanup (always runs)
-
-    // Before the comment update, so it links the branch the work went to.
-    const runUrl = `${GITHUB_SERVER_URL}/${context?.repository.full_name}/actions/runs/${process.env.GITHUB_RUN_ID}`;
-    if (runnerStarted && !agentSuccess && wipTarget) {
-      wipResult = saveUnfinishedWork(wipTarget, {
-        runUrl,
-        excludePaths: restoredConfigPaths,
-      });
-    }
-    // A resumed run that succeeded ends the WIP, so the next request on the
-    // issue does not resume it again.
-    if (agentSuccess && resumedWip) {
-      closeResumedWip(resumedWip.branch, resumedWip.sha, runUrl);
-    }
-
-    // Update tracking comment
-    if (
-      commentId &&
-      context &&
-      isEntityContext(context) &&
-      githubToken &&
-      octokit
-    ) {
-      try {
-        await updateCommentLink({
-          commentId,
-          githubToken,
-          agentBranch,
-          baseBranch: baseBranch || context.repository.default_branch || "main",
-          triggerUsername: context.actor,
-          context,
-          octokit,
-          agentSuccess,
-          outputFile: executionFile,
-          prepareSuccess,
-          prepareError,
-          useCommitSigning: context.inputs.useCommitSigning,
-          restoredConfigPaths,
-          wipNote: wipCommentNote(
-            wipResult,
-            context.repository.owner,
-            context.repository.repo,
-            context.inputs.triggerPhrase,
-          ),
+    try {
+      // Before the comment update, so it links the branch the work went to.
+      const runUrl = `${GITHUB_SERVER_URL}/${context?.repository.full_name}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+      if (runnerStarted && !agentSuccess && wipTarget) {
+        wipResult = saveUnfinishedWork(wipTarget, {
+          runUrl,
+          excludePaths: restoredConfigPaths,
         });
-      } catch (error) {
-        console.error("Error updating comment with job link:", error);
       }
+      // A resumed run that succeeded ends the WIP, so the next request on the
+      // issue does not resume it again.
+      if (agentSuccess && resumedWip) {
+        closeResumedWip(resumedWip.branch, resumedWip.sha, runUrl);
+      }
+
+      if (
+        trackingComment &&
+        context &&
+        isEntityContext(context) &&
+        tokenLifecycle
+      ) {
+        try {
+          await updateCommentLink({
+            trackingComment,
+            agentBranch,
+            baseBranch:
+              baseBranch || context.repository.default_branch || "main",
+            triggerUsername: context.actor,
+            context,
+            octokit: tokenLifecycle.octokit,
+            agentSuccess,
+            outputFile: executionFile,
+            prepareSuccess,
+            prepareError,
+            useCommitSigning: context.inputs.useCommitSigning,
+            restoredConfigPaths,
+            wipNote: wipCommentNote(
+              wipResult,
+              context.repository.owner,
+              context.repository.repo,
+              context.inputs.triggerPhrase,
+            ),
+          });
+        } catch (error) {
+          console.error("Error updating comment with job link:", error);
+        }
+      }
+
+      // The run summary is always written once the Runner started. The
+      // detailed report follows unless display_report is "false", its default
+      // in action.yml.
+      if (runnerStarted || executionFile) {
+        await writeJobSummary({
+          summaryFile: process.env.GITHUB_STEP_SUMMARY,
+          audit: runAudit,
+          executionFile,
+          displayReport: process.env.DISPLAY_REPORT !== "false",
+        });
+      }
+    } finally {
+      // Cleanup may still need a fresh token; later steps use and revoke the last one.
+      await tokenLifecycle?.stop();
+      core.setOutput("branch_name", agentBranch);
+      if (tokenLifecycle) core.setOutput("github_token", tokenLifecycle.token);
     }
-
-    // The run summary is always written once the Runner started. The
-    // detailed report follows unless display_report is "false", its default
-    // in action.yml.
-    if (runnerStarted || executionFile) {
-      await writeJobSummary({
-        summaryFile: process.env.GITHUB_STEP_SUMMARY,
-        audit: runAudit,
-        executionFile,
-        displayReport: process.env.DISPLAY_REPORT !== "false",
-      });
-    }
-
-    // Last: cleanup above may still need a fresh token. The token left
-    // current is the one the later steps get, and action.yml revokes it.
-    tokenBroker?.stop();
-    await tokenRefresher?.stop();
-
-    // Set remaining action-level outputs
-    core.setOutput("branch_name", agentBranch);
-    core.setOutput("github_token", githubToken);
   }
 }
 

@@ -12,7 +12,7 @@
 import { execFileSync } from "child_process";
 import type { Octokits } from "../api/client";
 import { GITHUB_SERVER_URL } from "../api/config";
-import { redactSecrets } from "../utils/sanitizer";
+import { redactSecrets } from "../../security/sanitizer";
 
 /** The commit trailer that marks a branch as unfinished work to resume. */
 export const WIP_TRAILER = "Pi-Agent-Wip";

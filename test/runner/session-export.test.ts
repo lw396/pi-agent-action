@@ -11,7 +11,7 @@ import {
   type SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import { writeSessionExport } from "../../src/runner/session-export";
-import { collectSecretValues } from "../../src/runner/secret-values";
+import { collectSecretValues } from "../../src/security/secret-values";
 
 let dir: string;
 

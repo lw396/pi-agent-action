@@ -3,12 +3,12 @@ import {
   updateCommentBody,
   type CommentUpdateInput,
 } from "../github/operations/comment-logic";
-import { isPullRequestReviewCommentEvent } from "../github/context";
 import type { ParsedGitHubContext } from "../github/context";
 import { GITHUB_SERVER_URL } from "../github/api/config";
 import { checkAndCommitOrDeleteBranch } from "../github/operations/branch-cleanup";
 import { updateComment } from "../github/operations/comments/update-comment";
 import { encodeBranchNameForUrl } from "../github/operations/comments/common";
+import type { TrackingComment } from "../github/operations/comments/tracking-comment";
 import {
   readExecutionFile,
   sessionStats,
@@ -34,8 +34,7 @@ export function executionDetailsFrom(
 }
 
 export type UpdateCommentLinkParams = {
-  commentId: number;
-  githubToken: string;
+  trackingComment: TrackingComment;
   agentBranch?: string;
   baseBranch: string;
   triggerUsername?: string;
@@ -60,7 +59,7 @@ export async function updateCommentLink(
   params: UpdateCommentLinkParams,
 ): Promise<void> {
   const {
-    commentId,
+    trackingComment,
     agentBranch,
     baseBranch,
     triggerUsername,
@@ -75,70 +74,28 @@ export async function updateCommentLink(
   const serverUrl = GITHUB_SERVER_URL;
   const jobUrl = `${serverUrl}/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`;
 
-  let comment;
-  let isPRReviewComment = false;
-
+  let currentBody: string;
   try {
-    // GitHub has separate ID namespaces for review comments and issue comments
-    // We need to use the correct API based on the event type
-    if (isPullRequestReviewCommentEvent(context)) {
-      // For PR review comments, use the pulls API
-      console.log(`Fetching PR review comment ${commentId}`);
-      try {
-        const { data: prComment } = await octokit.rest.pulls.getReviewComment({
-          owner,
-          repo,
-          comment_id: commentId,
-        });
-        comment = prComment;
-        isPRReviewComment = true;
-        console.log("Successfully fetched as PR review comment");
-      } catch (error: any) {
-        // createInitialComment falls back to an issue comment when the reply
-        // to the review comment fails; fetch that one below.
-        if (error.status !== 404) throw error;
-        console.log("Not a PR review comment, trying the issues API");
-      }
-    }
-
-    // For all other event types, use the issues API
-    if (!comment) {
-      console.log(`Fetching issue comment ${commentId}`);
-      const { data: issueComment } = await octokit.rest.issues.getComment({
-        owner,
-        repo,
-        comment_id: commentId,
-      });
-      comment = issueComment;
-      isPRReviewComment = false;
-      console.log("Successfully fetched as issue comment");
-    }
-  } catch (finalError) {
-    // If all attempts fail, try to determine more information about the comment
-    console.error("Failed to fetch comment. Debug info:");
-    console.error(`Comment ID: ${commentId}`);
-    console.error(`Event name: ${context.eventName}`);
-    console.error(`Entity number: ${context.entityNumber}`);
-    console.error(`Repository: ${context.repository.full_name}`);
-
-    // Try to get the PR info to understand the comment structure
-    try {
-      const { data: pr } = await octokit.rest.pulls.get({
-        owner,
-        repo,
-        pull_number: context.entityNumber,
-      });
-      console.log(`PR state: ${pr.state}`);
-      console.log(`PR comments count: ${pr.comments}`);
-      console.log(`PR review comments count: ${pr.review_comments}`);
-    } catch {
-      console.error("Could not fetch PR info for debugging");
-    }
-
-    throw finalError;
+    const { data: comment } =
+      trackingComment.namespace === "review"
+        ? await octokit.rest.pulls.getReviewComment({
+            owner,
+            repo,
+            comment_id: trackingComment.id,
+          })
+        : await octokit.rest.issues.getComment({
+            owner,
+            repo,
+            comment_id: trackingComment.id,
+          });
+    currentBody = comment.body ?? "";
+  } catch (error) {
+    console.error(
+      `Failed to fetch ${trackingComment.namespace} comment ${trackingComment.id} in ${context.repository.full_name}`,
+      error,
+    );
+    throw error;
   }
-
-  const currentBody = comment.body ?? "";
 
   // Check if we need to add branch link for new branches
   const { shouldDeleteBranch, branchLink } = await checkAndCommitOrDeleteBranch(
@@ -239,16 +196,15 @@ export async function updateCommentLink(
     await updateComment(octokit.rest, {
       owner,
       repo,
-      commentId,
+      comment: trackingComment,
       body: updatedBody,
-      isPullRequestReviewComment: isPRReviewComment,
     });
     console.log(
-      `✅ Updated ${isPRReviewComment ? "PR review" : "issue"} comment ${commentId} with job link`,
+      `✅ Updated ${trackingComment.namespace === "review" ? "PR review" : "issue"} comment ${trackingComment.id} with job link`,
     );
   } catch (updateError) {
     console.error(
-      `Failed to update ${isPRReviewComment ? "PR review" : "issue"} comment:`,
+      `Failed to update ${trackingComment.namespace} comment ${trackingComment.id}:`,
       updateError,
     );
     throw updateError;

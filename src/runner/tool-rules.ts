@@ -1,5 +1,5 @@
 import * as core from "@actions/core";
-import { stripCommentLines } from "./pi-args";
+import { stripCommentLines } from "../utils/input-lines";
 
 /**
  * Parsing of the allowed_tools and disallowed_tools inputs.

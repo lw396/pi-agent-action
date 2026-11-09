@@ -1,508 +1,228 @@
-import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { prepareMcpConfig } from "../src/mcp/install-mcp-server";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import * as core from "@actions/core";
-import type { ParsedGitHubContext } from "../src/github/context";
-import { APP_BOT_ID, APP_BOT_LOGIN } from "../src/github/constants";
+import { prepareMcpConfig } from "../src/mcp/install-mcp-server";
 
-describe("prepareMcpConfig", () => {
-  let consoleInfoSpy: any;
-  let consoleWarningSpy: any;
-  let setFailedSpy: any;
-  let processExitSpy: any;
-  let fetchSpy: any;
+type Config = Parameters<typeof prepareMcpConfig>[0];
+const pullRequest = { number: 456, classifyInlineComments: true };
+const fileOps = { branch: "feature", baseBranch: "main" };
+const env = {
+  GITHUB_ACTION_PATH: "/action",
+  GITHUB_WORKSPACE: "/checkout",
+  RUNNER_TEMP: "/run-temp",
+  DEFAULT_WORKFLOW_TOKEN: "workflow-token",
+};
+function configure(options: Partial<Config> = {}) {
+  return prepareMcpConfig({
+    githubToken: "app-token",
+    owner: "owner",
+    repo: "repo",
+    allowedTools: [],
+    env,
+    ...options,
+  });
+}
 
-  // Create a mock context for tests
-  const mockContext: ParsedGitHubContext = {
-    runId: "test-run-id",
-    eventName: "issue_comment",
-    eventAction: "created",
-    repository: {
-      owner: "test-owner",
-      repo: "test-repo",
-      full_name: "test-owner/test-repo",
-    },
-    actor: "test-actor",
-    payload: {} as any,
-    entityNumber: 123,
-    isPR: false,
-    inputs: {
-      prompt: "",
-      triggerPhrase: "@claude",
-      assigneeTrigger: "",
-      labelTrigger: "",
-      branchPrefix: "",
-      useStickyComment: false,
-      classifyInlineComments: true,
-      useCommitSigning: false,
-      sshSigningKey: "",
-      botId: String(APP_BOT_ID),
-      botName: APP_BOT_LOGIN,
-      allowedBots: "",
-      allowedNonWriteUsers: "",
-      trackProgress: false,
-      includeCommentsByActor: "",
-      excludeCommentsByActor: "",
-    },
-  };
+let fetchSpy: ReturnType<typeof spyOn>;
+let warningSpy: ReturnType<typeof spyOn>;
+beforeEach(() => {
+  fetchSpy = spyOn(global, "fetch").mockResolvedValue(
+    Response.json({ workflow_runs: [] }),
+  );
+  warningSpy = spyOn(core, "warning").mockImplementation(() => {});
+});
+afterEach(() => {
+  fetchSpy.mockRestore();
+  warningSpy.mockRestore();
+});
 
-  const mockPRContext: ParsedGitHubContext = {
-    ...mockContext,
-    eventName: "pull_request",
-    isPR: true,
-    entityNumber: 456,
-  };
-
-  const mockContextWithSigning: ParsedGitHubContext = {
-    ...mockContext,
-    inputs: {
-      ...mockContext.inputs,
-      useCommitSigning: true,
-    },
-  };
-
-  beforeEach(() => {
-    consoleInfoSpy = spyOn(core, "info").mockImplementation(() => {});
-    consoleWarningSpy = spyOn(core, "warning").mockImplementation(() => {});
-    setFailedSpy = spyOn(core, "setFailed").mockImplementation(() => {});
-    processExitSpy = spyOn(process, "exit").mockImplementation(() => {
-      throw new Error("Process exit");
-    });
-    // Mock fetch so checkActionsReadPermission succeeds (returns 200 for actions API)
-    fetchSpy = spyOn(global, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ workflow_runs: [] }), { status: 200 }),
-    );
-
-    // Set up required environment variables
-    if (!process.env.GITHUB_ACTION_PATH) {
-      process.env.GITHUB_ACTION_PATH = "/test/action/path";
-    }
+describe("MCP server selection", () => {
+  test("does not start servers without tool grants or signing capability", async () => {
+    expect(await configure()).toEqual({});
+    expect(
+      await configure({ allowedTools: ["Bash", "Read", "Grep", "mcp__*"] }),
+    ).toEqual({});
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  afterEach(() => {
-    consoleInfoSpy.mockRestore();
-    consoleWarningSpy.mockRestore();
-    setFailedSpy.mockRestore();
-    processExitSpy.mockRestore();
-    fetchSpy.mockRestore();
-  });
-
-  test("should redact secrets in the failure message", async () => {
-    const token = "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";
-    const allowedTools = {
-      some() {
-        throw new Error(`request with ${token} failed`);
-      },
-    } as unknown as string[];
-
-    const message = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools,
-      mode: "tag",
-      context: mockContext,
-    }).then(
-      () => "",
-      (error: Error) => error.message,
-    );
-
-    expect(processExitSpy).not.toHaveBeenCalled();
-    expect(message).toContain("Install MCP server failed");
-    expect(message).not.toContain(token);
-    expect(message).toContain("[REDACTED_GITHUB_TOKEN]");
-  });
-
-  test("should return comment server when commit signing is disabled", async () => {
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: [],
-      context: mockContext,
-      mode: "tag",
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers).toBeDefined();
-    expect(parsed.mcpServers.github).not.toBeDefined();
-    expect(parsed.mcpServers.github_file_ops).not.toBeDefined();
-    expect(parsed.mcpServers.github_comment).toBeDefined();
-    expect(parsed.mcpServers.github_comment.env.GITHUB_TOKEN).toBe(
-      "test-token",
-    );
-  });
-
-  test("gives the servers the token broker instead of the token when there is one", async () => {
-    const result = (await prepareMcpConfig({
-      githubToken: "test-token",
-      tokenBroker: { url: "http://127.0.0.1:1234/", key: "broker-key" },
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: ["mcp__github_inline_comment__create_inline_comment"],
-      context: { ...mockContextWithSigning, isPR: true },
-      mode: "tag",
-    })) as Record<string, any>;
-
-    for (const name of [
-      "github_comment",
-      "github_file_ops",
+  test.each([
+    ["mcp__github_comment", "github_comment"],
+    ["mcp__github_comment__update_comment", "github_comment"],
+    ["mcp__github_comment__*", "github_comment"],
+    ["mcp__github_ci", "github_ci"],
+    ["mcp__github_ci__get_ci_status", "github_ci"],
+    ["mcp__github_inline_comment", "github_inline_comment"],
+    [
+      "mcp__github_inline_comment__create_inline_comment",
       "github_inline_comment",
-    ]) {
-      expect(result[name].env.GITHUB_TOKEN_BROKER_URL).toBe(
-        "http://127.0.0.1:1234/",
-      );
-      expect(result[name].env.GITHUB_TOKEN_BROKER_KEY).toBe("broker-key");
-      expect(result[name].env.GITHUB_TOKEN).toBeUndefined();
-    }
+    ],
+  ])("starts the server named by %s", async (tool, name) => {
+    expect(
+      Object.keys(await configure({ allowedTools: [tool], pullRequest })),
+    ).toEqual([name]);
   });
 
-  test("should include file ops server when commit signing is enabled", async () => {
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: [],
-      mode: "tag",
-      context: mockContextWithSigning,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers).toBeDefined();
-    expect(parsed.mcpServers.github).not.toBeDefined();
-    expect(parsed.mcpServers.github_file_ops).toBeDefined();
-    expect(parsed.mcpServers.github_file_ops.env.GITHUB_TOKEN).toBe(
-      "test-token",
-    );
-    expect(parsed.mcpServers.github_file_ops.env.BRANCH_NAME).toBe(
-      "test-branch",
-    );
-  });
-
-  test("should include github MCP server when mcp__github__ tools are allowed", async () => {
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: ["mcp__github__create_issue", "mcp__github__create_pr"],
-      mode: "tag",
-      context: mockContext,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers).toBeDefined();
-    expect(parsed.mcpServers.github).toBeDefined();
-    expect(parsed.mcpServers.github.command).toBe("docker");
-    expect(parsed.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN).toBe(
-      "test-token",
-    );
-  });
-
-  test("should include inline comment server for PRs when tools are allowed", async () => {
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: ["mcp__github_inline_comment__create_inline_comment"],
-      mode: "tag",
-      context: mockPRContext,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers).toBeDefined();
-    expect(parsed.mcpServers.github_inline_comment).toBeDefined();
-    expect(parsed.mcpServers.github_inline_comment.env.GITHUB_TOKEN).toBe(
-      "test-token",
-    );
-    expect(parsed.mcpServers.github_inline_comment.env.PR_NUMBER).toBe("456");
-  });
-
-  test("should include comment server when no GitHub tools are allowed and signing disabled", async () => {
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: [],
-      mode: "tag",
-      context: mockContext,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers).toBeDefined();
-    expect(parsed.mcpServers.github).not.toBeDefined();
-    expect(parsed.mcpServers.github_file_ops).not.toBeDefined();
-    expect(parsed.mcpServers.github_comment).toBeDefined();
-  });
-
-  test("should set GITHUB_ACTION_PATH correctly", async () => {
-    process.env.GITHUB_ACTION_PATH = "/test/action/path";
-
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: [],
-      mode: "tag",
-      context: mockContextWithSigning,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers.github_file_ops.args).toContain(
-      "/test/action/path/src/mcp/github-file-ops-server.ts",
-    );
-  });
-
-  test("should pin bun config flags before run for every bun server", async () => {
-    process.env.GITHUB_ACTION_PATH = "/test/action/path";
-    process.env.DEFAULT_WORKFLOW_TOKEN = "workflow-token";
-
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: ["mcp__github_inline_comment__create_inline_comment"],
-      mode: "tag",
-      context: {
-        ...mockPRContext,
-        inputs: { ...mockPRContext.inputs, useCommitSigning: true },
-      },
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    const servers: Record<string, string> = {
-      github_comment: "src/mcp/github-comment-server.ts",
-      github_file_ops: "src/mcp/github-file-ops-server.ts",
-      github_inline_comment: "src/mcp/github-inline-comment-server.ts",
-      github_ci: "src/mcp/github-actions-server.ts",
-    };
-
-    for (const [name, script] of Object.entries(servers)) {
-      expect(parsed.mcpServers[name]).toBeDefined();
-      expect(parsed.mcpServers[name].command).toBe("bun");
-      expect(parsed.mcpServers[name].args).toEqual([
-        "--no-env-file",
-        "--config=/test/action/path/bunfig.toml",
-        "run",
-        `/test/action/path/${script}`,
+  test("starts GitHub's docker server and inline comments for GitHub tool grants on PRs", async () => {
+    for (const tool of ["mcp__github", "mcp__github__create_issue"]) {
+      const servers = await configure({ allowedTools: [tool], pullRequest });
+      expect(Object.keys(servers).sort()).toEqual([
+        "github",
+        "github_inline_comment",
       ]);
+      expect(servers.github).toMatchObject({
+        command: "docker",
+        env: { GITHUB_PERSONAL_ACCESS_TOKEN: "app-token" },
+      });
     }
-
-    delete process.env.DEFAULT_WORKFLOW_TOKEN;
   });
 
-  test("should use current working directory when GITHUB_WORKSPACE is not set", async () => {
-    delete process.env.GITHUB_WORKSPACE;
-
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: [],
-      mode: "tag",
-      context: mockContextWithSigning,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers.github_file_ops.env.REPO_DIR).toBe(process.cwd());
+  test("does not start PR-only servers without a PR", async () => {
+    expect(
+      await configure({
+        allowedTools: ["mcp__github_inline_comment", "mcp__github_ci"],
+      }),
+    ).toEqual({});
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  test("should include CI server when context.isPR is true and DEFAULT_WORKFLOW_TOKEN exists", async () => {
-    process.env.DEFAULT_WORKFLOW_TOKEN = "workflow-token";
-
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: [],
-      mode: "tag",
-      context: mockPRContext,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers.github_ci).toBeDefined();
-    expect(parsed.mcpServers.github_ci.env.GITHUB_TOKEN).toBe("workflow-token");
-    expect(parsed.mcpServers.github_ci.env.PR_NUMBER).toBe("456");
-
-    delete process.env.DEFAULT_WORKFLOW_TOKEN;
-  });
-
-  test("should not include github_ci server when context.isPR is false", async () => {
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: [],
-      mode: "tag",
-      context: mockContext,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers.github_ci).not.toBeDefined();
-  });
-
-  test("should not include github_ci server when actions:read permission is missing", async () => {
-    process.env.DEFAULT_WORKFLOW_TOKEN = "workflow-token";
-    // Simulate 403 from actions API
+  test("requires a workflow token and actions:read before starting CI", async () => {
+    const request = { allowedTools: ["mcp__github_ci"], pullRequest };
+    expect(
+      await configure({
+        ...request,
+        env: { ...env, DEFAULT_WORKFLOW_TOKEN: undefined },
+      }),
+    ).toEqual({});
+    expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockResolvedValue(
-      new Response(
-        JSON.stringify({ message: "Resource not accessible by integration" }),
+      Response.json(
+        { message: "Resource not accessible by integration" },
         { status: 403 },
       ),
     );
-
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: [],
-      mode: "tag",
-      context: mockPRContext,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers.github_ci).not.toBeDefined();
-
-    delete process.env.DEFAULT_WORKFLOW_TOKEN;
-  });
-
-  test("should not include github_ci server when DEFAULT_WORKFLOW_TOKEN is missing", async () => {
-    delete process.env.DEFAULT_WORKFLOW_TOKEN;
-
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: [],
-      mode: "tag",
-      context: mockPRContext,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers.github_ci).not.toBeDefined();
-  });
-
-  test("should include github MCP server when mcp__github shorthand is used", async () => {
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: ["mcp__github"],
-      mode: "agent",
-      context: mockContext,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers.github).toBeDefined();
-    expect(parsed.mcpServers.github.command).toBe("docker");
-    expect(parsed.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN).toBe(
-      "test-token",
+    expect(await configure(request)).toEqual({});
+    expect(warningSpy).toHaveBeenCalledWith(
+      expect.stringContaining("actions: read"),
     );
   });
 
-  test("should include inline comment server when mcp__github_inline_comment shorthand is used", async () => {
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: ["mcp__github_inline_comment"],
-      mode: "agent",
-      context: mockPRContext,
-    });
+  test("does not probe CI permissions when CI tools were not requested", async () => {
+    await configure({ allowedTools: ["mcp__github_comment"], pullRequest });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
 
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers.github_inline_comment).toBeDefined();
-    expect(parsed.mcpServers.github_inline_comment.env.GITHUB_TOKEN).toBe(
-      "test-token",
+test("passes comment identity and PR classification policy explicitly", async () => {
+  const servers = await configure({
+    allowedTools: ["mcp__github_comment", "mcp__github_inline_comment"],
+    trackingComment: { id: 987, namespace: "review" },
+    pullRequest: { ...pullRequest, classifyInlineComments: false },
+  });
+  expect(servers.github_comment).toMatchObject({
+    env: {
+      REPO_OWNER: "owner",
+      REPO_NAME: "repo",
+      TRACKING_COMMENT_ID: "987",
+      TRACKING_COMMENT_NAMESPACE: "review",
+    },
+  });
+  expect(servers.github_inline_comment).toMatchObject({
+    env: {
+      PR_NUMBER: "456",
+      CLASSIFY_INLINE_COMMENTS: "false",
+      INLINE_COMMENT_BUFFER: "/run-temp/pi-inline-comments.jsonl",
+    },
+  });
+});
+
+test("passes fresh-token broker addresses to owned servers but the workflow token to CI", async () => {
+  const servers = await configure({
+    allowedTools: [
+      "mcp__github_comment",
+      "mcp__github_inline_comment",
+      "mcp__github_ci",
+    ],
+    pullRequest,
+    fileOps,
+    tokenBroker: { url: "http://127.0.0.1:1234/", key: "broker-key" },
+  });
+  for (const name of [
+    "github_comment",
+    "github_file_ops",
+    "github_inline_comment",
+  ]) {
+    expect(servers[name]).toMatchObject({
+      env: {
+        GITHUB_TOKEN_BROKER_URL: "http://127.0.0.1:1234/",
+        GITHUB_TOKEN_BROKER_KEY: "broker-key",
+      },
+    });
+    const server = servers[name]!;
+    expect(
+      "command" in server ? server.env?.GITHUB_TOKEN : undefined,
+    ).toBeUndefined();
+  }
+  expect(servers.github_ci).toMatchObject({
+    env: { GITHUB_TOKEN: "workflow-token", PR_NUMBER: "456" },
+  });
+});
+
+test("pins Bun runtime flags and signing paths for every owned server", async () => {
+  const servers = await configure({
+    allowedTools: [
+      "mcp__github_comment",
+      "mcp__github_inline_comment",
+      "mcp__github_ci",
+    ],
+    pullRequest,
+    fileOps,
+  });
+  const scripts = {
+    github_comment: "github-comment-server",
+    github_file_ops: "github-file-ops-server",
+    github_inline_comment: "github-inline-comment-server",
+    github_ci: "github-actions-server",
+  };
+  for (const [name, script] of Object.entries(scripts)) {
+    expect(servers[name]).toMatchObject({
+      command: "bun",
+      args: [
+        "--no-env-file",
+        "--config=/action/bunfig.toml",
+        "run",
+        `/action/src/mcp/${script}.ts`,
+      ],
+    });
+  }
+  expect(servers.github_file_ops).toMatchObject({
+    env: {
+      GITHUB_TOKEN: "app-token",
+      BRANCH_NAME: "feature",
+      BASE_BRANCH: "main",
+      REPO_DIR: "/checkout",
+    },
+  });
+  const fallback = await configure({ fileOps, env: {} });
+  expect(fallback.github_file_ops).toMatchObject({
+    env: { REPO_DIR: process.cwd() },
+  });
+});
+
+test("redacts secrets in configuration errors without exiting the process", async () => {
+  const token = `ghp_${"a".repeat(36)}`;
+  const tools = {
+    some() {
+      throw new Error(`request with ${token} failed`);
+    },
+  } as unknown as string[];
+  const exitSpy = spyOn(process, "exit").mockImplementation(() => {
+    throw new Error("unexpected exit");
+  });
+  try {
+    await expect(configure({ allowedTools: tools })).rejects.toThrow(
+      "Install MCP server failed with error: Error: request with [REDACTED_GITHUB_TOKEN] failed",
     );
-    expect(parsed.mcpServers.github_inline_comment.env.PR_NUMBER).toBe("456");
-  });
-
-  test("should include comment server in agent mode when mcp__github_comment shorthand is used", async () => {
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: ["mcp__github_comment"],
-      mode: "agent",
-      context: mockContext,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers.github_comment).toBeDefined();
-    expect(parsed.mcpServers.github_comment.env.GITHUB_TOKEN).toBe(
-      "test-token",
-    );
-  });
-
-  test("should include CI server in agent mode when mcp__github_ci shorthand is used", async () => {
-    process.env.DEFAULT_WORKFLOW_TOKEN = "workflow-token";
-
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: ["mcp__github_ci"],
-      mode: "agent",
-      context: mockPRContext,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers.github_ci).toBeDefined();
-    expect(parsed.mcpServers.github_ci.env.GITHUB_TOKEN).toBe("workflow-token");
-    expect(parsed.mcpServers.github_ci.env.PR_NUMBER).toBe("456");
-
-    delete process.env.DEFAULT_WORKFLOW_TOKEN;
-  });
-
-  test("should not include github MCP server when unrelated tool is specified", async () => {
-    const result = await prepareMcpConfig({
-      githubToken: "test-token",
-      owner: "test-owner",
-      repo: "test-repo",
-      branch: "test-branch",
-      baseBranch: "main",
-      allowedTools: ["Bash", "Read", "Grep"],
-      mode: "agent",
-      context: mockContext,
-    });
-
-    const parsed = { mcpServers: result as Record<string, any> };
-    expect(parsed.mcpServers.github).not.toBeDefined();
-    expect(parsed.mcpServers.github_inline_comment).not.toBeDefined();
-  });
+    expect(exitSpy).not.toHaveBeenCalled();
+  } finally {
+    exitSpy.mockRestore();
+  }
 });

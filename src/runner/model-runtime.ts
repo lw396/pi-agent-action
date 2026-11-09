@@ -1,5 +1,5 @@
 import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
-import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { ModelRuntime, resolveCliModel } from "@earendil-works/pi-coding-agent";
 
 /**
  * The providers whose endpoint a workflow can override, and the env var that
@@ -92,4 +92,28 @@ export async function createModelRuntime(
     runtime.registerProvider(provider, { baseUrl });
   }
   return runtime;
+}
+
+/**
+ * pi's resolution of the model input: its catalog entry and thinking level,
+ * and, when unresolved, the reason.
+ */
+export type ResolvedMainModel = ReturnType<typeof resolveCliModel>;
+
+/**
+ * Resolve the model input and give its provider the api_key input, if set.
+ * The key belongs only to the main model's provider. An unknown reference is
+ * returned unresolved; the Runner reports it as an error, the comment
+ * classifier as a reason to post every comment.
+ */
+export async function resolveMainModel(
+  modelRuntime: ModelRuntime,
+  reference: string,
+  apiKey: string | undefined,
+): Promise<ResolvedMainModel> {
+  const resolved = resolveCliModel({ cliModel: reference, modelRuntime });
+  if (resolved.model && apiKey) {
+    await modelRuntime.setRuntimeApiKey(resolved.model.provider, apiKey);
+  }
+  return resolved;
 }

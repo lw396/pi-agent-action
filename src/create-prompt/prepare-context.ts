@@ -26,11 +26,9 @@ export function prepareContext(
   const prompt = context.inputs.prompt;
   const isPR = context.isPR;
 
-  // Get PR/Issue number from entityNumber
   const prNumber = isPR ? context.entityNumber.toString() : undefined;
   const issueNumber = !isPR ? context.entityNumber.toString() : undefined;
 
-  // Extract trigger username and comment data based on event type
   let triggerUsername: string | undefined;
   let triggerUserId: number | undefined;
   let commentId: string | undefined;
@@ -56,7 +54,6 @@ export function prepareContext(
     triggerUserId = context.payload.sender.id;
   }
 
-  // Create infrastructure fields object
   const commonFields: CommonFields = {
     repository,
     trackingCommentId,
@@ -67,7 +64,6 @@ export function prepareContext(
     ...(agentBranch && { agentBranch }),
   };
 
-  // Parse event-specific data based on event type
   let eventData: EventData;
 
   switch (eventName) {
@@ -292,7 +288,6 @@ export function getEventTypeAndContext(envVars: PreparedContext): {
       };
 
     case "pull_request":
-    case "pull_request_target":
       return {
         eventType: "PULL_REQUEST",
         triggerContext: eventData.eventAction

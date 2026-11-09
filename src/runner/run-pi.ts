@@ -1,25 +1,28 @@
 import * as core from "@actions/core";
 import { mkdtemp } from "fs/promises";
 import { tmpdir } from "os";
-import { join, sep } from "path";
+import { join } from "path";
 import {
   createAgentSession,
   createCodemodeExtension,
   DefaultResourceLoader,
   ModelRuntime,
-  resolveCliModel,
   SessionManager,
   type AgentSession,
   type AgentSessionEvent,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { redactSecrets } from "../github/utils/sanitizer";
-import { createModelRuntime, type ModelRuntimeOptions } from "./model-runtime";
+import { redactSecrets } from "../security/sanitizer";
+import {
+  createModelRuntime,
+  resolveMainModel,
+  type ModelRuntimeOptions,
+} from "./model-runtime";
 import { isolatedBashTool } from "./bash-isolation";
 import { commentRedactionExtension } from "./comment-redaction";
 import { parsePiArgs } from "./pi-args";
 import { putBundledPiOnPath } from "./pi-cli";
-import { resolvePackages } from "./packages";
+import { loadPackageResources, resolvePackages } from "./packages";
 import { withRunSettings, type RunSettings } from "./settings";
 import { expandSlashCommand } from "./slash-command";
 import {
@@ -263,47 +266,11 @@ export async function runPi(
         ],
         ...piArgs.resources,
       });
-      try {
-        await resourceLoader.reload();
-      } catch (error) {
-        if (!options.packages?.length) throw error;
-        throw new Error(
-          `packages: installation or loading failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-      if (options.packages?.length) {
-        const errors = resourceLoader.getExtensions().errors;
-        if (errors.length) {
-          throw new Error(
-            `packages: extension loading failed: ${errors.map((error) => `${error.path}: ${error.error}`).join("; ")}`,
-          );
-        }
-        const skills = resourceLoader.getSkills();
-        const prompts = resourceLoader.getPrompts();
-        const themes = resourceLoader.getThemes();
-        const loadedPaths = new Set([
-          ...skills.skills.map((skill) => skill.filePath),
-          ...prompts.prompts.map((prompt) => prompt.filePath),
-          ...themes.themes.map((theme) => theme.sourceInfo?.path),
-        ]);
-        const failed = [
-          ...skills.diagnostics,
-          ...prompts.diagnostics,
-          ...themes.diagnostics,
-        ].filter(
-          (diagnostic) =>
-            diagnostic.type !== "collision" &&
-            diagnostic.path?.startsWith(`${agentDir}${sep}`) &&
-            !loadedPaths.has(diagnostic.path),
-        );
-        // pi warns and skips invalid resources. Fail on skipped package resources,
-        // but retain its normal warnings for resources that did load and collisions.
-        if (failed.length) {
-          throw new Error(
-            `packages: resource loading failed: ${failed.map((diagnostic) => `${diagnostic.path}: ${diagnostic.message}`).join("; ")}`,
-          );
-        }
-      }
+      await loadPackageResources(
+        resourceLoader,
+        agentDir,
+        options.packages ?? [],
+      );
       const command = expandRequestedCommand(
         options.userRequest,
         resourceLoader,
@@ -450,18 +417,15 @@ function bashTools(options: RunnerOptions, cwd: string): ToolDefinition[] {
   return [];
 }
 
-/** Resolve the model input, and give its provider the api_key input if set. */
+/** Resolve the model input, failing the run when pi does not know it. */
 async function resolveModel(
   modelRuntime: ModelRuntime,
   reference: string,
   apiKey: string | undefined,
 ) {
-  const resolved = resolveCliModel({ cliModel: reference, modelRuntime });
+  const resolved = await resolveMainModel(modelRuntime, reference, apiKey);
   if (!resolved.model) {
     throw new Error(`Cannot use model '${reference}': ${resolved.error}`);
-  }
-  if (apiKey) {
-    await modelRuntime.setRuntimeApiKey(resolved.model.provider, apiKey);
   }
   return { model: resolved.model, thinkingLevel: resolved.thinkingLevel };
 }

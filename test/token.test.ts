@@ -66,10 +66,23 @@ describe("setupGitHubToken", () => {
   });
 
   test("returns app token from OIDC exchange", async () => {
-    await expect(setupGitHubToken()).resolves.toBe("app-token");
+    await expect(setupGitHubToken()).resolves.toEqual({
+      token: "app-token",
+      source: "app",
+    });
 
     expect(getIDTokenSpy).toHaveBeenCalledWith("pi-agent-action");
     expect(setSecretSpy).toHaveBeenCalledWith("app-token");
+  });
+
+  test("uses the input token without requesting OIDC or an app token", async () => {
+    process.env.OVERRIDE_GITHUB_TOKEN = "input-token";
+    await expect(setupGitHubToken()).resolves.toEqual({
+      token: "input-token",
+      source: "input",
+    });
+    expect(getIDTokenSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   test("exchanges the OIDC token at the project's token exchange service", async () => {

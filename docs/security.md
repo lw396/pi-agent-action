@@ -57,7 +57,7 @@ See [Pi packages](./configuration.md#pi-packages) for supported sources and fail
 
 When `allowed_non_write_users` is set, bash commands are isolated. Without it, bash commands see the agent's whole environment, including the provider key and `GH_TOKEN`, as in claude-code-action.
 
-**Environment allowlist.** Bash commands keep only the variables in `BASH_ENV_ALLOWLIST` (`src/runner/env-allowlist.ts`):
+**Environment allowlist.** Bash commands keep only the variables in `BASH_ENV_ALLOWLIST` (`src/security/env-allowlist.ts`):
 
 - `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `LANG`, `LANGUAGE`, `LC_ALL`, `LC_CTYPE`, `TZ`, `TMPDIR`, `CI`, `RUNNER_OS`, `RUNNER_ARCH`, `PWD`, `OLDPWD`
 - the `GITHUB_*` variables that hold no secret and change nothing: repository, ref, SHA, run, job, workflow, actor, server and API URLs, `GITHUB_EVENT_PATH`, `GITHUB_WORKSPACE`, `GITHUB_ACTION_PATH`

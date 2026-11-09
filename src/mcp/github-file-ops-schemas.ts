@@ -19,6 +19,3 @@ export const deleteFilesInputSchema = {
     ),
   message: z.string().describe("Commit message"),
 };
-
-export const commitFilesPayloadSchema = z.object(commitFilesInputSchema);
-export const deleteFilesPayloadSchema = z.object(deleteFilesInputSchema);

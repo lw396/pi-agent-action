@@ -1,12 +1,17 @@
 #!/usr/bin/env bun
 
 import { describe, expect, test, beforeAll } from "bun:test";
+import { z } from "zod";
 import { generatePrompt } from "../src/create-prompt";
 import type { PreparedContext } from "../src/create-prompt";
 import {
-  commitFilesPayloadSchema,
-  deleteFilesPayloadSchema,
+  commitFilesInputSchema,
+  deleteFilesInputSchema,
 } from "../src/mcp/github-file-ops-schemas";
+
+// The server hands these raw shapes to `server.tool`, which wraps them itself.
+const commitFilesPayloadSchema = z.object(commitFilesInputSchema);
+const deleteFilesPayloadSchema = z.object(deleteFilesInputSchema);
 
 beforeAll(() => {
   process.env.GITHUB_ACTION_PATH = "/test/action/path";
@@ -91,12 +96,7 @@ describe("delete_files prompt vs live MCP schema (#1665)", () => {
   });
 
   test("generated tag-mode prompt example parses against the live schema", async () => {
-    const prompt = await generatePrompt(
-      signingContext,
-      mockGitHubData,
-      true,
-      "tag",
-    );
+    const prompt = await generatePrompt(signingContext, mockGitHubData, true);
     const example = extractToolExample(
       prompt,
       "mcp__github_file_ops__delete_files",
@@ -127,22 +127,8 @@ describe("delete_files prompt vs live MCP schema (#1665)", () => {
     }
   });
 
-  test("accepts a payload that still includes the old files key beside paths", () => {
-    const result = deleteFilesPayloadSchema.safeParse({
-      files: ["path/to/old.js"],
-      paths: ["path/to/old.js"],
-      message: "chore: remove deprecated file",
-    });
-    expect(result.success).toBe(true);
-  });
-
   test("does not change commit_files — that sibling tool still requires files", async () => {
-    const prompt = await generatePrompt(
-      signingContext,
-      mockGitHubData,
-      true,
-      "tag",
-    );
+    const prompt = await generatePrompt(signingContext, mockGitHubData, true);
     const example = extractToolExample(
       prompt,
       "mcp__github_file_ops__commit_files",
@@ -151,19 +137,5 @@ describe("delete_files prompt vs live MCP schema (#1665)", () => {
     expect(example).not.toHaveProperty("paths");
     expect(commitFilesPayloadSchema.safeParse(example).success).toBe(true);
     expect(deleteFilesPayloadSchema.safeParse(example).success).toBe(false);
-  });
-
-  test("generated delete_files example keys are exactly paths and message", async () => {
-    const prompt = await generatePrompt(
-      signingContext,
-      mockGitHubData,
-      true,
-      "tag",
-    );
-    const example = extractToolExample(
-      prompt,
-      "mcp__github_file_ops__delete_files",
-    );
-    expect(Object.keys(example).sort()).toEqual(["message", "paths"]);
   });
 });

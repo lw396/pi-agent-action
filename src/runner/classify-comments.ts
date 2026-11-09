@@ -11,7 +11,11 @@ import {
   resolveCliModel,
   type ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
-import { createModelRuntime, type ModelRuntimeOptions } from "./model-runtime";
+import {
+  createModelRuntime,
+  resolveMainModel,
+  type ModelRuntimeOptions,
+} from "./model-runtime";
 
 /**
  * Classification of buffered inline comments as real review feedback or
@@ -208,12 +212,9 @@ export async function classifyComments(
       options.modelRuntime ?? (await createModelRuntime(options));
     const mainReference = options.model?.trim();
     const main = mainReference
-      ? resolveCliModel({ cliModel: mainReference, modelRuntime }).model
+      ? (await resolveMainModel(modelRuntime, mainReference, options.apiKey))
+          .model
       : undefined;
-    if (main && options.apiKey) {
-      // Like the Runner: the key is for the model input's provider only.
-      await modelRuntime.setRuntimeApiKey(main.provider, options.apiKey);
-    }
     const choice = chooseModel(
       modelRuntime,
       main,

@@ -3,6 +3,7 @@ import type { GitHubContext } from "../github/context";
 import type { BranchInfo } from "../github/operations/branch";
 import type { GitHubTokenSource } from "../github/token";
 import type { TokenBrokerAddress } from "../github/token-broker";
+import type { TrackingComment } from "../github/operations/comments/tracking-comment";
 import type { WipTarget } from "../github/operations/wip";
 import type { ModeRunSettings } from "../runner/run-plan";
 import type { ToolRule } from "../runner/tool-rules";
@@ -24,8 +25,8 @@ export type PrepareOptions = {
 export type PrepareResult = ModeRunSettings & {
   /** The prompt the model gets. */
   prompt: string;
-  /** The tracking comment, which only tag mode creates. */
-  commentId?: number;
+  /** The tracking comment this run updates; only tag mode creates one. */
+  trackingComment?: TrackingComment;
   branchInfo: BranchInfo;
   /** Where cleanup saves the agent's unfinished work if the run fails. */
   wipTarget?: WipTarget;

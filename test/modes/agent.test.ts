@@ -11,29 +11,23 @@ import { prepareAgentMode } from "../../src/modes/agent";
 import { parseToolRules } from "../../src/runner/tool-rules";
 import { createMockAutomationContext } from "../mockContext";
 import * as core from "@actions/core";
+import * as gitAuth from "../../src/modes/git-auth";
 import * as gitConfig from "../../src/github/operations/git-config";
 
 describe("Agent Mode", () => {
   let exportVariableSpy: any;
   let setOutputSpy: any;
   let configureGitAuthSpy: any;
-  let replaceCheckoutCredentialsSpy: any;
 
   beforeEach(() => {
     exportVariableSpy = spyOn(core, "exportVariable").mockImplementation(
       () => {},
     );
     setOutputSpy = spyOn(core, "setOutput").mockImplementation(() => {});
-    // Mock git configuration to prevent actual git commands from running
+    // Keep the real git commands out of the test environment.
     configureGitAuthSpy = spyOn(
       gitConfig,
       "configureGitAuth",
-    ).mockImplementation(async () => {
-      // Do nothing - prevent actual git config modifications
-    });
-    replaceCheckoutCredentialsSpy = spyOn(
-      gitConfig,
-      "replaceCheckoutCredentials",
     ).mockImplementation(async () => {});
   });
 
@@ -41,15 +35,9 @@ describe("Agent Mode", () => {
     exportVariableSpy?.mockClear();
     setOutputSpy?.mockClear();
     configureGitAuthSpy?.mockClear();
-    replaceCheckoutCredentialsSpy?.mockClear();
     exportVariableSpy?.mockRestore();
     setOutputSpy?.mockRestore();
     configureGitAuthSpy?.mockRestore();
-    replaceCheckoutCredentialsSpy?.mockRestore();
-  });
-
-  test("prepareAgentMode is exported as a function", () => {
-    expect(typeof prepareAgentMode).toBe("function");
   });
 
   test("prepare starts the MCP servers for the tools allowed_tools names", async () => {
@@ -100,7 +88,7 @@ describe("Agent Mode", () => {
       // Verify return structure - should fall back to repository.default_branch when no env vars set
       expect(withoutTools).toEqual({
         prompt: expect.any(String),
-        commentId: undefined,
+        trackingComment: undefined,
         branchInfo: {
           baseBranch: "main",
           currentBranch: "main",
@@ -287,52 +275,31 @@ describe("Agent Mode", () => {
       },
     } as any;
 
-    test("uses full git auth on the non-signing path", async () => {
+    test("sets git auth up without letting a credential failure fail the run", async () => {
+      const setupGitAuthSpy = spyOn(gitAuth, "setupGitAuth").mockImplementation(
+        async () => "git",
+      );
       const context = createMockAutomationContext({
         eventName: "workflow_dispatch",
       });
+      try {
+        await prepareAgentMode({
+          context,
+          octokit: mockOctokit,
+          githubToken: "test-token",
+          allowedTools: [],
+          untrustedInput: true,
+        });
 
-      await prepareAgentMode({
-        context,
-        octokit: mockOctokit,
-        githubToken: "test-token",
-        allowedTools: [],
-        untrustedInput: false,
-      });
-
-      expect(configureGitAuthSpy).toHaveBeenCalledTimes(1);
-      expect(configureGitAuthSpy).toHaveBeenCalledWith(
-        "test-token",
-        context,
-        { login: context.inputs.botName, id: parseInt(context.inputs.botId) },
-        false,
-      );
-      // configureGitAuth performs the credential replacement itself; the mock
-      // stands in for it here, so the standalone helper is not invoked.
-      expect(replaceCheckoutCredentialsSpy).not.toHaveBeenCalled();
-    });
-
-    test("still replaces the checkout credential when API commit signing is enabled", async () => {
-      const context = createMockAutomationContext({
-        eventName: "workflow_dispatch",
-        inputs: { useCommitSigning: true },
-      });
-
-      await prepareAgentMode({
-        context,
-        octokit: mockOctokit,
-        githubToken: "test-token",
-        allowedTools: [],
-        untrustedInput: true,
-      });
-
-      expect(configureGitAuthSpy).not.toHaveBeenCalled();
-      expect(replaceCheckoutCredentialsSpy).toHaveBeenCalledTimes(1);
-      expect(replaceCheckoutCredentialsSpy).toHaveBeenCalledWith(
-        "test-token",
-        context,
-        true,
-      );
+        expect(setupGitAuthSpy).toHaveBeenCalledWith({
+          githubToken: "test-token",
+          context,
+          untrustedInput: true,
+          failOnError: false,
+        });
+      } finally {
+        setupGitAuthSpy.mockRestore();
+      }
     });
   });
 });

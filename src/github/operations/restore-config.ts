@@ -15,14 +15,15 @@ import {
 import { dirname, join, posix, relative, sep } from "path";
 import { fetchDepthArgs } from "./fetch-depth";
 
-// Paths that are both PR-controllable and read from cwd at CLI startup.
+// Paths that are both PR-controllable and read by the agent, or by the git
+// commands it runs, from the working directory.
 //
-// Deliberately excluded from the CLI's broader auto-edit blocklist:
+// Deliberately not restored:
 //   .git/        — not tracked by git; PR commits cannot place files there.
 //                  Restoring it would also undo the PR checkout entirely.
 //   .gitconfig   — git reads ~/.gitconfig and .git/config, never cwd/.gitconfig.
 //   .bashrc etc. — shells source these from $HOME; checkout cannot reach $HOME.
-//   .vscode/.idea— IDE config; nothing in the CLI's startup path reads them.
+//   .vscode/.idea— IDE config; the agent reads neither.
 export const SENSITIVE_PATHS = [
   ".claude",
   ".mcp.json",
@@ -239,30 +240,32 @@ function ensurePrSnapshotExcludedFromGit(): void {
 }
 
 /**
- * Restores security-sensitive config paths from the PR base branch.
+ * Restores security-sensitive agent configuration from the PR base branch.
  *
- * The CLI's non-interactive mode trusts cwd: it reads `.mcp.json`,
- * `.claude/settings.json`, and `.claude/settings.local.json` from the working
- * directory and acts on them before any tool-permission gating — executing
- * hooks (including SessionStart), setting env vars (NODE_OPTIONS, LD_PRELOAD,
- * PATH), running apiKeyHelper/awsAuthRefresh shell commands, and auto-approving
- * MCP servers. When this action checks out a PR head, all of these are
- * attacker-controlled.
+ * The agent reads configuration from the working directory before its tools
+ * run: context and system prompt files (AGENTS.md, CLAUDE.md and their
+ * variants), skills under `.agents/` and `.pi/`, and extensions and settings
+ * under `.pi/`. Those extensions run as code inside the action, with access to
+ * the provider key and the GitHub token. Git runs `.husky/` hooks when the
+ * agent commits, `.gitmodules` changes how a submodule is fetched, and the
+ * Claude-compatible paths (`.claude/`, `.claude.json`, `.mcp.json`, the
+ * CLAUDE.* files) are restored alongside them, as is `.ripgreprc`. On a PR
+ * head, all of these are attacker-controlled.
  *
- * Rather than enumerate every dangerous key, this replaces the entire `.claude/`
- * tree and `.mcp.json` with the versions from the PR base branch, which a
- * maintainer has reviewed and merged. Paths absent on base are deleted.
+ * Rather than enumerate every dangerous key, this replaces each entry of
+ * SENSITIVE_PATHS with the version from the PR base branch, which a maintainer
+ * has reviewed and merged. Paths absent on base are deleted.
  *
- * Known limitation: if a PR legitimately modifies `.claude/` and the CLI later
- * commits with `git add -A`, the revert will be included in that commit. This
- * is a narrow UX tradeoff for closing the RCE surface.
+ * Known limitation: if a PR legitimately modifies `.pi/` or `.claude/` and the
+ * agent later commits with `git add -A`, the revert will be included in that
+ * commit. This is a narrow UX tradeoff for closing the RCE surface.
  *
  * Only the paths listed in SENSITIVE_PATHS come from the base branch; the rest
- * of the working tree stays at the PR head. A base-branch hook or setting that
+ * of the working tree stays at the PR head. Base-branch configuration that
  * calls out through files a PR can change — package-manager scripts
  * (`bun run`, `npm run`, `yarn`, `pnpm run`), Makefile or task-runner targets,
  * repo-relative script paths, or tools that load executable project config —
- * therefore runs whatever the PR head provides. Keep restored hooks
+ * therefore runs whatever the PR head provides. Keep restored configuration
  * self-contained: invoke the tool binary directly, pin its version, and pass
  * config on the command line rather than reading it from the checkout. This
  * extends to the runtime itself: `bunx <tool>` runs the tool under `node` when

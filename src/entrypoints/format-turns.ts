@@ -1,13 +1,7 @@
 #!/usr/bin/env bun
 
-import { existsSync } from "fs";
-import { exit } from "process";
-import { redactSecrets } from "../github/utils/sanitizer";
-import {
-  readExecutionFile,
-  sessionStats,
-  type ExecutionRecord,
-} from "../runner/execution-file";
+import { redactSecrets } from "../security/sanitizer";
+import { sessionStats, type ExecutionRecord } from "../runner/execution-file";
 
 export type ToolUse = {
   type: string;
@@ -35,26 +29,20 @@ export type GroupedContent = {
 export function detectContentType(content: any): string {
   const contentStr = String(content).trim();
 
-  // Check for JSON
   if (contentStr.startsWith("{") && contentStr.endsWith("}")) {
     try {
       JSON.parse(contentStr);
       return "json";
-    } catch {
-      // Fall through
-    }
+    } catch {}
   }
 
   if (contentStr.startsWith("[") && contentStr.endsWith("]")) {
     try {
       JSON.parse(contentStr);
       return "json";
-    } catch {
-      // Fall through
-    }
+    } catch {}
   }
 
-  // Check for code-like content
   const codeKeywords = [
     "def ",
     "class ",
@@ -83,7 +71,6 @@ export function detectContentType(content: any): string {
     }
   }
 
-  // Check for shell/bash output
   const shellIndicators = ["ls -", "cd ", "mkdir ", "rm ", "$ ", "# "];
   if (
     contentStr.startsWith("/") ||
@@ -94,7 +81,6 @@ export function detectContentType(content: any): string {
     return "bash";
   }
 
-  // Check for diff format
   if (
     contentStr.startsWith("@@") ||
     contentStr.includes("+++ ") ||
@@ -103,18 +89,15 @@ export function detectContentType(content: any): string {
     return "diff";
   }
 
-  // Check for HTML/XML
   if (contentStr.startsWith("<") && contentStr.endsWith(">")) {
     return "html";
   }
 
-  // Check for markdown
   const mdIndicators = ["# ", "## ", "### ", "- ", "* ", "```"];
   if (mdIndicators.some((indicator) => contentStr.includes(indicator))) {
     return "markdown";
   }
 
-  // Default to plain text
   return "text";
 }
 
@@ -125,7 +108,6 @@ export function formatResultContent(content: any): string {
 
   let contentStr: string;
 
-  // Check if content is a list with "type": "text" structure
   try {
     let parsedContent: any;
     if (typeof content === "string") {
@@ -160,32 +142,24 @@ export function formatResultContent(content: any): string {
   // slip past the final redaction pass.
   contentStr = redactSecrets(contentStr);
 
-  // Truncate very long results
   if (contentStr.length > 3000) {
     contentStr = contentStr.substring(0, 2997) + "...";
   }
 
-  // Detect content type
   const contentType = detectContentType(contentStr);
 
-  // Handle JSON content specially - pretty print it
   if (contentType === "json") {
     try {
-      // Try to parse and pretty print JSON
       const parsed = JSON.parse(contentStr);
       contentStr = JSON.stringify(parsed, null, 2);
-    } catch {
-      // Keep original if parsing fails
-    }
+    } catch {}
   }
 
-  // Format with appropriate syntax highlighting
   if (
     contentType === "text" &&
     contentStr.length < 100 &&
     !contentStr.includes("\n")
   ) {
-    // Short text results don't need code blocks
     return `**→** ${contentStr}\n\n`;
   } else {
     return `**Result:**\n\`\`\`${contentType}\n${contentStr}\n\`\`\`\n\n`;
@@ -210,14 +184,12 @@ export function formatToolWithResult(
 
   let result = `### 🔧 \`${toolName}\`\n\n`;
 
-  // Add parameters if they exist and are not empty
   if (Object.keys(toolInput).length > 0) {
     result += "**Parameters:**\n```json\n";
     result += JSON.stringify(toolInput, null, 2);
     result += "\n```\n\n";
   }
 
-  // Add result if available
   if (toolResult) {
     const content = toolResult.content || "";
     const isError = toolResult.is_error || false;
@@ -236,7 +208,6 @@ export function groupTurnsNaturally(data: ExecutionRecord[]): GroupedContent[] {
   const groupedContent: GroupedContent[] = [];
   const toolResultsMap = new Map<string, ToolResult>();
 
-  // First pass: collect all tool results by tool call id
   for (const record of data) {
     if (record.type === "tool_execution_end" && record.toolCallId) {
       toolResultsMap.set(record.toolCallId, {
@@ -334,14 +305,12 @@ export function formatGroupedContent(groupedContent: GroupedContent[]): string {
     if (itemType === "system_init") {
       markdown += `## 🚀 System Initialization\n\n**Available Tools:** ${item.tools_count} tools loaded\n\n---\n\n`;
     } else if (itemType === "assistant_action") {
-      // Add text content first (if any) - no header needed
       for (const text of item.text_parts || []) {
         if (text.trim()) {
           markdown += `${text}\n\n`;
         }
       }
 
-      // Add tool calls with their results
       for (const toolCall of item.tool_calls || []) {
         markdown += formatToolWithResult(
           toolCall.tool_use,
@@ -349,13 +318,11 @@ export function formatGroupedContent(groupedContent: GroupedContent[]): string {
         );
       }
 
-      // Add usage info if available
       const usage = item.usage;
       if (usage) {
         markdown += `*Token usage: ${inputTokens(usage)} input, ${usage.output || 0} output*\n\n`;
       }
 
-      // Only add separator if this section had content
       if (
         (item.text_parts && item.text_parts.length > 0) ||
         (item.tool_calls && item.tool_calls.length > 0)
@@ -394,47 +361,11 @@ function inputTokens(usage: Record<string, any>): number {
 }
 
 export function formatTurnsFromData(data: ExecutionRecord[]): string {
-  // Group turns naturally
   const groupedContent = groupTurnsNaturally(data);
 
-  // Generate markdown
   const markdown = formatGroupedContent(groupedContent);
 
   // Runtime output may contain credentials that are not registered as
   // workflow secrets, so redact known formats before this gets published.
   return redactSecrets(markdown);
-}
-
-function main(): void {
-  // Get the JSON file path from command line arguments
-  const args = process.argv.slice(2);
-  if (args.length === 0) {
-    console.error("Usage: format-turns.ts <json-file>");
-    exit(1);
-  }
-
-  const jsonFile = args[0];
-  if (!jsonFile) {
-    console.error("Error: No JSON file provided");
-    exit(1);
-  }
-
-  if (!existsSync(jsonFile)) {
-    console.error(`Error: ${jsonFile} not found`);
-    exit(1);
-  }
-
-  try {
-    const data = readExecutionFile(jsonFile);
-
-    // Print to stdout (so it can be captured by shell)
-    console.log(formatTurnsFromData(data));
-  } catch (error) {
-    console.error(`Error processing file: ${error}`);
-    exit(1);
-  }
-}
-
-if (import.meta.main) {
-  main();
 }

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { handleRequest, TOKEN_EXCHANGE_PATH, type Env } from "../src/handler";
+import { handleRequest, type Env } from "../src/handler";
+import { TOKEN_EXCHANGE_PATH } from "../../../src/contracts/token-exchange";
 import { createJwksProvider } from "../src/oidc";
 import {
   APP_ID,

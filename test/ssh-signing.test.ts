@@ -1,291 +1,155 @@
-#!/usr/bin/env bun
-
+// SSH commit signing against the real setup/cleanup functions. The key path is
+// derived from homedir() at import time, so every case runs
+// test/fixtures/ssh-signing-probe.ts in its own Bun process with an isolated
+// HOME and a throwaway git repository as cwd. setupSshSigning only validates
+// the key delimiters and writes the file, so a dummy key is enough; ssh-keygen
+// never runs.
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { execFileSync } from "node:child_process";
 import {
-  describe,
-  test,
-  expect,
-  afterEach,
-  beforeAll,
-  afterAll,
-} from "bun:test";
-import { mkdir, writeFile, rm, readFile, stat } from "fs/promises";
-import { join } from "path";
-import { tmpdir } from "os";
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-describe("SSH Signing", () => {
-  // Use a temp directory for tests
-  const testTmpDir = join(tmpdir(), "claude-ssh-signing-test");
-  const testSshDir = join(testTmpDir, ".ssh");
-  const testKeyPath = join(testSshDir, "pi_signing_key");
-  const testKey =
-    "-----BEGIN OPENSSH PRIVATE KEY-----\ntest-key-content\n-----END OPENSSH PRIVATE KEY-----";
+const PROBE = join(import.meta.dir, "fixtures", "ssh-signing-probe.ts");
 
-  beforeAll(async () => {
-    await mkdir(testTmpDir, { recursive: true });
+const DUMMY_KEY =
+  "-----BEGIN OPENSSH PRIVATE KEY-----\ndummy-key-material\n-----END OPENSSH PRIVATE KEY-----";
+
+// git exports these into hooks; inherited they would point git at the
+// enclosing repository instead of the temp repo, or make the probe read a
+// config it did not write.
+const GIT_ENV_OVERRIDES = [
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_INDEX_FILE",
+  "GIT_COMMON_DIR",
+  "GIT_PREFIX",
+] as const;
+
+let root: string;
+let homeDir: string;
+let repoDir: string;
+let keyPath: string;
+
+// Every git command and the probe run with the same isolated HOME and without
+// the inherited GIT_* overrides.
+function isolatedEnv(): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    HOME: homeDir,
+  };
+  for (const name of GIT_ENV_OVERRIDES) delete env[name];
+  return env;
+}
+
+function git(args: string[], cwd?: string): string {
+  return execFileSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    stdio: "pipe",
+    env: isolatedEnv(),
+  }).trim();
+}
+
+beforeEach(() => {
+  root = mkdtempSync(join(tmpdir(), "ssh-signing-test-"));
+  homeDir = join(root, "home");
+  repoDir = join(root, "repo");
+  keyPath = join(homeDir, ".ssh", "pi_signing_key");
+  mkdirSync(homeDir);
+  git(["init", "-q", repoDir], root);
+});
+
+afterEach(() => {
+  rmSync(root, { recursive: true, force: true });
+});
+
+type ProbeResult = { ok: true } | { ok: false; message: string };
+
+function probe(action: "setup" | "cleanup", key?: string): ProbeResult {
+  const result = Bun.spawnSync({
+    // The same runtime that runs the suite, including a custom Bun executable.
+    cmd: [process.execPath, "run", PROBE, action, key ?? ""],
+    cwd: repoDir,
+    env: isolatedEnv(),
+    stdout: "pipe",
+    stderr: "pipe",
   });
+  const lastLine = result.stdout.toString().trim().split("\n").at(-1);
+  if (!lastLine) {
+    throw new Error(`probe produced no output: ${result.stderr.toString()}`);
+  }
+  const parsed = JSON.parse(lastLine) as ProbeResult;
+  expect(result.exitCode).toBe(parsed.ok ? 0 : 1);
+  return parsed;
+}
 
-  afterAll(async () => {
-    await rm(testTmpDir, { recursive: true, force: true });
-  });
+function gitConfig(key: string): string {
+  return git(["config", "--local", "--get", key], repoDir);
+}
 
-  afterEach(async () => {
-    // Clean up test key if it exists
-    try {
-      await rm(testKeyPath, { force: true });
-    } catch {
-      // Ignore cleanup errors
+function permissions(path: string): number {
+  return statSync(path).mode & 0o777;
+}
+
+// Windows has no POSIX permission bits; the mode assertions only describe
+// runners where `writeFile({ mode })` is enforced.
+const modesEnforced = process.platform !== "win32";
+
+describe("setupSshSigning", () => {
+  test("writes the normalized key with private permissions", () => {
+    expect(probe("setup", DUMMY_KEY)).toEqual({ ok: true });
+
+    expect(readFileSync(keyPath, "utf8")).toBe(DUMMY_KEY + "\n");
+    if (modesEnforced) {
+      expect(permissions(keyPath)).toBe(0o600);
+      expect(permissions(join(homeDir, ".ssh"))).toBe(0o700);
     }
   });
 
-  describe("setupSshSigning file operations", () => {
-    test("should write key file atomically with correct permissions", async () => {
-      // Create the directory with secure permissions (same as setupSshSigning does)
-      await mkdir(testSshDir, { recursive: true, mode: 0o700 });
+  test("keeps a single trailing newline when the key already has one", () => {
+    expect(probe("setup", DUMMY_KEY + "\n")).toEqual({ ok: true });
 
-      // Write key atomically with proper permissions (same as setupSshSigning does)
-      await writeFile(testKeyPath, testKey, { mode: 0o600 });
-
-      // Verify key was written
-      const keyContent = await readFile(testKeyPath, "utf-8");
-      expect(keyContent).toBe(testKey);
-
-      // Verify permissions (0o600 = 384 in decimal for permission bits only)
-      const stats = await stat(testKeyPath);
-      const permissions = stats.mode & 0o777; // Get only permission bits
-      expect(permissions).toBe(0o600);
-    });
-
-    test("should normalize key to have trailing newline", async () => {
-      // ssh-keygen requires a trailing newline to parse the key
-      const keyWithoutNewline =
-        "-----BEGIN OPENSSH PRIVATE KEY-----\ntest-key-content\n-----END OPENSSH PRIVATE KEY-----";
-      const keyWithNewline = keyWithoutNewline + "\n";
-
-      // Create directory
-      await mkdir(testSshDir, { recursive: true, mode: 0o700 });
-
-      // Normalize the key (same logic as setupSshSigning)
-      const normalizedKey = keyWithoutNewline.endsWith("\n")
-        ? keyWithoutNewline
-        : keyWithoutNewline + "\n";
-
-      await writeFile(testKeyPath, normalizedKey, { mode: 0o600 });
-
-      // Verify the written key ends with newline
-      const keyContent = await readFile(testKeyPath, "utf-8");
-      expect(keyContent).toBe(keyWithNewline);
-      expect(keyContent.endsWith("\n")).toBe(true);
-    });
-
-    test("should not add extra newline if key already has one", async () => {
-      const keyWithNewline =
-        "-----BEGIN OPENSSH PRIVATE KEY-----\ntest-key-content\n-----END OPENSSH PRIVATE KEY-----\n";
-
-      await mkdir(testSshDir, { recursive: true, mode: 0o700 });
-
-      // Normalize the key (same logic as setupSshSigning)
-      const normalizedKey = keyWithNewline.endsWith("\n")
-        ? keyWithNewline
-        : keyWithNewline + "\n";
-
-      await writeFile(testKeyPath, normalizedKey, { mode: 0o600 });
-
-      // Verify no double newline
-      const keyContent = await readFile(testKeyPath, "utf-8");
-      expect(keyContent).toBe(keyWithNewline);
-      expect(keyContent.endsWith("\n\n")).toBe(false);
-    });
-
-    test("should create .ssh directory with secure permissions", async () => {
-      // Clean up first
-      await rm(testSshDir, { recursive: true, force: true });
-
-      // Create directory with secure permissions (same as setupSshSigning does)
-      await mkdir(testSshDir, { recursive: true, mode: 0o700 });
-
-      // Verify directory exists
-      const dirStats = await stat(testSshDir);
-      expect(dirStats.isDirectory()).toBe(true);
-
-      // Verify directory permissions
-      const dirPermissions = dirStats.mode & 0o777;
-      expect(dirPermissions).toBe(0o700);
-    });
+    expect(readFileSync(keyPath, "utf8")).toBe(DUMMY_KEY + "\n");
   });
 
-  describe("setupSshSigning validation", () => {
-    test("should reject empty SSH key", () => {
-      const emptyKey = "";
-      expect(() => {
-        if (!emptyKey.trim()) {
-          throw new Error("SSH signing key cannot be empty");
-        }
-      }).toThrow("SSH signing key cannot be empty");
-    });
+  test("configures git to sign commits with that key", () => {
+    probe("setup", DUMMY_KEY);
 
-    test("should reject whitespace-only SSH key", () => {
-      const whitespaceKey = "   \n\t  ";
-      expect(() => {
-        if (!whitespaceKey.trim()) {
-          throw new Error("SSH signing key cannot be empty");
-        }
-      }).toThrow("SSH signing key cannot be empty");
-    });
-
-    test("should reject invalid SSH key format", () => {
-      const invalidKey = "not a valid key";
-      expect(() => {
-        if (
-          !invalidKey.includes("BEGIN") ||
-          !invalidKey.includes("PRIVATE KEY")
-        ) {
-          throw new Error("Invalid SSH private key format");
-        }
-      }).toThrow("Invalid SSH private key format");
-    });
-
-    test("should accept valid SSH key format", () => {
-      const validKey =
-        "-----BEGIN OPENSSH PRIVATE KEY-----\nkey-content\n-----END OPENSSH PRIVATE KEY-----";
-      expect(() => {
-        if (!validKey.trim()) {
-          throw new Error("SSH signing key cannot be empty");
-        }
-        if (!validKey.includes("BEGIN") || !validKey.includes("PRIVATE KEY")) {
-          throw new Error("Invalid SSH private key format");
-        }
-      }).not.toThrow();
-    });
+    expect(gitConfig("gpg.format")).toBe("ssh");
+    expect(gitConfig("user.signingkey")).toBe(keyPath);
+    expect(gitConfig("commit.gpgsign")).toBe("true");
   });
 
-  describe("cleanupSshSigning file operations", () => {
-    test("should remove the signing key file", async () => {
-      // Create the key file first
-      await mkdir(testSshDir, { recursive: true });
-      await writeFile(testKeyPath, testKey, { mode: 0o600 });
+  test.each([
+    ["an empty key", "", "SSH signing key cannot be empty"],
+    ["a whitespace-only key", " \n\t ", "SSH signing key cannot be empty"],
+    ["a non-key string", "not a valid key", "Invalid SSH private key format"],
+  ])("rejects %s without writing a key", (_label, key, message) => {
+    expect(probe("setup", key)).toEqual({ ok: false, message });
 
-      // Verify it exists
-      const existsBefore = await stat(testKeyPath)
-        .then(() => true)
-        .catch(() => false);
-      expect(existsBefore).toBe(true);
-
-      // Clean up (same operation as cleanupSshSigning)
-      await rm(testKeyPath, { force: true });
-
-      // Verify it's gone
-      const existsAfter = await stat(testKeyPath)
-        .then(() => true)
-        .catch(() => false);
-      expect(existsAfter).toBe(false);
-    });
-
-    test("should not throw if key file does not exist", async () => {
-      // Make sure file doesn't exist
-      await rm(testKeyPath, { force: true });
-
-      // Should not throw (rm with force: true doesn't throw on missing files)
-      await expect(rm(testKeyPath, { force: true })).resolves.toBeUndefined();
-    });
+    expect(existsSync(keyPath)).toBe(false);
   });
 });
 
-describe("SSH Signing Mode Detection", () => {
-  test("sshSigningKey should take precedence over useCommitSigning", () => {
-    // When both are set, SSH signing takes precedence
-    const sshSigningKey = "test-key";
-    const useCommitSigning = true;
+describe("cleanupSshSigning", () => {
+  test("removes the key written by setup", () => {
+    probe("setup", DUMMY_KEY);
+    expect(existsSync(keyPath)).toBe(true);
 
-    const useSshSigning = !!sshSigningKey;
-    const useApiCommitSigning = useCommitSigning && !useSshSigning;
+    expect(probe("cleanup")).toEqual({ ok: true });
 
-    expect(useSshSigning).toBe(true);
-    expect(useApiCommitSigning).toBe(false);
+    expect(existsSync(keyPath)).toBe(false);
   });
 
-  test("useCommitSigning should work when sshSigningKey is not set", () => {
-    const sshSigningKey = "";
-    const useCommitSigning = true;
-
-    const useSshSigning = !!sshSigningKey;
-    const useApiCommitSigning = useCommitSigning && !useSshSigning;
-
-    expect(useSshSigning).toBe(false);
-    expect(useApiCommitSigning).toBe(true);
-  });
-
-  test("neither signing method when both are false/empty", () => {
-    const sshSigningKey = "";
-    const useCommitSigning = false;
-
-    const useSshSigning = !!sshSigningKey;
-    const useApiCommitSigning = useCommitSigning && !useSshSigning;
-
-    expect(useSshSigning).toBe(false);
-    expect(useApiCommitSigning).toBe(false);
-  });
-
-  test("git CLI tools should be used when sshSigningKey is set", () => {
-    // This tests the logic in tag mode for tool selection
-    const sshSigningKey = "test-key";
-    const useCommitSigning = true; // Even if this is true
-
-    const useSshSigning = !!sshSigningKey;
-    const useApiCommitSigning = useCommitSigning && !useSshSigning;
-
-    // When SSH signing is used, we should use git CLI (not API)
-    const shouldUseGitCli = !useApiCommitSigning;
-    expect(shouldUseGitCli).toBe(true);
-  });
-
-  test("MCP file ops should only be used with API commit signing", () => {
-    // Case 1: API commit signing
-    {
-      const sshSigningKey = "";
-      const useCommitSigning = true;
-
-      const useSshSigning = !!sshSigningKey;
-      const useApiCommitSigning = useCommitSigning && !useSshSigning;
-
-      expect(useApiCommitSigning).toBe(true);
-    }
-
-    // Case 2: SSH signing (should NOT use API)
-    {
-      const sshSigningKey = "test-key";
-      const useCommitSigning = true;
-
-      const useSshSigning = !!sshSigningKey;
-      const useApiCommitSigning = useCommitSigning && !useSshSigning;
-
-      expect(useApiCommitSigning).toBe(false);
-    }
-
-    // Case 3: No signing (should NOT use API)
-    {
-      const sshSigningKey = "";
-      const useCommitSigning = false;
-
-      const useSshSigning = !!sshSigningKey;
-      const useApiCommitSigning = useCommitSigning && !useSshSigning;
-
-      expect(useApiCommitSigning).toBe(false);
-    }
-  });
-});
-
-describe("Context parsing", () => {
-  test("sshSigningKey should be parsed from environment", () => {
-    // Test that context.ts parses SSH_SIGNING_KEY correctly
-    const testCases = [
-      { env: "test-key", expected: "test-key" },
-      { env: "", expected: "" },
-      { env: undefined, expected: "" },
-    ];
-
-    for (const { env, expected } of testCases) {
-      const result = env || "";
-      expect(result).toBe(expected);
-    }
+  test("is a no-op when no key was written", () => {
+    expect(probe("cleanup")).toEqual({ ok: true });
   });
 });

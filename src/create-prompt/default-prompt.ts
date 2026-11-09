@@ -1,12 +1,12 @@
 import type { FetchDataResult } from "../github/data/fetcher";
-import { sanitizeContent } from "../github/utils/sanitizer";
+import { sanitizeContent } from "../security/sanitizer";
 import { GITHUB_SERVER_URL } from "../github/api/config";
 import { SPINNER_HTML } from "../github/operations/comments/common";
+import { gitPushWrapper } from "../github/operations/git-push";
 import { getEventTypeAndContext } from "./prepare-context";
 import {
   coAuthorTrailer,
   formatGitHubData,
-  gitPushWrapper,
   isCommentEvent,
   wrapInTag,
 } from "./shared";

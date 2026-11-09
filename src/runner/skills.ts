@@ -3,7 +3,7 @@ import { mkdtemp } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { parse as parseShellWords } from "shell-quote";
-import { stripCommentLines } from "./pi-args";
+import { stripCommentLines } from "../utils/input-lines";
 
 /**
  * The skills input: one `gh skill install` call per line, as

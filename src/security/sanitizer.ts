@@ -1,4 +1,4 @@
-import { redactSecretValues } from "../../runner/secret-values";
+import { redactSecretValues } from "./secret-values";
 
 export function stripInvisibleCharacters(content: string): string {
   content = content.replace(/[\u200B\u200C\u200D\uFEFF]/g, "");
@@ -124,43 +124,20 @@ export function redactSecrets(content: string): string {
   return content;
 }
 
+/**
+ * Redact one GitHub token format: `ghp_`, `gho_`, `ghu_`, `ghs_` and `ghr_`
+ * followed by 36 alphanumerics, and the fine-grained `github_pat_` format.
+ * Vendor prefixes anchor the match, so no leading word boundary is needed.
+ */
 export function redactGitHubTokens(content: string): string {
-  // GitHub Personal Access Tokens (classic): ghp_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (40 chars)
   content = content.replace(
-    /ghp_[A-Za-z0-9]{36}\b/g,
+    /gh[pousr]_[A-Za-z0-9]{36}\b/g,
     "[REDACTED_GITHUB_TOKEN]",
   );
-
-  // GitHub OAuth tokens: gho_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (40 chars)
-  content = content.replace(
-    /gho_[A-Za-z0-9]{36}\b/g,
-    "[REDACTED_GITHUB_TOKEN]",
-  );
-
-  // GitHub user-to-server tokens: ghu_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (40 chars)
-  content = content.replace(
-    /ghu_[A-Za-z0-9]{36}\b/g,
-    "[REDACTED_GITHUB_TOKEN]",
-  );
-
-  // GitHub installation tokens: ghs_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (40 chars)
-  content = content.replace(
-    /ghs_[A-Za-z0-9]{36}\b/g,
-    "[REDACTED_GITHUB_TOKEN]",
-  );
-
-  // GitHub refresh tokens: ghr_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (40 chars)
-  content = content.replace(
-    /ghr_[A-Za-z0-9]{36}\b/g,
-    "[REDACTED_GITHUB_TOKEN]",
-  );
-
-  // GitHub fine-grained personal access tokens: github_pat_XXXXXXXXXX (up to 255 chars)
   content = content.replace(
     /github_pat_[A-Za-z0-9_]{11,221}\b/g,
     "[REDACTED_GITHUB_TOKEN]",
   );
-
   return content;
 }
 

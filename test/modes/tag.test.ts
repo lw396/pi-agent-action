@@ -1,7 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { join } from "node:path";
 import { prepareTagMode } from "../../src/modes/tag";
-import { mockIssueCommentContext } from "../mockContext";
+import {
+  mockIssueCommentContext,
+  mockPullRequestCommentContext,
+} from "../mockContext";
 import * as actor from "../../src/github/validation/actor";
 import * as createInitial from "../../src/github/operations/comments/create-initial";
 import * as fetcher from "../../src/github/data/fetcher";
@@ -9,6 +12,7 @@ import * as branch from "../../src/github/operations/branch";
 import * as createPrompt from "../../src/create-prompt";
 import * as mcp from "../../src/mcp/install-mcp-server";
 import * as gitConfig from "../../src/github/operations/git-config";
+import * as gitAuth from "../../src/modes/git-auth";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { runPi } from "../../src/runner/run-pi";
 import { parseToolRules } from "../../src/runner/tool-rules";
@@ -20,10 +24,6 @@ describe("Tag Mode", () => {
   afterEach(() => {
     if (savedActionPath === undefined) delete process.env.GITHUB_ACTION_PATH;
     else process.env.GITHUB_ACTION_PATH = savedActionPath;
-  });
-
-  test("prepareTagMode is exported as a function", () => {
-    expect(typeof prepareTagMode).toBe("function");
   });
 
   describe("git credential configuration", () => {
@@ -46,7 +46,7 @@ describe("Tag Mode", () => {
         replaceCheckoutCredentialsSpy,
         spyOn(actor, "checkHumanActor").mockImplementation(async () => {}),
         spyOn(createInitial, "createInitialComment").mockImplementation(
-          async () => ({ id: 42 }) as any,
+          async () => ({ id: 42, namespace: "issue" }) as any,
         ),
         spyOn(fetcher, "fetchGitHubData").mockImplementation(
           async () => ({ changedFiles: [] }) as any,
@@ -75,41 +75,29 @@ describe("Tag Mode", () => {
       }
     });
 
-    test("uses full git auth on the non-signing path", async () => {
-      const context = { ...mockIssueCommentContext };
-
-      await prepareTagMode({
-        context,
-        octokit: {} as any,
-        githubToken: "test-token",
-        allowedTools: [],
-        untrustedInput: false,
-      });
-
-      expect(configureGitAuthSpy).toHaveBeenCalledTimes(1);
-      expect(configureGitAuthSpy).toHaveBeenCalledWith(
-        "test-token",
-        context,
-        { login: context.inputs.botName, id: parseInt(context.inputs.botId) },
-        false,
+    test("sets git auth up with failures fatal for the run", async () => {
+      const setupGitAuthSpy = spyOn(gitAuth, "setupGitAuth").mockImplementation(
+        async () => "git",
       );
-      // configureGitAuth performs the credential replacement itself; the mock
-      // stands in for it here, so the standalone helper is not invoked.
-      expect(replaceCheckoutCredentialsSpy).not.toHaveBeenCalled();
-    });
+      const context = { ...mockIssueCommentContext };
+      try {
+        await prepareTagMode({
+          context,
+          octokit: {} as any,
+          githubToken: "test-token",
+          allowedTools: [],
+          untrustedInput: true,
+        });
 
-    test("passes the token source to the prompt", async () => {
-      await prepareTagMode({
-        context: { ...mockIssueCommentContext },
-        octokit: {} as any,
-        githubToken: "test-token",
-        githubTokenSource: "app",
-        allowedTools: [],
-        untrustedInput: false,
-      });
-
-      const calls = (createPrompt.createPrompt as any).mock.calls;
-      expect(calls.at(-1)?.[5]).toBe("app");
+        expect(setupGitAuthSpy).toHaveBeenCalledWith({
+          githubToken: "test-token",
+          context,
+          untrustedInput: true,
+          failOnError: true,
+        });
+      } finally {
+        setupGitAuthSpy.mockRestore();
+      }
     });
 
     test("hashes the changed files after checking out the PR's branch", async () => {
@@ -170,28 +158,6 @@ describe("Tag Mode", () => {
       expect(calls).toEqual(["configureGitAuth", "setupBranch"]);
     });
 
-    test("still replaces the checkout credential when API commit signing is enabled", async () => {
-      const context = {
-        ...mockIssueCommentContext,
-        inputs: { ...mockIssueCommentContext.inputs, useCommitSigning: true },
-      };
-
-      await prepareTagMode({
-        context,
-        octokit: {} as any,
-        githubToken: "test-token",
-        allowedTools: [],
-        untrustedInput: false,
-      });
-
-      expect(configureGitAuthSpy).not.toHaveBeenCalled();
-      expect(replaceCheckoutCredentialsSpy).toHaveBeenCalledTimes(1);
-      expect(replaceCheckoutCredentialsSpy).toHaveBeenCalledWith(
-        "test-token",
-        context,
-        false,
-      );
-    });
     test("allows the git commands it needs, and file edits in the workspace", async () => {
       process.env.GITHUB_ACTION_PATH = "/action";
 
@@ -239,6 +205,12 @@ describe("Tag Mode", () => {
         ]),
       );
       expect(result.allowedTools.some((t) => t.startsWith("Bash"))).toBe(false);
+      expect(replaceCheckoutCredentialsSpy).toHaveBeenCalledWith(
+        "test-token",
+        expect.objectContaining({ entityNumber: 55 }),
+        false,
+      );
+      expect(configureGitAuthSpy).not.toHaveBeenCalled();
     });
 
     test("starts the MCP servers for the action's tools that allowed_tools names", async () => {
@@ -258,6 +230,44 @@ describe("Tag Mode", () => {
         "mcp__github_inline_comment__create_inline_comment",
       );
       expect(allowedTools).not.toContain("Bash(npm test)");
+    });
+
+    test("starts tracking and CI servers from its own grants without workflow tool rules", async () => {
+      prepareMcpConfigSpy.mockRestore();
+      const savedToken = process.env.DEFAULT_WORKFLOW_TOKEN;
+      process.env.DEFAULT_WORKFLOW_TOKEN = "workflow-token";
+      const fetchSpy = spyOn(global, "fetch").mockResolvedValue(
+        Response.json({ workflow_runs: [] }),
+      );
+      try {
+        const result = await prepareTagMode({
+          context: { ...mockPullRequestCommentContext },
+          octokit: {} as any,
+          githubToken: "test-token",
+          allowedTools: [],
+          untrustedInput: false,
+        });
+        expect(Object.keys(result.mcpServers).sort()).toEqual([
+          "github_ci",
+          "github_comment",
+        ]);
+        expect(result.mcpServers.github_comment).toMatchObject({
+          env: {
+            TRACKING_COMMENT_ID: "42",
+            TRACKING_COMMENT_NAMESPACE: "issue",
+          },
+        });
+        expect(result.mcpServers.github_ci).toMatchObject({
+          env: {
+            PR_NUMBER: "789",
+            GITHUB_TOKEN: "workflow-token",
+          },
+        });
+      } finally {
+        fetchSpy.mockRestore();
+        if (savedToken === undefined) delete process.env.DEFAULT_WORKFLOW_TOKEN;
+        else process.env.DEFAULT_WORKFLOW_TOKEN = savedToken;
+      }
     });
   });
 
@@ -296,7 +306,7 @@ describe("Tag Mode", () => {
       const spies = [
         spyOn(actor, "checkHumanActor").mockImplementation(async () => {}),
         spyOn(createInitial, "createInitialComment").mockImplementation(
-          async () => ({ id: 42 }) as any,
+          async () => ({ id: 42, namespace: "issue" }) as any,
         ),
         spyOn(fetcher, "fetchGitHubData").mockImplementation(
           async () => ({ changedFiles: [] }) as any,

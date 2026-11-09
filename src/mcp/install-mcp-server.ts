@@ -1,12 +1,10 @@
 import * as core from "@actions/core";
 import { GITHUB_API_URL, GITHUB_SERVER_URL } from "../github/api/config";
-import type { GitHubContext } from "../github/context";
-import { isEntityContext } from "../github/context";
-import { redactSecrets } from "../github/utils/sanitizer";
+import { redactSecrets } from "../security/sanitizer";
 import { Octokit } from "@octokit/rest";
-import type { AutoDetectedMode } from "../modes/detector";
 import type { McpServers } from "../runner/mcp-servers";
 import type { TokenBrokerAddress } from "../github/token-broker";
+import type { TrackingComment } from "../github/operations/comments/tracking-comment";
 import { inlineCommentBufferPath } from "./inline-comment-buffer";
 
 type PrepareConfigParams = {
@@ -18,26 +16,39 @@ type PrepareConfigParams = {
   tokenBroker?: TokenBrokerAddress;
   owner: string;
   repo: string;
-  branch: string;
-  baseBranch: string;
-  trackingCommentId?: string;
+  /** The workflow's tool grants, plus the mode's own grants. */
   allowedTools: string[];
-  mode: AutoDetectedMode;
-  context: GitHubContext;
+  /** The tracking comment the comment server updates, if the run has one. */
+  trackingComment?: TrackingComment;
+  /** The PR whose inline comments and CI status the servers read. */
+  pullRequest?: { number: number; classifyInlineComments: boolean };
+  /**
+   * use_commit_signing: the file ops server commits through the API to this
+   * branch, and creates it from the base branch when it is missing.
+   */
+  fileOps?: { branch: string; baseBranch: string };
+  /** The environment the servers' configuration is read from. */
+  env?: NodeJS.ProcessEnv;
 };
 
 // Build the bun invocation for one of the action's own MCP servers. The
 // flags mirror the entrypoint invocation in action.yml so the server process
 // reads its runtime config from the action directory rather than from the
 // process working directory.
-function bunServerArgs(scriptPath: string): string[] {
-  const actionPath = process.env.GITHUB_ACTION_PATH;
+function bunServerArgs(env: NodeJS.ProcessEnv, scriptPath: string): string[] {
+  const actionPath = env.GITHUB_ACTION_PATH;
   return [
     "--no-env-file",
     `--config=${actionPath}/bunfig.toml`,
     "run",
     `${actionPath}/${scriptPath}`,
   ];
+}
+
+function usesServer(allowedTools: string[], server: string): boolean {
+  return allowedTools.some(
+    (tool) => tool === `mcp__${server}` || tool.startsWith(`mcp__${server}__`),
+  );
 }
 
 async function checkActionsReadPermission(
@@ -48,8 +59,6 @@ async function checkActionsReadPermission(
   try {
     const client = new Octokit({ auth: token, baseUrl: GITHUB_API_URL });
 
-    // Try to list workflow runs - this requires actions:read
-    // We use per_page=1 to minimize the response size
     await client.actions.listWorkflowRunsForRepo({
       owner,
       repo,
@@ -58,7 +67,6 @@ async function checkActionsReadPermission(
 
     return true;
   } catch (error: any) {
-    // Check if it's a permission error
     if (
       error.status === 403 &&
       error.message?.includes("Resource not accessible")
@@ -74,7 +82,9 @@ async function checkActionsReadPermission(
 
 /**
  * The env that gives a server the GitHub token: the broker's address when
- * there is one, so the token itself is not in the server's env.
+ * there is one, so each call asks the action for the current token instead of
+ * keeping the token the server started with. pi starts these servers with
+ * this process's environment, so the token is there either way.
  */
 function githubTokenEnv(
   githubToken: string,
@@ -97,119 +107,78 @@ export async function prepareMcpConfig(
     tokenBroker,
     owner,
     repo,
-    branch,
-    baseBranch,
-    trackingCommentId,
     allowedTools,
-    context,
-    mode,
+    trackingComment,
+    pullRequest,
+    fileOps,
+    env = process.env,
   } = params;
   try {
-    const allowedToolsList = allowedTools || [];
-
-    // Detect if we're in agent mode (explicit prompt provided)
-    const isAgentMode = mode === "agent";
-
-    const hasGitHubCommentTools = allowedToolsList.some(
-      (tool) =>
-        tool === "mcp__github_comment" ||
-        tool.startsWith("mcp__github_comment__"),
+    const hasGitHubCommentTools = usesServer(allowedTools, "github_comment");
+    const hasGitHubMcpTools = usesServer(allowedTools, "github");
+    const hasInlineCommentTools = usesServer(
+      allowedTools,
+      "github_inline_comment",
     );
-
-    const hasGitHubMcpTools = allowedToolsList.some(
-      (tool) => tool === "mcp__github" || tool.startsWith("mcp__github__"),
-    );
-
-    const hasInlineCommentTools = allowedToolsList.some(
-      (tool) =>
-        tool === "mcp__github_inline_comment" ||
-        tool.startsWith("mcp__github_inline_comment__"),
-    );
-
-    const hasGitHubCITools = allowedToolsList.some(
-      (tool) =>
-        tool === "mcp__github_ci" || tool.startsWith("mcp__github_ci__"),
-    );
+    const hasGitHubCITools = usesServer(allowedTools, "github_ci");
 
     const servers: McpServers = {};
 
-    // Include comment server:
-    // - Always in tag mode (for updating the tracking comment)
-    // - Only with explicit tools in agent mode
-    const shouldIncludeCommentServer = !isAgentMode || hasGitHubCommentTools;
-
-    if (shouldIncludeCommentServer) {
+    if (hasGitHubCommentTools) {
       servers.github_comment = {
         command: "bun",
-        args: bunServerArgs("src/mcp/github-comment-server.ts"),
+        args: bunServerArgs(env, "src/mcp/github-comment-server.ts"),
         env: {
           ...githubTokenEnv(githubToken, tokenBroker),
           REPO_OWNER: owner,
           REPO_NAME: repo,
-          ...(trackingCommentId && { TRACKING_COMMENT_ID: trackingCommentId }),
-          GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME || "",
+          ...(trackingComment && {
+            TRACKING_COMMENT_ID: trackingComment.id.toString(),
+            TRACKING_COMMENT_NAMESPACE: trackingComment.namespace,
+          }),
           GITHUB_API_URL: GITHUB_API_URL,
         },
       };
     }
 
-    // Include file ops server when commit signing is enabled
-    if (context.inputs.useCommitSigning) {
+    if (fileOps) {
       servers.github_file_ops = {
         command: "bun",
-        args: bunServerArgs("src/mcp/github-file-ops-server.ts"),
+        args: bunServerArgs(env, "src/mcp/github-file-ops-server.ts"),
         env: {
           ...githubTokenEnv(githubToken, tokenBroker),
           REPO_OWNER: owner,
           REPO_NAME: repo,
-          BRANCH_NAME: branch,
-          BASE_BRANCH: baseBranch,
-          REPO_DIR: process.env.GITHUB_WORKSPACE || process.cwd(),
-          GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME || "",
-          IS_PR: process.env.IS_PR || "false",
+          BRANCH_NAME: fileOps.branch,
+          BASE_BRANCH: fileOps.baseBranch,
+          REPO_DIR: env.GITHUB_WORKSPACE || process.cwd(),
           GITHUB_API_URL: GITHUB_API_URL,
         },
       };
     }
 
-    // Include inline comment server for PRs when requested via allowed tools
-    if (
-      isEntityContext(context) &&
-      context.isPR &&
-      (hasGitHubMcpTools || hasInlineCommentTools)
-    ) {
+    if (pullRequest && (hasGitHubMcpTools || hasInlineCommentTools)) {
       servers.github_inline_comment = {
         command: "bun",
-        args: bunServerArgs("src/mcp/github-inline-comment-server.ts"),
+        args: bunServerArgs(env, "src/mcp/github-inline-comment-server.ts"),
         env: {
           ...githubTokenEnv(githubToken, tokenBroker),
           REPO_OWNER: owner,
           REPO_NAME: repo,
-          PR_NUMBER: context.entityNumber?.toString() || "",
+          PR_NUMBER: pullRequest.number.toString(),
           GITHUB_API_URL: GITHUB_API_URL,
-          CLASSIFY_INLINE_COMMENTS: context.inputs.classifyInlineComments
+          CLASSIFY_INLINE_COMMENTS: pullRequest.classifyInlineComments
             ? "true"
             : "false",
-          // pi passes a server only the env listed here, not RUNNER_TEMP.
-          INLINE_COMMENT_BUFFER: inlineCommentBufferPath(),
+          INLINE_COMMENT_BUFFER: inlineCommentBufferPath(env),
         },
       };
     }
 
-    // CI server is included when:
-    // - In tag mode: when we have a workflow token and context is a PR
-    // - In agent mode: same conditions PLUS explicit CI tools in allowedTools
-    const hasWorkflowToken = !!process.env.DEFAULT_WORKFLOW_TOKEN;
-    const shouldIncludeCIServer =
-      (!isAgentMode || hasGitHubCITools) &&
-      isEntityContext(context) &&
-      context.isPR &&
-      hasWorkflowToken;
-
-    if (shouldIncludeCIServer) {
-      // Verify the token actually has actions:read permission
+    const workflowToken = env.DEFAULT_WORKFLOW_TOKEN;
+    if (hasGitHubCITools && pullRequest && workflowToken) {
       const actuallyHasPermission = await checkActionsReadPermission(
-        process.env.DEFAULT_WORKFLOW_TOKEN || "",
+        workflowToken,
         owner,
         repo,
       );
@@ -224,14 +193,14 @@ export async function prepareMcpConfig(
       } else {
         servers.github_ci = {
           command: "bun",
-          args: bunServerArgs("src/mcp/github-actions-server.ts"),
+          args: bunServerArgs(env, "src/mcp/github-actions-server.ts"),
           env: {
-            // Use workflow github token, not app token
-            GITHUB_TOKEN: process.env.DEFAULT_WORKFLOW_TOKEN!,
+            // The workflow token, not the action's app token.
+            GITHUB_TOKEN: workflowToken,
             REPO_OWNER: owner,
             REPO_NAME: repo,
-            PR_NUMBER: context.entityNumber?.toString() || "",
-            RUNNER_TEMP: process.env.RUNNER_TEMP || "/tmp",
+            PR_NUMBER: pullRequest.number.toString(),
+            RUNNER_TEMP: env.RUNNER_TEMP || "/tmp",
           },
         };
       }

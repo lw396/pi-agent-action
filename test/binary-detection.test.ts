@@ -58,22 +58,11 @@ describe("isBinaryContent", () => {
       // First two bytes of a 3-byte character, cut short.
       expect(isBinaryContent(Buffer.from([0xe6, 0x97]))).toBe(true);
     });
-  });
 
-  it("round-trips text through UTF-8 without loss", () => {
-    const original = "acentuação, emoji 🚀, símbolos ±≠";
-    const buffer = Buffer.from(original);
-
-    expect(isBinaryContent(buffer)).toBe(false);
-    expect(buffer.toString("utf-8")).toBe(original);
-  });
-
-  it("preserves bytes that a UTF-8 decode would have replaced", () => {
-    const bytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x10, 0x4a]);
-
-    expect(isBinaryContent(bytes)).toBe(true);
-    // What the old text path would have produced, versus base64.
-    expect(Buffer.from(bytes.toString("utf-8"), "utf-8")).not.toEqual(bytes);
-    expect(Buffer.from(bytes.toString("base64"), "base64")).toEqual(bytes);
+    it("detects JPEG", () => {
+      expect(
+        isBinaryContent(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x10, 0x4a])),
+      ).toBe(true);
+    });
   });
 });

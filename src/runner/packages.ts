@@ -1,9 +1,10 @@
+import { sep } from "node:path";
 import {
   DefaultPackageManager,
   type DefaultResourceLoader,
   type SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import { stripCommentLines } from "./pi-args";
+import { stripCommentLines } from "../utils/input-lines";
 
 // Restrict npm to registry names with an optional version/range/tag. Local
 // tarballs, aliases and URL dependencies are not package sources for this input.
@@ -89,6 +90,59 @@ export async function resolvePackages(
   } catch (error) {
     throw new Error(
       `packages: installation or loading failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+/**
+ * Load the session's resources, then verify that every package source the
+ * workflow asked for actually loaded. pi warns and skips invalid resources;
+ * an explicit package input must never silently run without its resources.
+ */
+export async function loadPackageResources(
+  resourceLoader: DefaultResourceLoader,
+  agentDir: string,
+  packages: string[],
+): Promise<void> {
+  try {
+    await resourceLoader.reload();
+  } catch (error) {
+    if (packages.length === 0) throw error;
+    throw new Error(
+      `packages: installation or loading failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (packages.length === 0) return;
+
+  const errors = resourceLoader.getExtensions().errors;
+  if (errors.length) {
+    throw new Error(
+      `packages: extension loading failed: ${errors.map((error) => `${error.path}: ${error.error}`).join("; ")}`,
+    );
+  }
+  const skills = resourceLoader.getSkills();
+  const prompts = resourceLoader.getPrompts();
+  const themes = resourceLoader.getThemes();
+  const loadedPaths = new Set([
+    ...skills.skills.map((skill) => skill.filePath),
+    ...prompts.prompts.map((prompt) => prompt.filePath),
+    ...themes.themes.map((theme) => theme.sourceInfo?.path),
+  ]);
+  const failed = [
+    ...skills.diagnostics,
+    ...prompts.diagnostics,
+    ...themes.diagnostics,
+  ].filter(
+    (diagnostic) =>
+      diagnostic.type !== "collision" &&
+      diagnostic.path?.startsWith(`${agentDir}${sep}`) &&
+      !loadedPaths.has(diagnostic.path),
+  );
+  // pi warns and skips invalid resources. Fail on skipped package resources,
+  // but retain its normal warnings for resources that did load and collisions.
+  if (failed.length) {
+    throw new Error(
+      `packages: resource loading failed: ${failed.map((diagnostic) => `${diagnostic.path}: ${diagnostic.message}`).join("; ")}`,
     );
   }
 }

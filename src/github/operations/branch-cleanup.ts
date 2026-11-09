@@ -1,6 +1,5 @@
 import type { Octokits } from "../api/client";
-import { GITHUB_SERVER_URL } from "../api/config";
-import { encodeBranchNameForUrl } from "./comments/common";
+import { createBranchLink } from "./comments/common";
 import { $ } from "bun";
 
 export async function checkAndCommitOrDeleteBranch(
@@ -37,7 +36,6 @@ export async function checkAndCommitOrDeleteBranch(
   }
 
   if (agentBranch) {
-    // First check if the branch exists remotely
     let branchExistsRemotely = false;
     try {
       await octokit.rest.repos.getBranch({
@@ -54,7 +52,6 @@ export async function checkAndCommitOrDeleteBranch(
       }
     }
 
-    // Only proceed if branch exists remotely
     if (!branchExistsRemotely) {
       console.log(
         `Branch ${agentBranch} does not exist remotely, no branch link will be added`,
@@ -62,7 +59,6 @@ export async function checkAndCommitOrDeleteBranch(
       return { shouldDeleteBranch: false, branchLink: "" };
     }
 
-    // Check if the agent made any commits to the branch
     try {
       const { data: comparison } =
         await octokit.rest.repos.compareCommitsWithBasehead({
@@ -71,14 +67,12 @@ export async function checkAndCommitOrDeleteBranch(
           basehead: `${baseBranch}...${agentBranch}`,
         });
 
-      // If there are no commits, check for uncommitted changes if not using commit signing
       if (comparison.total_commits === 0) {
         if (!useCommitSigning) {
           console.log(
             `Branch ${agentBranch} has no commits from the agent, checking for uncommitted changes...`,
           );
 
-          // Check for uncommitted changes using git status
           try {
             // Scoped the same way as the staging below: if the restored config
             // is the only dirty entry there is no real work, and the branch
@@ -91,24 +85,19 @@ export async function checkAndCommitOrDeleteBranch(
             if (hasUncommittedChanges) {
               console.log("Found uncommitted changes, committing them...");
 
-              // Add all changes, minus anything restored from the base branch
               await $`git add -A ${pathspecArgs}`;
 
-              // Commit with a descriptive message
               const runId = process.env.GITHUB_RUN_ID || "unknown";
               const commitMessage = `Auto-commit: Save uncommitted changes from pi\n\nRun ID: ${runId}`;
               await $`git commit -m ${commitMessage}`;
 
-              // Push the changes
               await $`git push origin ${agentBranch}`;
 
               console.log(
                 "✅ Successfully committed and pushed uncommitted changes",
               );
 
-              // Set branch link since we now have commits
-              const branchUrl = `${GITHUB_SERVER_URL}/${owner}/${repo}/tree/${encodeBranchNameForUrl(agentBranch)}`;
-              branchLink = `\n[View branch](${branchUrl})`;
+              branchLink = createBranchLink(owner, repo, agentBranch);
             } else {
               console.log(
                 "No uncommitted changes found, marking branch for deletion",
@@ -117,9 +106,7 @@ export async function checkAndCommitOrDeleteBranch(
             }
           } catch (gitError) {
             console.error("Error checking/committing changes:", gitError);
-            // If we can't check git status, assume the branch might have changes
-            const branchUrl = `${GITHUB_SERVER_URL}/${owner}/${repo}/tree/${encodeBranchNameForUrl(agentBranch)}`;
-            branchLink = `\n[View branch](${branchUrl})`;
+            branchLink = createBranchLink(owner, repo, agentBranch);
           }
         } else {
           console.log(
@@ -128,19 +115,14 @@ export async function checkAndCommitOrDeleteBranch(
           shouldDeleteBranch = true;
         }
       } else {
-        // Only add branch link if there are commits
-        const branchUrl = `${GITHUB_SERVER_URL}/${owner}/${repo}/tree/${encodeBranchNameForUrl(agentBranch)}`;
-        branchLink = `\n[View branch](${branchUrl})`;
+        branchLink = createBranchLink(owner, repo, agentBranch);
       }
     } catch (error) {
       console.error("Error comparing commits on the agent branch:", error);
-      // If we can't compare but the branch exists remotely, include the branch link
-      const branchUrl = `${GITHUB_SERVER_URL}/${owner}/${repo}/tree/${encodeBranchNameForUrl(agentBranch)}`;
-      branchLink = `\n[View branch](${branchUrl})`;
+      branchLink = createBranchLink(owner, repo, agentBranch);
     }
   }
 
-  // Delete the branch if it has no commits
   if (shouldDeleteBranch && agentBranch) {
     try {
       await octokit.rest.git.deleteRef({
@@ -151,7 +133,6 @@ export async function checkAndCommitOrDeleteBranch(
       console.log(`✅ Deleted empty branch: ${agentBranch}`);
     } catch (deleteError) {
       console.error(`Failed to delete branch ${agentBranch}:`, deleteError);
-      // Continue even if deletion fails
     }
   }
 

@@ -8,11 +8,6 @@ import {
 } from "../github/data/formatter";
 import type { EventData, PreparedContext } from "./types";
 
-/** The only push command tag mode permits (see src/modes/tag). */
-export function gitPushWrapper(): string {
-  return `${process.env.GITHUB_ACTION_PATH}/scripts/git-push.sh`;
-}
-
 type CommentEventData = Extract<
   EventData,
   {

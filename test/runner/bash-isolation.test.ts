@@ -12,7 +12,7 @@ import {
   getCurrentTools,
 } from "@earendil-works/pi-ai";
 import { runPi, type RunnerOptions } from "../../src/runner/run-pi";
-import { BASH_ENV_ALLOWLIST } from "../../src/runner/env-allowlist";
+import { BASH_ENV_ALLOWLIST } from "../../src/security/env-allowlist";
 import { fauxRuntime, readExecutionFile, useScratch, rules } from "./harness";
 
 const getScratch = useScratch();

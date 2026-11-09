@@ -1,99 +1,83 @@
 #!/usr/bin/env node
-// GitHub Comment MCP Server - Minimal server that only provides comment update functionality
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { GITHUB_API_URL } from "../github/api/config";
 import { Octokit } from "@octokit/rest";
 import { updateComment } from "../github/operations/comments/update-comment";
-import { redactSecrets, sanitizeContent } from "../github/utils/sanitizer";
+import type { TrackingComment } from "../github/operations/comments/tracking-comment";
+import { redactSecrets, sanitizeContent } from "../security/sanitizer";
 import { currentGitHubToken } from "./github-token";
+import { errorResult, jsonResult, runStdioServer } from "./server-runtime";
 
-// Get repository information from environment variables
-const REPO_OWNER = process.env.REPO_OWNER;
-const REPO_NAME = process.env.REPO_NAME;
+type CommentServerConfig = {
+  owner: string;
+  repo: string;
+  env: NodeJS.ProcessEnv;
+};
 
-if (!REPO_OWNER || !REPO_NAME) {
-  console.error(
-    "Error: REPO_OWNER and REPO_NAME environment variables are required",
-  );
-  process.exit(1);
+function trackingCommentFrom(env: NodeJS.ProcessEnv): TrackingComment {
+  const id = env.TRACKING_COMMENT_ID;
+  if (!id) {
+    throw new Error("TRACKING_COMMENT_ID environment variable is required");
+  }
+  const namespace = env.TRACKING_COMMENT_NAMESPACE;
+  if (namespace !== "issue" && namespace !== "review") {
+    throw new Error(
+      'TRACKING_COMMENT_NAMESPACE environment variable must be "issue" or "review"',
+    );
+  }
+  return { id: parseInt(id, 10), namespace };
 }
 
-const server = new McpServer({
-  name: "GitHub Comment Server",
-  version: "0.0.1",
-});
-
-server.tool(
-  "update_comment",
-  "Update the tracking comment with progress and results (automatically handles both issue and PR comments)",
-  {
-    body: z.string().describe("The updated comment content"),
-  },
-  async ({ body }) => {
-    try {
-      const githubToken = await currentGitHubToken();
-      const trackingCommentId = process.env.TRACKING_COMMENT_ID;
-      const eventName = process.env.GITHUB_EVENT_NAME;
-
-      if (!trackingCommentId) {
-        throw new Error("TRACKING_COMMENT_ID environment variable is required");
-      }
-
-      const owner = REPO_OWNER;
-      const repo = REPO_NAME;
-      const commentId = parseInt(trackingCommentId, 10);
-
-      const octokit = new Octokit({
-        auth: githubToken,
-        baseUrl: GITHUB_API_URL,
-      });
-
-      const isPullRequestReviewComment =
-        eventName === "pull_request_review_comment";
-
-      const sanitizedBody = redactSecrets(sanitizeContent(body));
-
-      const result = await updateComment(octokit, {
-        owner,
-        repo,
-        commentId,
-        body: sanitizedBody,
-        isPullRequestReviewComment,
-      });
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error: ${errorMessage}`,
-          },
-        ],
-        error: errorMessage,
-        isError: true,
-      };
-    }
-  },
-);
-
-async function runServer() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  process.on("exit", () => {
-    server.close();
+function createServer(config: CommentServerConfig): McpServer {
+  const server = new McpServer({
+    name: "GitHub Comment Server",
+    version: "0.0.1",
   });
+
+  server.tool(
+    "update_comment",
+    "Update the tracking comment with progress and results (automatically handles both issue and PR comments)",
+    {
+      body: z.string().describe("The updated comment content"),
+    },
+    async ({ body }) => {
+      try {
+        const githubToken = await currentGitHubToken(config.env);
+        const octokit = new Octokit({
+          auth: githubToken,
+          baseUrl: GITHUB_API_URL,
+        });
+
+        const result = await updateComment(octokit, {
+          owner: config.owner,
+          repo: config.repo,
+          comment: trackingCommentFrom(config.env),
+          body: redactSecrets(sanitizeContent(body)),
+        });
+
+        return jsonResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  return server;
 }
 
-runServer().catch(console.error);
+async function main() {
+  const owner = process.env.REPO_OWNER;
+  const repo = process.env.REPO_NAME;
+  if (!owner || !repo) {
+    console.error(
+      "Error: REPO_OWNER and REPO_NAME environment variables are required",
+    );
+    process.exit(1);
+  }
+  await runStdioServer(createServer({ owner, repo, env: process.env }));
+}
+
+if (import.meta.main) {
+  main().catch(console.error);
+}

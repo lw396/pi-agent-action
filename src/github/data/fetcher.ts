@@ -249,14 +249,11 @@ export function filterCommentsToTriggerTime<
   const triggerTimestamp = new Date(triggerTime).getTime();
 
   return comments.filter((comment) => {
-    // Comment must have been created before trigger (not at or after)
     const createdTimestamp = new Date(comment.createdAt).getTime();
     if (createdTimestamp >= triggerTimestamp) {
       return false;
     }
 
-    // If comment has been edited, the most recent edit must have occurred before trigger
-    // Use lastEditedAt if available, otherwise fall back to updatedAt
     const lastEditTime = comment.lastEditedAt || comment.updatedAt;
     if (lastEditTime) {
       const lastEditTimestamp = new Date(lastEditTime).getTime();
@@ -281,13 +278,11 @@ export function filterReviewsToTriggerTime<
   const triggerTimestamp = new Date(triggerTime).getTime();
 
   return reviews.filter((review) => {
-    // Review must have been submitted before trigger (not at or after)
     const submittedTimestamp = new Date(review.submittedAt).getTime();
     if (submittedTimestamp >= triggerTimestamp) {
       return false;
     }
 
-    // If review has been edited, the most recent edit must have occurred before trigger
     const lastEditTime = review.lastEditedAt || review.updatedAt;
     if (lastEditTime) {
       const lastEditTimestamp = new Date(lastEditTime).getTime();
@@ -313,14 +308,12 @@ export function isBodySafeToUse(
   contextData: { createdAt: string; updatedAt?: string; lastEditedAt?: string },
   triggerTime: string | undefined,
 ): boolean {
-  // If no trigger time is available, we can't validate - allow the body
-  // This maintains backwards compatibility for triggers that don't have timestamps
+  // Triggers without a timestamp cannot be compared against, so they keep the
+  // pre-timestamp behaviour and pass.
   if (!triggerTime) return true;
 
   const triggerTimestamp = new Date(triggerTime).getTime();
 
-  // Check if the body was edited after the trigger
-  // Use lastEditedAt if available (more accurate for body edits), otherwise fall back to updatedAt
   const lastEditTime = contextData.lastEditedAt || contextData.updatedAt;
   if (lastEditTime) {
     const lastEditTimestamp = new Date(lastEditTime).getTime();
@@ -406,7 +399,6 @@ export function hashChangedFiles(
   changedFiles: GitHubFile[],
 ): GitHubFileWithSHA[] {
   return changedFiles.map((file) => {
-    // Don't compute SHA for deleted files
     if (file.changeType === "DELETED") {
       return { ...file, sha: "deleted" };
     }
@@ -447,7 +439,6 @@ export async function fetchGitHubData({
 
   try {
     if (isPR) {
-      // Fetch PR data with all comments and file information
       const prResult = await octokits.graphql<PullRequestQueryResponse>(
         PR_QUERY,
         {
@@ -481,7 +472,6 @@ export async function fetchGitHubData({
         throw new Error(`PR #${prNumber} not found`);
       }
     } else {
-      // Fetch issue data
       const issueResult = await octokits.graphql<IssueQueryResponse>(
         ISSUE_QUERY,
         {
@@ -512,7 +502,6 @@ export async function fetchGitHubData({
     throw new Error(`Failed to fetch ${isPR ? "PR" : "issue"} data`);
   }
 
-  // Prepare all comments for image processing
   const issueComments: CommentWithImages[] = comments
     .filter((c) => c.body && !c.isMinimized)
     .map((c) => ({
@@ -529,14 +518,12 @@ export async function fetchGitHubData({
   // it, review bodies and inline review comments would reach the prompt
   // verbatim regardless of when they landed.
   if (reviewData && reviewData.nodes) {
-    // Drop reviews submitted or edited after the trigger, then filter by actor.
     reviewData.nodes = filterCommentsByActor(
       filterReviewsToTriggerTime(reviewData.nodes, triggerTime),
       includeCommentsByActor,
       excludeCommentsByActor,
     );
 
-    // Apply the same trigger-time + actor filtering to inline review comments.
     reviewData.nodes.forEach((review) => {
       if (review.comments?.nodes) {
         review.comments.nodes = filterCommentsByActor(
@@ -620,13 +607,11 @@ export async function fetchGitHubData({
     allComments,
   );
 
-  // Fetch trigger user display name if username is provided
   let triggerDisplayName: string | null | undefined;
   if (triggerUsername) {
     triggerDisplayName = await fetchUserDisplayName(octokits, triggerUsername);
   }
 
-  // Use the original title from the webhook payload if provided
   if (originalTitle !== undefined) {
     contextData.title = originalTitle;
   }

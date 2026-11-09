@@ -1,4 +1,5 @@
 import { parse as parseShellWords } from "shell-quote";
+import { stripCommentLines } from "../utils/input-lines";
 import {
   parseArgs,
   type Args,
@@ -53,17 +54,6 @@ const SUPPORTED = new Set<keyof Args>([
 
 function flagName(field: string): string {
   return `--${field.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-}
-
-/**
- * Drop whole-line `#` comments from a multi-line input, as Upstream's
- * claude_args allows. Used by pi_args, allowed_tools and disallowed_tools.
- */
-export function stripCommentLines(text: string): string {
-  return text
-    .split("\n")
-    .filter((line) => !line.trim().startsWith("#"))
-    .join("\n");
 }
 
 /** Split pi_args like a shell would, without running anything. */
